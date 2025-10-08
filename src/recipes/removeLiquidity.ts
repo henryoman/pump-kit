@@ -29,7 +29,7 @@ export interface RemoveLiquidityParams {
  * 
  * TODO: This needs to be implemented once the AMM client is complete.
  */
-export function removeLiquidity(params: RemoveLiquidityParams): Instruction {
+export async function removeLiquidity(params: RemoveLiquidityParams): Promise<Instruction> {
   const {
     user,
     baseMint,

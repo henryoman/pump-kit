@@ -30,7 +30,7 @@ export interface ProvideLiquidityParams {
  * TODO: This needs to be implemented once the AMM client is complete.
  * The AMM client needs deposit/withdraw instruction builders similar to the pump client.
  */
-export function provideLiquidity(params: ProvideLiquidityParams): Instruction {
+export async function provideLiquidity(params: ProvideLiquidityParams): Promise<Instruction> {
   const {
     user,
     baseMint,

@@ -43,17 +43,17 @@ export interface CreatePoolParams {
  * 
  * TODO: Complete implementation once we verify the generated instruction signature.
  */
-export function createPool(params: CreatePoolParams) {
+export async function createPool(params: CreatePoolParams) {
   const { user, baseMint, quoteMint, index } = params;
 
   const userAddr = user.address;
   const base = getAddress(baseMint);
   const quote = getAddress(quoteMint);
   
-  // Derive PDAs
-  const pool = poolPda(index, userAddr, base, quote);
-  const lpMint = lpMintPda(pool);
-  const globalConfig = globalConfigPda();
+  // Derive PDAs (all async)
+  const pool = await poolPda(index, userAddr, base, quote);
+  const lpMint = await lpMintPda(pool);
+  const globalConfig = await globalConfigPda();
 
   // TODO: Complete with actual instruction builder once API is confirmed
   throw new Error("createPool not yet implemented - needs generated instruction verification");
@@ -81,21 +81,21 @@ export interface DepositParams {
  * 
  * TODO: Complete implementation once we verify the generated instruction signature.
  */
-export function deposit(params: DepositParams) {
+export async function deposit(params: DepositParams) {
   const { user, baseMint, quoteMint, index, maxBaseIn, maxQuoteIn, minLpOut } = params;
 
   const userAddr = user.address;
   const base = getAddress(baseMint);
   const quote = getAddress(quoteMint);
   
-  // Derive PDAs
-  const pool = poolPda(index, userAddr, base, quote);
-  const lpMint = lpMintPda(pool);
-  const userLp = userLpAta(userAddr, lpMint);
+  // Derive PDAs (all async)
+  const pool = await poolPda(index, userAddr, base, quote);
+  const lpMint = await lpMintPda(pool);
+  const userLp = await userLpAta(userAddr, lpMint);
 
   // Pool token ATAs
-  const poolBaseAta = poolTokenAta(pool, base, getAddress(TOKEN_PROGRAM_ID));
-  const poolQuoteAta = poolTokenAta(pool, quote, getAddress(TOKEN_PROGRAM_ID));
+  const poolBaseAta = await poolTokenAta(pool, base, getAddress(TOKEN_PROGRAM_ID));
+  const poolQuoteAta = await poolTokenAta(pool, quote, getAddress(TOKEN_PROGRAM_ID));
 
   // TODO: Complete with actual instruction builder
   throw new Error("deposit not yet implemented - needs generated instruction verification");
@@ -123,21 +123,21 @@ export interface WithdrawParams {
  * 
  * TODO: Complete implementation once we verify the generated instruction signature.
  */
-export function withdraw(params: WithdrawParams) {
+export async function withdraw(params: WithdrawParams) {
   const { user, baseMint, quoteMint, index, lpAmountIn, minBaseOut, minQuoteOut } = params;
 
   const userAddr = user.address;
   const base = getAddress(baseMint);
   const quote = getAddress(quoteMint);
   
-  // Derive PDAs
-  const pool = poolPda(index, userAddr, base, quote);
-  const lpMint = lpMintPda(pool);
-  const userLp = userLpAta(userAddr, lpMint);
+  // Derive PDAs (all async)
+  const pool = await poolPda(index, userAddr, base, quote);
+  const lpMint = await lpMintPda(pool);
+  const userLp = await userLpAta(userAddr, lpMint);
 
   // Pool token ATAs
-  const poolBaseAta = poolTokenAta(pool, base, getAddress(TOKEN_PROGRAM_ID));
-  const poolQuoteAta = poolTokenAta(pool, quote, getAddress(TOKEN_PROGRAM_ID));
+  const poolBaseAta = await poolTokenAta(pool, base, getAddress(TOKEN_PROGRAM_ID));
+  const poolQuoteAta = await poolTokenAta(pool, quote, getAddress(TOKEN_PROGRAM_ID));
 
   // TODO: Complete with actual instruction builder
   throw new Error("withdraw not yet implemented - needs generated instruction verification");

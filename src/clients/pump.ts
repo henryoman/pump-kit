@@ -162,9 +162,9 @@ export async function sell(params: SellParams) {
 export interface CreateParams {
   /** The user's wallet/signer (will be creator) */
   user: TransactionSigner;
-  /** Token mint (should be pre-generated keypair) */
-  mint: Address | string;
-  /** Mint authority */
+  /** Token mint keypair/signer (should be pre-generated) */
+  mint: TransactionSigner;
+  /** Mint authority address (usually same as user) */
   mintAuthority: Address | string;
   /** Token name */
   name: string;
@@ -172,6 +172,8 @@ export interface CreateParams {
   symbol: string;
   /** Metadata URI */
   uri: string;
+  /** Creator address (usually user's address) */
+  creator?: Address | string;
 }
 
 /**
@@ -180,14 +182,15 @@ export interface CreateParams {
  * For mint + first buy, you'll need to combine this with a buy instruction.
  */
 export async function create(params: CreateParams) {
-  const { user, mint: mintStr, mintAuthority, name, symbol, uri } = params;
+  const { user, mint, mintAuthority, name, symbol, uri, creator } = params;
 
-  const mint = getAddress(mintStr);
+  const mintAddress = mint.address;
+  const creatorAddress = creator ? getAddress(creator) : user.address;
   
   // Derive PDAs (all async)
   const global = await globalPda();
-  const bondingCurve = await bondingCurvePda(mint);
-  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mint);
+  const bondingCurve = await bondingCurvePda(mintAddress);
+  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mintAddress);
   
   // Metadata PDA (Metaplex standard)
   // Seed: ["metadata", metadataProgram, mint]
@@ -196,7 +199,7 @@ export async function create(params: CreateParams) {
     seeds: [
       new TextEncoder().encode("metadata"),
       getAddress("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"),
-      mint,
+      mintAddress,
     ],
   });
 
@@ -220,6 +223,7 @@ export async function create(params: CreateParams) {
     name,
     symbol,
     uri,
+    creator: creatorAddress,
   });
 }
 

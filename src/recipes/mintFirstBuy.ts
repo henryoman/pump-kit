@@ -9,9 +9,9 @@ import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/sl
 export interface MintWithFirstBuyParams {
   /** User's wallet/signer (will be the creator) */
   user: TransactionSigner;
-  /** Pre-generated mint keypair address */
-  mint: Address | string;
-  /** Mint authority (usually same as user) */
+  /** Pre-generated mint keypair/signer */
+  mint: TransactionSigner;
+  /** Mint authority address (usually same as user) */
   mintAuthority: Address | string;
   /** Token name */
   name: string;
@@ -68,11 +68,11 @@ export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<
     uri,
   });
 
-  // Build buy instruction with slippage
+  // Build buy instruction with slippage (use mint address, not the signer)
   const maxSolCostLamports = addSlippage(estimatedFirstBuyCost, slippageBps);
   const buyInstruction = await buildBuyInstruction({
     user,
-    mint,
+    mint: mint.address,
     tokenAmount: firstBuyTokenAmount,
     maxSolCostLamports,
     feeRecipient,
