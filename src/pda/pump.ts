@@ -14,22 +14,24 @@ const enc = new TextEncoder();
  * Derives the global state PDA.
  * Seed: ["global"]
  */
-export function globalPda(): Address {
-  return getProgramDerivedAddress({
+export async function globalPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("global")],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the bonding curve PDA for a given mint.
  * Seed: ["bonding-curve", mint]
  */
-export function bondingCurvePda(mint: Address | string): Address {
-  return getProgramDerivedAddress({
+export async function bondingCurvePda(mint: Address | string): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("bonding-curve"), getAddress(mint)],
-  })[0];
+  });
+  return address;
 }
 
 /**
@@ -37,54 +39,59 @@ export function bondingCurvePda(mint: Address | string): Address {
  * This is where the bonding curve holds its tokens.
  * Owner: bondingCurve, Mint: mint, TokenProgram: TOKEN_PROGRAM_ID
  */
-export function associatedBondingCurveAta(bondingCurve: Address | string, mint: Address | string): Address {
-  return findAssociatedTokenPda({
+export async function associatedBondingCurveAta(bondingCurve: Address | string, mint: Address | string): Promise<Address> {
+  const [address] = await findAssociatedTokenPda({
     owner: getAddress(bondingCurve),
     mint: getAddress(mint),
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the creator vault PDA.
  * Seed: ["creator-vault", creator]
  */
-export function creatorVaultPda(creator: Address | string): Address {
-  return getProgramDerivedAddress({
+export async function creatorVaultPda(creator: Address | string): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("creator-vault"), getAddress(creator)],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the global volume accumulator PDA.
  * Seed: ["global_volume_accumulator"]
  */
-export function globalVolumeAccumulatorPda(): Address {
-  return getProgramDerivedAddress({
+export async function globalVolumeAccumulatorPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("global_volume_accumulator")],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the user volume accumulator PDA.
  * Seed: ["user_volume_accumulator", user]
  */
-export function userVolumeAccumulatorPda(user: Address | string): Address {
-  return getProgramDerivedAddress({
+export async function userVolumeAccumulatorPda(user: Address | string): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("user_volume_accumulator"), getAddress(user)],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the event authority PDA.
  * Seed: ["__event_authority"]
  */
-export function eventAuthorityPda(): Address {
-  return getProgramDerivedAddress({
+export async function eventAuthorityPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("__event_authority")],
-  })[0];
+  });
+  return address;
 }

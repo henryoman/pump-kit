@@ -25,7 +25,7 @@ export interface SellWithSlippageParams {
  * Build a sell instruction with automatic slippage calculation.
  * Takes an estimated SOL output and subtracts slippage to create the min SOL output.
  */
-export function sellWithSlippage(params: SellWithSlippageParams): Instruction {
+export async function sellWithSlippage(params: SellWithSlippageParams): Promise<Instruction> {
   const {
     user,
     mint,
@@ -43,7 +43,7 @@ export function sellWithSlippage(params: SellWithSlippageParams): Instruction {
   // Calculate min SOL output with slippage protection
   const minSolOutputLamports = subSlippage(estimatedSolOut, slippageBps);
 
-  return buildSellInstruction({
+  return await buildSellInstruction({
     user,
     mint,
     tokenAmount,
@@ -65,13 +65,13 @@ export interface SimpleSellParams {
   trackVolume?: boolean;
 }
 
-export function sellSimple(params: SimpleSellParams): Instruction {
+export async function sellSimple(params: SimpleSellParams): Promise<Instruction> {
   const { user, mint, tokenAmount, minSolOutputLamports, feeRecipient, trackVolume = true } = params;
 
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
   if (minSolOutputLamports < 0n) throw new Error("Min SOL output cannot be negative");
 
-  return buildSellInstruction({
+  return await buildSellInstruction({
     user,
     mint,
     tokenAmount,

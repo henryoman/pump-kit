@@ -14,18 +14,18 @@ const enc = new TextEncoder();
  * Derives the pool PDA.
  * Seed: ["pool", index:u16 (little-endian), creator, baseMint, quoteMint]
  */
-export function poolPda(
+export async function poolPda(
   index: number,
   creator: Address | string,
   baseMint: Address | string,
   quoteMint: Address | string
-): Address {
+): Promise<Address> {
   // Encode index as little-endian u16
   const indexBytes = new Uint8Array(2);
   indexBytes[0] = index & 0xff;
   indexBytes[1] = (index >> 8) & 0xff;
 
-  return getProgramDerivedAddress({
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
     seeds: [
       enc.encode("pool"),
@@ -34,18 +34,20 @@ export function poolPda(
       getAddress(baseMint),
       getAddress(quoteMint),
     ],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the LP (Liquidity Provider) mint PDA for a pool.
  * Seed: ["pool_lp_mint", pool]
  */
-export function lpMintPda(pool: Address | string): Address {
-  return getProgramDerivedAddress({
+export async function lpMintPda(pool: Address | string): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
     seeds: [enc.encode("pool_lp_mint"), getAddress(pool)],
-  })[0];
+  });
+  return address;
 }
 
 /**
@@ -53,59 +55,64 @@ export function lpMintPda(pool: Address | string): Address {
  * Uses Token-2022 program for LP tokens.
  * Owner: user, Mint: lpMint, TokenProgram: TOKEN_2022_PROGRAM_ID
  */
-export function userLpAta(user: Address | string, lpMint: Address | string): Address {
-  return findATA2022({
+export async function userLpAta(user: Address | string, lpMint: Address | string): Promise<Address> {
+  const [address] = await findATA2022({
     owner: getAddress(user),
     mint: getAddress(lpMint),
     tokenProgram: getAddress(TOKEN_2022_PROGRAM_ID),
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the pool's token ATA for holding base or quote tokens.
  * Owner: pool, Mint: tokenMint, TokenProgram: tokenProgram
  */
-export function poolTokenAta(
+export async function poolTokenAta(
   pool: Address | string,
   tokenMint: Address | string,
   tokenProgram: Address | string
-): Address {
-  return findATA2022({
+): Promise<Address> {
+  const [address] = await findATA2022({
     owner: getAddress(pool),
     mint: getAddress(tokenMint),
     tokenProgram: getAddress(tokenProgram),
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the global config PDA.
  * Seed: ["global_config"]
  */
-export function globalConfigPda(): Address {
-  return getProgramDerivedAddress({
+export async function globalConfigPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
     seeds: [enc.encode("global_config")],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the global volume accumulator PDA.
  * Seed: ["global_volume_accumulator"]
  */
-export function globalVolumeAccumulatorPda(): Address {
-  return getProgramDerivedAddress({
+export async function globalVolumeAccumulatorPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
     seeds: [enc.encode("global_volume_accumulator")],
-  })[0];
+  });
+  return address;
 }
 
 /**
  * Derives the user volume accumulator PDA.
  * Seed: ["user_volume_accumulator", user]
  */
-export function userVolumeAccumulatorPda(user: Address | string): Address {
-  return getProgramDerivedAddress({
+export async function userVolumeAccumulatorPda(user: Address | string): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
     seeds: [enc.encode("user_volume_accumulator"), getAddress(user)],
-  })[0];
+  });
+  return address;
 }

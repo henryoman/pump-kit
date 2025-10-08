@@ -25,7 +25,7 @@ export interface BuyWithSlippageParams {
  * Build a buy instruction with automatic slippage calculation.
  * Takes an estimated SOL cost and adds slippage to create the max SOL cost.
  */
-export function buyWithSlippage(params: BuyWithSlippageParams): Instruction {
+export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<Instruction> {
   const {
     user,
     mint,
@@ -43,7 +43,7 @@ export function buyWithSlippage(params: BuyWithSlippageParams): Instruction {
   // Calculate max SOL cost with slippage
   const maxSolCostLamports = addSlippage(estimatedSolCost, slippageBps);
 
-  return buildBuyInstruction({
+  return await buildBuyInstruction({
     user,
     mint,
     tokenAmount,
@@ -65,13 +65,13 @@ export interface SimpleBuyParams {
   trackVolume?: boolean;
 }
 
-export function buySimple(params: SimpleBuyParams): Instruction {
+export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
   const { user, mint, tokenAmount, maxSolCostLamports, feeRecipient, trackVolume = true } = params;
 
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
   if (maxSolCostLamports <= 0n) throw new Error("Max SOL cost must be positive");
 
-  return buildBuyInstruction({
+  return await buildBuyInstruction({
     user,
     mint,
     tokenAmount,

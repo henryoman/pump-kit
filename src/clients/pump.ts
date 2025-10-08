@@ -46,7 +46,7 @@ export interface BuyParams {
 /**
  * Build a buy instruction for purchasing tokens from the bonding curve.
  */
-export function buy(params: BuyParams) {
+export async function buy(params: BuyParams) {
   const {
     user,
     mint: mintStr,
@@ -59,19 +59,19 @@ export function buy(params: BuyParams) {
   const mint = getAddress(mintStr);
   const userAddr = user.address;
   
-  // Derive PDAs
-  const global = globalPda();
-  const bondingCurve = bondingCurvePda(mint);
-  const associatedBondingCurve = associatedBondingCurveAta(bondingCurve, mint);
-  const associatedUser = findAssociatedTokenPda({
+  // Derive PDAs (all async)
+  const global = await globalPda();
+  const bondingCurve = await bondingCurvePda(mint);
+  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mint);
+  const [associatedUser] = await findAssociatedTokenPda({
     owner: userAddr,
     mint,
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-  })[0];
-  const creatorVault = creatorVaultPda(bondingCurve);
-  const eventAuthority = eventAuthorityPda();
-  const globalVolumeAccumulator = globalVolumeAccumulatorPda();
-  const userVolumeAccumulator = userVolumeAccumulatorPda(userAddr);
+  });
+  const creatorVault = await creatorVaultPda(bondingCurve);
+  const eventAuthority = await eventAuthorityPda();
+  const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
+  const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
 
   return getBuyInstruction({
     global,
@@ -114,7 +114,7 @@ export interface SellParams {
 /**
  * Build a sell instruction for selling tokens back to the bonding curve.
  */
-export function sell(params: SellParams) {
+export async function sell(params: SellParams) {
   const {
     user,
     mint: mintStr,
@@ -127,19 +127,17 @@ export function sell(params: SellParams) {
   const mint = getAddress(mintStr);
   const userAddr = user.address;
   
-  // Derive PDAs (same as buy)
-  const global = globalPda();
-  const bondingCurve = bondingCurvePda(mint);
-  const associatedBondingCurve = associatedBondingCurveAta(bondingCurve, mint);
-  const associatedUser = findAssociatedTokenPda({
+  // Derive PDAs (all async)
+  const global = await globalPda();
+  const bondingCurve = await bondingCurvePda(mint);
+  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mint);
+  const [associatedUser] = await findAssociatedTokenPda({
     owner: userAddr,
     mint,
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-  })[0];
-  const creatorVault = creatorVaultPda(bondingCurve);
-  const eventAuthority = eventAuthorityPda();
-  const globalVolumeAccumulator = globalVolumeAccumulatorPda();
-  const userVolumeAccumulator = userVolumeAccumulatorPda(userAddr);
+  });
+  const creatorVault = await creatorVaultPda(bondingCurve);
+  const eventAuthority = await eventAuthorityPda();
 
   return getSellInstruction({
     global,
@@ -181,27 +179,28 @@ export interface CreateParams {
  * Note: This creates the token but doesn't include a first buy.
  * For mint + first buy, you'll need to combine this with a buy instruction.
  */
-export function create(params: CreateParams) {
+export async function create(params: CreateParams) {
   const { user, mint: mintStr, mintAuthority, name, symbol, uri } = params;
 
   const mint = getAddress(mintStr);
-  const userAddr = user.address;
   
-  // Derive PDAs
-  const global = globalPda();
-  const bondingCurve = bondingCurvePda(mint);
-  const associatedBondingCurve = associatedBondingCurveAta(bondingCurve, mint);
+  // Derive PDAs (all async)
+  const global = await globalPda();
+  const bondingCurve = await bondingCurvePda(mint);
+  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mint);
   
   // Metadata PDA (Metaplex standard)
   // Seed: ["metadata", metadataProgram, mint]
-  const metadataPda = getProgramDerivedAddress({
+  const [metadataPda] = await getProgramDerivedAddress({
     programAddress: getAddress("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"),
     seeds: [
       new TextEncoder().encode("metadata"),
       getAddress("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"),
       mint,
     ],
-  })[0];
+  });
+
+  const eventAuthority = await eventAuthorityPda();
 
   return getCreateInstruction({
     mint,
@@ -216,7 +215,7 @@ export function create(params: CreateParams) {
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
     associatedTokenProgram: getAddress("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
     rent: getAddress("SysvarRent111111111111111111111111111111111"),
-    eventAuthority: eventAuthorityPda(),
+    eventAuthority,
     program: getAddress(PUMP_PROGRAM_ID),
     name,
     symbol,

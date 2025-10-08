@@ -14,12 +14,13 @@ import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "../config/addresses";
  * @param mint Token mint address
  * @returns ATA address
  */
-export function ata(owner: string | Address, mint: string | Address): Address {
-  return findATA({
+export async function ata(owner: string | Address, mint: string | Address): Promise<Address> {
+  const [address] = await findATA({
     owner: getAddress(owner),
     mint: getAddress(mint),
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-  })[0];
+  });
+  return address;
 }
 
 /**
@@ -28,10 +29,11 @@ export function ata(owner: string | Address, mint: string | Address): Address {
  * @param mint Token mint address
  * @returns ATA address
  */
-export function ata2022(owner: string | Address, mint: string | Address): Address {
-  return findATA2022({
+export async function ata2022(owner: string | Address, mint: string | Address): Promise<Address> {
+  const [address] = await findATA2022({
     owner: getAddress(owner),
     mint: getAddress(mint),
     tokenProgram: getAddress(TOKEN_2022_PROGRAM_ID),
-  })[0];
+  });
+  return address;
 }

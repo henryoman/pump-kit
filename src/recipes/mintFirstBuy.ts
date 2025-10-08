@@ -33,10 +33,10 @@ export interface MintWithFirstBuyParams {
  * Build instructions for minting a new token and making the first purchase.
  * Returns both create and buy instructions to be included in a single transaction.
  */
-export function mintWithFirstBuy(params: MintWithFirstBuyParams): {
+export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<{
   createInstruction: Instruction;
   buyInstruction: Instruction;
-} {
+}> {
   const {
     user,
     mint,
@@ -59,7 +59,7 @@ export function mintWithFirstBuy(params: MintWithFirstBuyParams): {
   if (estimatedFirstBuyCost <= 0n) throw new Error("Estimated first buy cost must be positive");
 
   // Build create instruction
-  const createInstruction = buildCreateInstruction({
+  const createInstruction = await buildCreateInstruction({
     user,
     mint,
     mintAuthority,
@@ -70,7 +70,7 @@ export function mintWithFirstBuy(params: MintWithFirstBuyParams): {
 
   // Build buy instruction with slippage
   const maxSolCostLamports = addSlippage(estimatedFirstBuyCost, slippageBps);
-  const buyInstruction = buildBuyInstruction({
+  const buyInstruction = await buildBuyInstruction({
     user,
     mint,
     tokenAmount: firstBuyTokenAmount,
