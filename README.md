@@ -1,3 +1,8 @@
+to-do:
+add code
+generate idl codama stuff
+release
+
 # pump-kit
 
 To install dependencies:
@@ -12,4 +17,4 @@ To run:
 bun run index.ts
 ```
 
-This project was created using `bun init` in bun v1.2.23. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+This project was created using bun init` in bun v1.2.23. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
