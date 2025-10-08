@@ -1,9 +1,10 @@
-# pump-kit
+# pump-kit --- first release coming around October 15!
 
-> **Minimal, fast SDK for Pump.fun bonding curves and AMM pools**  
+> **Minimal, fast SDK for Pump.fun bonding curves and AMM pools**
 > Built with Bun + TypeScript + Solana Kit 3.0 + Codama
 
 A TypeScript SDK exposing the core user flows for Pump.fun:
+
 - **mint (with first buy)** — Create a new token with initial purchase
 - **buy** — Purchase tokens from bonding curve
 - **sell** — Sell tokens back to bonding curve
@@ -64,6 +65,7 @@ export SOLANA_TX_TIMEOUT_MS="60000"
 ### Bonding Curve Operations
 
 #### `buy(args)`
+
 Buy tokens from the bonding curve.
 
 ```typescript
@@ -77,6 +79,7 @@ await buy({
 ```
 
 #### `sell(args)`
+
 Sell tokens back to the bonding curve.
 
 ```typescript
@@ -90,6 +93,7 @@ await sell({
 ```
 
 #### `sellPercent(args)`
+
 Sell a percentage of token holdings (0-100).
 
 ```typescript
@@ -103,6 +107,7 @@ await sellPercent({
 ```
 
 #### `mintWithFirstBuy(args)`
+
 Create a new token with initial purchase.
 
 ```typescript
@@ -121,6 +126,7 @@ await mintWithFirstBuy({
 ### AMM Pool Operations
 
 #### `provideLiquidity(args)`
+
 Add liquidity to a Pump AMM pool.
 
 ```typescript
@@ -136,6 +142,7 @@ await provideLiquidity({
 ```
 
 #### `removeLiquidity(args)`
+
 Remove liquidity from a Pump AMM pool.
 
 ```typescript
@@ -153,11 +160,13 @@ await removeLiquidity({
 ## Examples
 
 See the `examples/` directory:
+
 - `quickstart.ts` — Basic operations walkthrough
 - `sell-percentage.ts` — Selling by percentage
 - `liquidity.ts` — Managing AMM liquidity
 
 Run examples:
+
 ```bash
 SOLANA_RPC=https://api.mainnet-beta.solana.com bun run examples/quickstart.ts
 ```
@@ -210,12 +219,14 @@ src/
 ## Status
 
 ⚠️ **Work in Progress** — Core structure is in place, but client implementations need:
+
 1. Proper PDA derivation using @solana/kit
 2. Account resolution for instructions
 3. Transaction building, signing, and sending
 4. Real-world testing with live programs
 
 The skeleton provides the foundation. Next steps:
+
 - Implement PDA helpers in `pumpsdk/pda.ts` and `ammsdk/pda.ts`
 - Complete transaction building in client methods
 - Add comprehensive error handling
