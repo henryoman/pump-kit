@@ -3,12 +3,13 @@
  * These functions derive all the necessary accounts for interacting with liquidity pools.
  */
 
-import { getProgramDerivedAddress, address as getAddress } from "@solana/kit";
+import { getProgramDerivedAddress, address as getAddress, getAddressEncoder } from "@solana/kit";
 import type { Address } from "@solana/kit";
 import { PUMP_AMM_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "../config/addresses";
 import { findAssociatedTokenPda as findATA2022 } from "@solana-program/token-2022";
 
 const enc = new TextEncoder();
+const addressEncoder = getAddressEncoder();
 
 /**
  * Derives the pool PDA.
@@ -30,9 +31,9 @@ export async function poolPda(
     seeds: [
       enc.encode("pool"),
       indexBytes,
-      getAddress(creator),
-      getAddress(baseMint),
-      getAddress(quoteMint),
+      addressEncoder.encode(getAddress(creator)),
+      addressEncoder.encode(getAddress(baseMint)),
+      addressEncoder.encode(getAddress(quoteMint)),
     ],
   });
   return address;
@@ -45,7 +46,7 @@ export async function poolPda(
 export async function lpMintPda(pool: Address | string): Promise<Address> {
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
-    seeds: [enc.encode("pool_lp_mint"), getAddress(pool)],
+    seeds: [enc.encode("pool_lp_mint"), addressEncoder.encode(getAddress(pool))],
   });
   return address;
 }
@@ -112,7 +113,7 @@ export async function globalVolumeAccumulatorPda(): Promise<Address> {
 export async function userVolumeAccumulatorPda(user: Address | string): Promise<Address> {
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
-    seeds: [enc.encode("user_volume_accumulator"), getAddress(user)],
+    seeds: [enc.encode("user_volume_accumulator"), addressEncoder.encode(getAddress(user))],
   });
   return address;
 }

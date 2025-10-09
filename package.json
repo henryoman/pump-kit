@@ -24,19 +24,24 @@
     "build:types": "tsc -p tsconfig.build.json",
     "build": "rm -rf dist && bun run build:js && bun run build:types",
     "codegen": "bun run scripts/codama-generate.ts",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@codama/nodes-from-anchor": "^1.2.9",
     "@codama/renderers-js": "^1.4.2",
-    "@types/bun": "latest",
-    "@types/node": "^24.7.0",
+    "@types/bun": "^1.2.23",
+    "@types/node": "^24.7.1",
     "codama": "^1.3.7",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@solana-program/token": "^0.6.0",
     "@solana-program/token-2022": "^0.5.0",
-    "@solana/kit": "^3.0.3"
+    "@solana/kit": "^4.0.0"
   }
 }

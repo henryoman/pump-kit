@@ -3,12 +3,13 @@
  * These functions derive all the necessary accounts for interacting with the program.
  */
 
-import { getProgramDerivedAddress, address as getAddress } from "@solana/kit";
+import { getProgramDerivedAddress, address as getAddress, getAddressEncoder } from "@solana/kit";
 import type { Address } from "@solana/kit";
 import { PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
 import { findAssociatedTokenPda } from "@solana-program/token";
 
 const enc = new TextEncoder();
+const addressEncoder = getAddressEncoder();
 
 /**
  * Derives the global state PDA.
@@ -29,7 +30,7 @@ export async function globalPda(): Promise<Address> {
 export async function bondingCurvePda(mint: Address | string): Promise<Address> {
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
-    seeds: [enc.encode("bonding-curve"), getAddress(mint)],
+    seeds: [enc.encode("bonding-curve"), addressEncoder.encode(getAddress(mint))],
   });
   return address;
 }
@@ -55,7 +56,7 @@ export async function associatedBondingCurveAta(bondingCurve: Address | string, 
 export async function creatorVaultPda(creator: Address | string): Promise<Address> {
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
-    seeds: [enc.encode("creator-vault"), getAddress(creator)],
+    seeds: [enc.encode("creator-vault"), addressEncoder.encode(getAddress(creator))],
   });
   return address;
 }
@@ -79,7 +80,7 @@ export async function globalVolumeAccumulatorPda(): Promise<Address> {
 export async function userVolumeAccumulatorPda(user: Address | string): Promise<Address> {
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
-    seeds: [enc.encode("user_volume_accumulator"), getAddress(user)],
+    seeds: [enc.encode("user_volume_accumulator"), addressEncoder.encode(getAddress(user))],
   });
   return address;
 }
