@@ -1,3 +1,5 @@
+![Pump Kit](pump-kit.jpeg)
+
 # 🚀 Pump Kit
 
 > **The fastest, most modern TypeScript SDK for Pump.fun**  
@@ -861,4 +863,5 @@ This SDK is community-built and not officially affiliated with Pump.fun. Use at 
 **Built with ❤️ by the Solana community**
 
 [GitHub](https://github.com/yourusername/pump-kit) • [Twitter](https://twitter.com/yourhandle) • [Discord](https://discord.gg/yourserver)
+
 
