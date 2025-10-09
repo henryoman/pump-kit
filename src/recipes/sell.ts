@@ -2,15 +2,19 @@
  * Sell recipe - sell tokens back to the bonding curve with slippage protection.
  */
 
-import type { TransactionSigner, Instruction } from "@solana/kit";
+import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { sell as buildSellInstruction } from "../clients/pump";
-import { subSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
+import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
+import { DEFAULT_SLIPPAGE_BPS, subSlippage, validateSlippage } from "../utils/slippage";
+
+type RpcClient = Parameters<typeof buildSellInstruction>[0]["rpc"];
+type CommitmentLevel = Parameters<typeof buildSellInstruction>[0]["commitment"];
 
 export interface SellWithSlippageParams {
   /** User's wallet/signer */
   user: TransactionSigner;
   /** Token mint address */
-  mint: string;
+  mint: Address | string;
   /** Amount of tokens to sell */
   tokenAmount: bigint;
   /** Estimated SOL output in lamports (will subtract slippage) */
@@ -18,7 +22,13 @@ export interface SellWithSlippageParams {
   /** Slippage tolerance in basis points (default: 50 = 0.5%) */
   slippageBps?: number;
   /** Fee recipient address */
-  feeRecipient: string;
+  feeRecipient?: Address | string;
+  /** Optional override to skip fetching the bonding curve account */
+  bondingCurveCreator?: Address | string;
+  /** Optional RPC client override */
+  rpc?: RpcClient;
+  /** Optional commitment override */
+  commitment?: CommitmentLevel;
 }
 
 /**
@@ -32,7 +42,10 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
     tokenAmount,
     estimatedSolOut,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
-    feeRecipient,
+    feeRecipient = DEFAULT_FEE_RECIPIENT,
+    bondingCurveCreator,
+    rpc,
+    commitment,
   } = params;
 
   // Validate inputs
@@ -49,7 +62,9 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
     tokenAmount,
     minSolOutputLamports,
     feeRecipient,
-    trackVolume: true,
+    bondingCurveCreator,
+    rpc,
+    commitment,
   });
 }
 
@@ -58,15 +73,26 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
  */
 export interface SimpleSellParams {
   user: TransactionSigner;
-  mint: string;
+  mint: Address | string;
   tokenAmount: bigint;
   minSolOutputLamports: bigint;
-  feeRecipient: string;
-  trackVolume?: boolean;
+  feeRecipient?: Address | string;
+  bondingCurveCreator?: Address | string;
+  rpc?: RpcClient;
+  commitment?: CommitmentLevel;
 }
 
 export async function sellSimple(params: SimpleSellParams): Promise<Instruction> {
-  const { user, mint, tokenAmount, minSolOutputLamports, feeRecipient, trackVolume = true } = params;
+  const {
+    user,
+    mint,
+    tokenAmount,
+    minSolOutputLamports,
+    feeRecipient = DEFAULT_FEE_RECIPIENT,
+    bondingCurveCreator,
+    rpc,
+    commitment,
+  } = params;
 
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
   if (minSolOutputLamports < 0n) throw new Error("Min SOL output cannot be negative");
@@ -77,6 +103,8 @@ export async function sellSimple(params: SimpleSellParams): Promise<Instruction>
     tokenAmount,
     minSolOutputLamports,
     feeRecipient,
-    trackVolume,
+    bondingCurveCreator,
+    rpc,
+    commitment,
   });
 }

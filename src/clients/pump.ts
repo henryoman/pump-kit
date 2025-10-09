@@ -21,12 +21,18 @@ import {
   globalVolumeAccumulatorPda,
   userVolumeAccumulatorPda,
   eventAuthorityPda,
+  feeConfigPda,
 } from "../pda/pump";
 import {
   getBuyInstruction,
   getSellInstruction,
   getCreateInstruction,
 } from "../pumpsdk/generated/instructions";
+import { fetchBondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
+import { rpc as defaultRpc, defaultCommitment } from "../config/rpc";
+
+type RpcClient = Parameters<typeof fetchBondingCurve>[0];
+type Commitment = "processed" | "confirmed" | "finalized";
 
 export interface BuyParams {
   /** The user's wallet/signer */
@@ -41,6 +47,12 @@ export interface BuyParams {
   feeRecipient: Address | string;
   /** Whether to track volume (default: true) */
   trackVolume?: boolean;
+  /** Optional bonding curve creator (skips RPC lookup) */
+  bondingCurveCreator?: Address | string;
+  /** Optional RPC client */
+  rpc?: RpcClient;
+  /** Optional commitment level */
+  commitment?: Commitment;
 }
 
 /**
@@ -54,25 +66,57 @@ export async function buy(params: BuyParams) {
     maxSolCostLamports,
     feeRecipient,
     trackVolume = true,
+    bondingCurveCreator,
+    rpc = defaultRpc,
+    commitment = defaultCommitment,
   } = params;
 
   const mint = getAddress(mintStr);
   const userAddr = user.address;
-  
-  // Derive PDAs (all async)
-  const global = await globalPda();
   const bondingCurve = await bondingCurvePda(mint);
-  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mint);
-  const [associatedUser] = await findAssociatedTokenPda({
+
+  const feeConfigPromise = feeConfigPda();
+  const globalPromise = globalPda();
+  const eventAuthorityPromise = eventAuthorityPda();
+  const globalVolumeAccumulatorPromise = globalVolumeAccumulatorPda();
+  const userVolumeAccumulatorPromise = userVolumeAccumulatorPda(userAddr);
+
+  // Derive PDAs (all async)
+  const associatedBondingCurvePromise = associatedBondingCurveAta(bondingCurve, mint);
+  const associatedUserPromise = findAssociatedTokenPda({
     owner: userAddr,
     mint,
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
   });
-  const creatorVault = await creatorVaultPda(bondingCurve);
-  const eventAuthority = await eventAuthorityPda();
-  const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
-  const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
 
+  const creatorAddress = await resolveCreatorAddress({
+    bondingCurve,
+    providedCreator: bondingCurveCreator,
+    rpc,
+    commitment,
+  });
+
+  const [
+    global,
+    associatedBondingCurve,
+    [associatedUser],
+    creatorVault,
+    eventAuthority,
+    globalVolumeAccumulator,
+    userVolumeAccumulator,
+    feeConfig,
+  ] = await Promise.all([
+    globalPromise,
+    associatedBondingCurvePromise,
+    associatedUserPromise,
+    creatorVaultPda(creatorAddress),
+    eventAuthorityPromise,
+    globalVolumeAccumulatorPromise,
+    userVolumeAccumulatorPromise,
+    feeConfigPromise,
+  ]);
+
+  // Derive PDAs (all async)
   return getBuyInstruction({
     global,
     feeRecipient: getAddress(feeRecipient),
@@ -88,7 +132,7 @@ export async function buy(params: BuyParams) {
     program: getAddress(PUMP_PROGRAM_ID),
     globalVolumeAccumulator,
     userVolumeAccumulator,
-    feeConfig: global, // Placeholder - may need specific PDA
+    feeConfig,
     feeProgram: getAddress(FEE_PROGRAM_ID),
     amount: tokenAmount,
     maxSolCost: maxSolCostLamports,
@@ -107,8 +151,12 @@ export interface SellParams {
   minSolOutputLamports: bigint;
   /** Fee recipient address */
   feeRecipient: Address | string;
-  /** Whether to track volume (default: true) */
-  trackVolume?: boolean;
+  /** Optional bonding curve creator (skips RPC lookup) */
+  bondingCurveCreator?: Address | string;
+  /** Optional RPC client */
+  rpc?: RpcClient;
+  /** Optional commitment level */
+  commitment?: Commitment;
 }
 
 /**
@@ -121,24 +169,49 @@ export async function sell(params: SellParams) {
     tokenAmount,
     minSolOutputLamports,
     feeRecipient,
-    trackVolume = true,
+    bondingCurveCreator,
+    rpc = defaultRpc,
+    commitment = defaultCommitment,
   } = params;
 
   const mint = getAddress(mintStr);
   const userAddr = user.address;
-  
-  // Derive PDAs (all async)
-  const global = await globalPda();
   const bondingCurve = await bondingCurvePda(mint);
-  const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mint);
-  const [associatedUser] = await findAssociatedTokenPda({
+
+  const globalPromise = globalPda();
+  const associatedBondingCurvePromise = associatedBondingCurveAta(bondingCurve, mint);
+  const associatedUserPromise = findAssociatedTokenPda({
     owner: userAddr,
     mint,
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
   });
-  const creatorVault = await creatorVaultPda(bondingCurve);
-  const eventAuthority = await eventAuthorityPda();
+  const feeConfigPromise = feeConfigPda();
+  const eventAuthorityPromise = eventAuthorityPda();
 
+  const creatorAddress = await resolveCreatorAddress({
+    bondingCurve,
+    providedCreator: bondingCurveCreator,
+    rpc,
+    commitment,
+  });
+
+  const [
+    global,
+    associatedBondingCurve,
+    [associatedUser],
+    creatorVault,
+    eventAuthority,
+    feeConfig,
+  ] = await Promise.all([
+    globalPromise,
+    associatedBondingCurvePromise,
+    associatedUserPromise,
+    creatorVaultPda(creatorAddress),
+    eventAuthorityPromise,
+    feeConfigPromise,
+  ]);
+
+  // Derive PDAs (all async)
   return getSellInstruction({
     global,
     feeRecipient: getAddress(feeRecipient),
@@ -152,7 +225,7 @@ export async function sell(params: SellParams) {
     tokenProgram: getAddress(TOKEN_PROGRAM_ID),
     eventAuthority,
     program: getAddress(PUMP_PROGRAM_ID),
-    feeConfig: global, // Placeholder
+    feeConfig,
     feeProgram: getAddress(FEE_PROGRAM_ID),
     amount: tokenAmount,
     minSolOutput: minSolOutputLamports,
@@ -229,3 +302,26 @@ export async function create(params: CreateParams) {
 
 // Helper import for metadata PDA
 import { getProgramDerivedAddress } from "@solana/kit";
+
+async function resolveCreatorAddress(args: {
+  bondingCurve: Address;
+  providedCreator?: Address | string;
+  rpc: RpcClient;
+  commitment: Commitment;
+}): Promise<Address> {
+  const { bondingCurve, providedCreator, rpc, commitment } = args;
+
+  if (providedCreator) {
+    return getAddress(providedCreator);
+  }
+
+  try {
+    const account = await fetchBondingCurve(rpc, bondingCurve, { commitment });
+    return account.data.creator;
+  } catch (error) {
+    throw new Error(
+      "Unable to resolve bonding curve creator. Provide `bondingCurveCreator` or configure an RPC endpoint with access to the bonding curve account.",
+      { cause: error }
+    );
+  }
+}

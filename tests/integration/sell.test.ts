@@ -4,27 +4,44 @@
 
 import { describe, test, expect, beforeAll } from "bun:test";
 import { sellWithSlippage } from "../../src/recipes/sell";
-import { createTestWallet, skipIfNoRpc } from "../setup";
+import { createTestWallet } from "../setup";
 import type { TransactionSigner } from "@solana/kit";
+import { address as getAddress } from "@solana/kit";
+import {
+  bondingCurvePda,
+  globalPda,
+  associatedBondingCurveAta,
+  creatorVaultPda,
+  feeConfigPda,
+  eventAuthorityPda,
+} from "../../src/pda/pump";
+import { findAssociatedTokenPda } from "@solana-program/token";
+import {
+  PUMP_PROGRAM_ID,
+  SYSTEM_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  FEE_PROGRAM_ID,
+} from "../../src/config/addresses";
+import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
 
 describe("Sell Operations", () => {
   let testWallet: TransactionSigner;
+  const mintAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  const feeRecipient = DEFAULT_FEE_RECIPIENT;
 
   beforeAll(async () => {
-    if (skipIfNoRpc()) return;
     testWallet = await createTestWallet();
   });
 
   test("sellWithSlippage builds valid instruction", async () => {
-    if (skipIfNoRpc()) return;
-
     const instruction = await sellWithSlippage({
       user: testWallet,
-      mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      mint: mintAddress,
       tokenAmount: 250_000n,
       estimatedSolOut: 1_000_000n,
       slippageBps: 50,
-      feeRecipient: "11111111111111111111111111111111",
+      feeRecipient,
+      bondingCurveCreator: testWallet.address,
     });
 
     expect(instruction).toBeDefined();
@@ -33,17 +50,63 @@ describe("Sell Operations", () => {
   });
 
   test("sellWithSlippage uses default slippage when not specified", async () => {
-    if (skipIfNoRpc()) return;
-
     const instruction = await sellWithSlippage({
       user: testWallet,
-      mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      mint: mintAddress,
       tokenAmount: 250_000n,
       estimatedSolOut: 1_000_000n,
-      feeRecipient: "11111111111111111111111111111111",
+      feeRecipient,
+      bondingCurveCreator: testWallet.address,
     });
 
     expect(instruction).toBeDefined();
   });
-});
 
+  test("sellWithSlippage wires expected accounts", async () => {
+    const instruction = await sellWithSlippage({
+      user: testWallet,
+      mint: mintAddress,
+      tokenAmount: 250_000n,
+      estimatedSolOut: 1_000_000n,
+      bondingCurveCreator: testWallet.address,
+      feeRecipient,
+    });
+
+    expect(instruction.programAddress).toBe(getAddress(PUMP_PROGRAM_ID));
+
+    const bondingCurve = await bondingCurvePda(mintAddress);
+    const associatedBondingCurve = await associatedBondingCurveAta(
+      bondingCurve,
+      mintAddress
+    );
+    const [associatedUser] = await findAssociatedTokenPda({
+      owner: testWallet.address,
+      mint: getAddress(mintAddress),
+      tokenProgram: getAddress(TOKEN_PROGRAM_ID),
+    });
+    const global = await globalPda();
+    const creatorVault = await creatorVaultPda(testWallet.address);
+    const eventAuthority = await eventAuthorityPda();
+    const feeConfig = await feeConfigPda();
+
+    const expectedAccounts = [
+      global,
+      feeRecipient,
+      getAddress(mintAddress),
+      bondingCurve,
+      associatedBondingCurve,
+      associatedUser,
+      testWallet.address,
+      getAddress(SYSTEM_PROGRAM_ID),
+      creatorVault,
+      getAddress(TOKEN_PROGRAM_ID),
+      eventAuthority,
+      getAddress(PUMP_PROGRAM_ID),
+      feeConfig,
+      getAddress(FEE_PROGRAM_ID),
+    ];
+
+    const accountAddresses = instruction.accounts.map((meta) => meta.address);
+    expect(accountAddresses).toEqual(expectedAccounts.map(getAddress));
+  });
+});

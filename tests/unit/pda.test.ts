@@ -5,7 +5,7 @@
 
 import { describe, test, expect } from "bun:test";
 import { address } from "@solana/kit";
-import { globalPda, bondingCurvePda, creatorVaultPda } from "../../src/pda/pump";
+import { globalPda, bondingCurvePda, creatorVaultPda, feeConfigPda } from "../../src/pda/pump";
 
 describe("Pump PDAs", () => {
   describe("globalPda", () => {
@@ -47,5 +47,18 @@ describe("Pump PDAs", () => {
       expect(pda1).toBe(pda2);
     });
   });
-});
 
+  describe("feeConfigPda", () => {
+    test("derives deterministic fee config PDA", async () => {
+      const feeConfig = await feeConfigPda();
+      const feeConfigAgain = await feeConfigPda();
+      expect(feeConfig).toBe(feeConfigAgain);
+    });
+
+    test("fee config differs from global state", async () => {
+      const feeConfig = await feeConfigPda();
+      const global = await globalPda();
+      expect(feeConfig).not.toBe(global);
+    });
+  });
+});

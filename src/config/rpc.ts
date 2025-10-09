@@ -6,7 +6,7 @@
 import { createSolanaRpc, devnet, mainnet, testnet } from "@solana/kit";
 
 // Determine cluster from environment
-const CLUSTER = process.env.SOLANA_CLUSTER || "mainnet";
+const CLUSTER = process.env.SOLANA_CLUSTER || "devnet";
 const CUSTOM_RPC = process.env.SOLANA_RPC;
 
 // Create appropriate cluster URL or use custom RPC

@@ -12,9 +12,9 @@ async function main() {
   const buyIx = await buy({
     user: wallet,
     mint: "TokenMintAddress",
-    amount: 1_000_000n,
-    maxCost: 5_000_000n,
-    slippage: 100,  // 100 bps = 1%
+    tokenAmount: 1_000_000n,
+    estimatedSolCostLamports: 5_000_000n,
+    slippageBps: 100,  // 100 bps = 1%
   });
 
   console.log("Buy with 1% slippage:", buyIx);
@@ -23,13 +23,12 @@ async function main() {
   const sellIx = await sell({
     user: wallet,
     mint: "TokenMintAddress",
-    amount: 500_000n,
-    minReceive: 2_000_000n,
-    slippage: 25,  // 25 bps = 0.25%
+    tokenAmount: 500_000n,
+    estimatedSolOutputLamports: 2_000_000n,
+    slippageBps: 25,  // 25 bps = 0.25%
   });
 
   console.log("Sell with 0.25% slippage:", sellIx);
 }
 
 main().catch(console.error);
-

@@ -5,6 +5,7 @@
 import type { TransactionSigner, Instruction, Address } from "@solana/kit";
 import { create as buildCreateInstruction, buy as buildBuyInstruction } from "../clients/pump";
 import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
+import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 
 export interface MintWithFirstBuyParams {
   /** User's wallet/signer (will be the creator) */
@@ -26,7 +27,15 @@ export interface MintWithFirstBuyParams {
   /** Slippage tolerance in basis points (default: 50 = 0.5%) */
   slippageBps?: number;
   /** Fee recipient address */
-  feeRecipient: string;
+  feeRecipient?: Address | string;
+  /** Optional override to skip fetching the bonding curve account */
+  bondingCurveCreator?: Address | string;
+  /** Whether to track user volume for the initial buy (default true) */
+  trackVolume?: boolean;
+  /** Optional RPC client */
+  rpc?: Parameters<typeof buildBuyInstruction>[0]["rpc"];
+  /** Optional commitment */
+  commitment?: Parameters<typeof buildBuyInstruction>[0]["commitment"];
 }
 
 /**
@@ -47,7 +56,11 @@ export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<
     firstBuyTokenAmount,
     estimatedFirstBuyCost,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
-    feeRecipient,
+    feeRecipient = DEFAULT_FEE_RECIPIENT,
+    bondingCurveCreator,
+    trackVolume,
+    rpc,
+    commitment,
   } = params;
 
   // Validate inputs
@@ -76,7 +89,10 @@ export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<
     tokenAmount: firstBuyTokenAmount,
     maxSolCostLamports,
     feeRecipient,
-    trackVolume: true,
+    trackVolume: trackVolume ?? true,
+    bondingCurveCreator: bondingCurveCreator ?? user.address,
+    rpc,
+    commitment,
   });
 
   return {

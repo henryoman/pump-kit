@@ -2,15 +2,19 @@
  * Buy recipe - purchase tokens from the bonding curve with slippage protection.
  */
 
-import type { TransactionSigner, Instruction } from "@solana/kit";
+import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { buy as buildBuyInstruction } from "../clients/pump";
+import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
+
+type RpcClient = Parameters<typeof buildBuyInstruction>[0]["rpc"];
+type CommitmentLevel = Parameters<typeof buildBuyInstruction>[0]["commitment"];
 
 export interface BuyWithSlippageParams {
   /** User's wallet/signer */
   user: TransactionSigner;
   /** Token mint address */
-  mint: string;
+  mint: Address | string;
   /** Amount of tokens to buy */
   tokenAmount: bigint;
   /** Estimated SOL cost in lamports (will add slippage) */
@@ -18,7 +22,15 @@ export interface BuyWithSlippageParams {
   /** Slippage tolerance in basis points (default: 50 = 0.5%) */
   slippageBps?: number;
   /** Fee recipient address */
-  feeRecipient: string;
+  feeRecipient?: Address | string;
+  /** Optional override to skip fetching the bonding curve account */
+  bondingCurveCreator?: Address | string;
+  /** Whether to track user volume (default true) */
+  trackVolume?: boolean;
+  /** Optional RPC client override */
+  rpc?: RpcClient;
+  /** Optional commitment override */
+  commitment?: CommitmentLevel;
 }
 
 /**
@@ -32,7 +44,11 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
     tokenAmount,
     estimatedSolCost,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
-    feeRecipient,
+    feeRecipient = DEFAULT_FEE_RECIPIENT,
+    bondingCurveCreator,
+    trackVolume = true,
+    rpc,
+    commitment,
   } = params;
 
   // Validate inputs
@@ -49,7 +65,10 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
     tokenAmount,
     maxSolCostLamports,
     feeRecipient,
-    trackVolume: true,
+    trackVolume,
+    bondingCurveCreator,
+    rpc,
+    commitment,
   });
 }
 
@@ -58,15 +77,28 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
  */
 export interface SimpleBuyParams {
   user: TransactionSigner;
-  mint: string;
+  mint: Address | string;
   tokenAmount: bigint;
   maxSolCostLamports: bigint;
-  feeRecipient: string;
+  feeRecipient?: Address | string;
   trackVolume?: boolean;
+  bondingCurveCreator?: Address | string;
+  rpc?: RpcClient;
+  commitment?: CommitmentLevel;
 }
 
 export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
-  const { user, mint, tokenAmount, maxSolCostLamports, feeRecipient, trackVolume = true } = params;
+  const {
+    user,
+    mint,
+    tokenAmount,
+    maxSolCostLamports,
+    feeRecipient = DEFAULT_FEE_RECIPIENT,
+    trackVolume = true,
+    bondingCurveCreator,
+    rpc,
+    commitment,
+  } = params;
 
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
   if (maxSolCostLamports <= 0n) throw new Error("Max SOL cost must be positive");
@@ -78,5 +110,8 @@ export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
     maxSolCostLamports,
     feeRecipient,
     trackVolume,
+    bondingCurveCreator,
+    rpc,
+    commitment,
   });
 }

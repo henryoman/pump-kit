@@ -14,7 +14,7 @@ async function main() {
     wallet,
     "TokenMintAddress",
     1_000_000n,      // amount of tokens
-    5_000_000n       // max SOL to spend (lamports)
+    5_000_000n       // estimated SOL cost (lamports)
   );
 
   console.log("Buy instruction created:", buyInstruction);
@@ -24,7 +24,7 @@ async function main() {
     wallet,
     "TokenMintAddress",
     500_000n,        // amount of tokens to sell
-    2_000_000n       // min SOL to receive (lamports)
+    2_000_000n       // estimated SOL output (lamports)
   );
 
   console.log("Sell instruction created:", sellInstruction);
@@ -34,4 +34,3 @@ async function main() {
 }
 
 main().catch(console.error);
-

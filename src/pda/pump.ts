@@ -5,7 +5,7 @@
 
 import { getProgramDerivedAddress, address as getAddress, getAddressEncoder } from "@solana/kit";
 import type { Address } from "@solana/kit";
-import { PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
+import { FEE_PROGRAM_ID, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
 import { findAssociatedTokenPda } from "@solana-program/token";
 
 const enc = new TextEncoder();
@@ -93,6 +93,21 @@ export async function eventAuthorityPda(): Promise<Address> {
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("__event_authority")],
+  });
+  return address;
+}
+
+/**
+ * Derives the fee config PDA for the pump fee program.
+ * Seed: ["fee_config", pump_program_id]
+ */
+export async function feeConfigPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
+    programAddress: getAddress(FEE_PROGRAM_ID),
+    seeds: [
+      enc.encode("fee_config"),
+      addressEncoder.encode(getAddress(PUMP_PROGRAM_ID)),
+    ],
   });
   return address;
 }

@@ -1,5 +1,7 @@
 # API Simplification - Liquidity Functions
 
+> **Status:** Liquidity helpers are still under development and intentionally not exported in the current SDK build. This document captures the planned ergonomics once the AMM client ships.
+
 ## What We Changed
 
 ### Before (Too Complicated)
@@ -105,4 +107,3 @@ We removed all the complexity that users don't need to think about:
 - ✅ Just: wallet + mint + amounts + optional slippage
 
 The pool contract handles all the complex math internally!
-

@@ -3,8 +3,9 @@
  * This file provides common test helpers and configuration.
  */
 
-import { generateKeyPair, createSolanaRpc } from "@solana/kit";
+import { createSolanaRpc } from "@solana/kit";
 import type { TransactionSigner, Address } from "@solana/kit";
+import { generateKeyPairSigner } from "@solana/signers";
 
 /**
  * Get the test RPC endpoint from environment or use devnet
@@ -18,7 +19,7 @@ export function getTestRpc() {
  * Create a test wallet with some SOL
  */
 export async function createTestWallet(): Promise<TransactionSigner> {
-  return await generateKeyPair();
+  return await generateKeyPairSigner();
 }
 
 /**
@@ -45,4 +46,3 @@ export function skipIfNoRpc() {
   }
   return false;
 }
-

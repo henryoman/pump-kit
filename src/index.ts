@@ -17,15 +17,6 @@ export {
   type MintWithFirstBuyParams,
 } from "./recipes/mintFirstBuy";
 
-export {
-  addLiquidity,
-  removeLiquidity,
-  quickAddLiquidity,
-  quickRemoveLiquidity,
-  type AddLiquidityParams,
-  type RemoveLiquidityParams,
-} from "./liquidity";
-
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -63,10 +54,3 @@ export {
   bpsToPercent,
   DEFAULT_SLIPPAGE_BPS,
 } from "./utils/slippage";
-
-export {
-  buildTransaction,
-  sendAndConfirmTransaction,
-  simulateTransaction,
-  type TransactionResult,
-} from "./utils/transaction";

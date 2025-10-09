@@ -162,40 +162,7 @@ const { createInstruction, buyInstruction } = await mintWithFirstBuy({
 });
 ```
 
-### Add Liquidity
-
-```typescript
-import { addLiquidity } from "pump-kit";
-
-const depositIx = await addLiquidity({
-  user: myWallet,
-  mint: "TokenMintAddress",
-  tokenAmount: 100_000_000n,  // tokens to add
-  solAmount: 50_000_000n,     // SOL to add (lamports)
-  slippage: 50,               // optional
-});
-
-// Or use the quick version
-import { quickAddLiquidity } from "pump-kit";
-const ix = await quickAddLiquidity(myWallet, "TokenMint", 100_000_000n, 50_000_000n);
-```
-
-### Remove Liquidity
-
-```typescript
-import { removeLiquidity } from "pump-kit";
-
-const withdrawIx = await removeLiquidity({
-  user: myWallet,
-  mint: "TokenMintAddress",
-  lpAmount: 50_000_000n,  // LP tokens to burn
-  slippage: 50,           // optional
-});
-
-// Or use the quick version
-import { quickRemoveLiquidity } from "pump-kit";
-const ix = await quickRemoveLiquidity(myWallet, "TokenMint", 50_000_000n);
-```
+> **Note:** Liquidity pool helpers are under active development and intentionally not exported in the current release to avoid runtime surprises. Follow the repository updates for the first stable release of AMM tooling.
 
 ---
 
@@ -208,14 +175,12 @@ const ix = await quickRemoveLiquidity(myWallet, "TokenMint", 50_000_000n);
 quickBuy(wallet, mint, amount, maxCost)
 quickSell(wallet, mint, amount, minReceive)
 
-// With options
-buy({ user, mint, amount, maxCost, slippage? })
-sell({ user, mint, amount, minReceive, slippage? })
+// With options (slippage expressed in basis points)
+buy({ user, mint, tokenAmount, estimatedSolCostLamports, slippageBps? })
+sell({ user, mint, tokenAmount, estimatedSolOutputLamports, slippageBps? })
 
 // Token & Liquidity
 mintWithFirstBuy({ user, mint, name, symbol, uri, ... })
-addLiquidity({ user, mint, tokenAmount, solAmount })
-removeLiquidity({ user, mint, lpAmount })
 ```
 
 ### Core Functions
@@ -223,8 +188,6 @@ removeLiquidity({ user, mint, lpAmount })
 - `buy()` / `quickBuy()` - Buy tokens with automatic slippage protection
 - `sell()` / `quickSell()` - Sell tokens with minimum output protection
 - `mintWithFirstBuy()` - Create and launch a new token
-- `addLiquidity()` / `quickAddLiquidity()` - Add liquidity to pools
-- `removeLiquidity()` / `quickRemoveLiquidity()` - Withdraw liquidity from pools
 
 ### Utilities
 
@@ -307,5 +270,4 @@ MIT License - see [LICENSE](./LICENSE) for details.
 ## Disclaimer
 
 This SDK is community-built and not officially affiliated with Pump.fun. Use at your own risk. Always test on devnet first.
-
 
