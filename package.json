@@ -6,12 +6,16 @@
     ".": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./simple": {
+      "types": "./dist/types/simple.d.ts",
+      "import": "./dist/simple.js"
     }
   },
   "files": [
     "dist",
-    "src/**/*.ts",
     "README.md",
+    "MIGRATION.md",
     "LICENSE"
   ],
   "engines": {

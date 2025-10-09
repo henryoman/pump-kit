@@ -1,0 +1,35 @@
+/**
+ * Example with custom slippage settings
+ */
+
+import { buy, sell } from "pump-kit";
+import { generateKeyPair } from "@solana/kit";
+
+async function main() {
+  const wallet = await generateKeyPair();
+
+  // Buy with custom slippage (1% instead of default 0.5%)
+  const buyIx = await buy({
+    user: wallet,
+    mint: "TokenMintAddress",
+    amount: 1_000_000n,
+    maxCost: 5_000_000n,
+    slippage: 100,  // 100 bps = 1%
+  });
+
+  console.log("Buy with 1% slippage:", buyIx);
+
+  // Sell with tighter slippage (0.25%)
+  const sellIx = await sell({
+    user: wallet,
+    mint: "TokenMintAddress",
+    amount: 500_000n,
+    minReceive: 2_000_000n,
+    slippage: 25,  // 25 bps = 0.25%
+  });
+
+  console.log("Sell with 0.25% slippage:", sellIx);
+}
+
+main().catch(console.error);
+

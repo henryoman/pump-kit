@@ -14,6 +14,19 @@ A minimal, type-safe SDK for Pump.fun bonding curves and AMM pools with automati
 
 ---
 
+## ⚠️ Not Ready for Production
+
+**This SDK is currently in active development and is NOT ready for production use.**
+
+- Core functionality is being tested
+- APIs may change without notice
+- Use at your own risk on devnet only
+- Do not use with real funds on mainnet
+
+We'll remove this notice once the SDK has been thoroughly tested and audited.
+
+---
+
 ## Why Solana Kit 4.0?
 
 Pump Kit is built on Solana Kit 4.0, the next generation of Solana development tools that dramatically outperforms legacy `@solana/web3.js`:
@@ -63,36 +76,68 @@ bun add pump-kit
 
 ---
 
+## Quick Start
+
+```typescript
+import { quickBuy } from "pump-kit";
+import { generateKeyPair } from "@solana/kit";
+
+// 1. Create wallet
+const wallet = await generateKeyPair();
+
+// 2. Buy tokens - 4 parameters, done!
+const instruction = await quickBuy(
+  wallet,
+  "TokenMintAddress",
+  1_000_000n,      // amount
+  5_000_000n       // max SOL (lamports)
+);
+
+// That's it! Auto slippage, auto PDAs, zero complexity.
+```
+
+---
+
 ## Usage
 
 ### Buy Tokens
 
 ```typescript
-import { buyWithSlippage } from "pump-kit";
+import { buy } from "pump-kit";
 
-const buyIx = await buyWithSlippage({
+const instruction = await buy({
   user: myWallet,
   mint: "TokenMintAddress",
-  tokenAmount: 1_000_000n,
-  estimatedSolCost: 5_000_000n,
-  slippageBps: 50, // Optional, defaults to 0.5%
-  feeRecipient: "FeeRecipientAddress",
+  amount: 1_000_000n,
+  maxCost: 5_000_000n, // Max SOL in lamports
 });
+
+// Auto slippage protection included (0.5% default)
 ```
 
 ### Sell Tokens
 
 ```typescript
-import { sellWithSlippage } from "pump-kit";
+import { sell } from "pump-kit";
 
-const sellIx = await sellWithSlippage({
+const instruction = await sell({
   user: myWallet,
   mint: "TokenMintAddress",
-  tokenAmount: 250_000n,
-  estimatedSolOut: 1_000_000n,
-  slippageBps: 50,
-  feeRecipient: "FeeRecipientAddress",
+  amount: 250_000n,
+  minReceive: 1_000_000n, // Min SOL in lamports
 });
+```
+
+### Even Simpler
+
+```typescript
+import { quickBuy, quickSell } from "pump-kit";
+
+// Buy with 4 parameters
+const buyIx = await quickBuy(myWallet, "TokenMint", 1_000_000n, 5_000_000n);
+
+// Sell with 4 parameters
+const sellIx = await quickSell(myWallet, "TokenMint", 250_000n, 1_000_000n);
 ```
 
 ### Mint New Token
@@ -155,10 +200,27 @@ const withdrawIx = await removeLiquidity({
 
 ## API Reference
 
+### Simple API (Recommended)
+
+```typescript
+// Super simple - just 4 parameters
+quickBuy(wallet, mint, amount, maxCost)
+quickSell(wallet, mint, amount, minReceive)
+
+// With options
+buy({ user, mint, amount, maxCost, slippage? })
+sell({ user, mint, amount, minReceive, slippage? })
+
+// Token & Liquidity
+mintWithFirstBuy({ user, mint, name, symbol, uri, ... })
+provideLiquidity({ user, baseMint, quoteMint, baseIn, quoteIn, ... })
+removeLiquidity({ user, baseMint, quoteMint, lpAmount, ... })
+```
+
 ### Core Functions
 
-- `buyWithSlippage()` - Buy tokens with automatic slippage protection
-- `sellWithSlippage()` - Sell tokens with minimum output protection
+- `buy()` / `quickBuy()` - Buy tokens with automatic slippage protection
+- `sell()` / `quickSell()` - Sell tokens with minimum output protection
 - `mintWithFirstBuy()` - Create and launch a new token
 - `provideLiquidity()` - Add liquidity to AMM pools
 - `removeLiquidity()` - Withdraw liquidity from pools

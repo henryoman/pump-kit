@@ -1,0 +1,29 @@
+# Development files
+tests/
+examples/
+scripts/
+
+# Build files
+tsconfig*.json
+codama.config.json
+
+# Documentation (keep only README and MIGRATION)
+TESTING.md
+
+# Source files (we ship compiled dist/)
+src/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+*.log
+node_modules/
+bun.lock
+

@@ -1,55 +1,15 @@
 /**
- * Pump Kit - Modern TypeScript SDK for Pump.fun bonding curves and AMM pools.
+ * Pump Kit - The simplest TypeScript SDK for Pump.fun
  * 
- * This is the main public API surface. We export a clean, minimal interface
- * that abstracts away the complexity of program interactions.
+ * Clean, minimal API - just buy, sell, mint, and manage liquidity.
  */
 
 // ============================================================================
-// Configuration & Setup
+// Simple API (recommended - start here!)
 // ============================================================================
 
-export { rpc, defaultCommitment } from "./config/rpc";
-export * from "./config/addresses";
-
-// ============================================================================
-// Core Types
-// ============================================================================
-
-export type { Address, TransactionSigner, Instruction } from "@solana/kit";
-
-// ============================================================================
-// PDA Helpers
-// ============================================================================
-
-export * as PumpPDAs from "./pda/pump";
-export * as AmmPDAs from "./pda/pumpAmm";
-export { ata, ata2022 } from "./pda/ata";
-
-// ============================================================================
-// Low-Level Clients (instruction builders)
-// ============================================================================
-
-export * as PumpClient from "./clients/pump";
-export * as AmmClient from "./clients/amm";
-
-// ============================================================================
-// High-Level Recipes (with automatic slippage)
-// ============================================================================
-
-export {
-  buyWithSlippage,
-  buySimple,
-  type BuyWithSlippageParams,
-  type SimpleBuyParams,
-} from "./recipes/buy";
-
-export {
-  sellWithSlippage,
-  sellSimple,
-  type SellWithSlippageParams,
-  type SimpleSellParams,
-} from "./recipes/sell";
+export { buy, sell, quickBuy, quickSell } from "./swap";
+export type { BuyParams, SellParams } from "./swap";
 
 export {
   mintWithFirstBuy,
@@ -70,6 +30,31 @@ export {
 } from "./recipes/removeLiquidity";
 
 // ============================================================================
+// Core Types
+// ============================================================================
+
+export type { Address, TransactionSigner, Instruction } from "@solana/kit";
+
+// ============================================================================
+// Advanced: Detailed control (optional)
+// ============================================================================
+
+export {
+  buyWithSlippage,
+  buySimple,
+  type BuyWithSlippageParams,
+  type SimpleBuyParams,
+} from "./recipes/buy";
+
+export {
+  sellWithSlippage,
+  sellSimple,
+  type SellWithSlippageParams,
+  type SimpleSellParams,
+} from "./recipes/sell";
+
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -88,17 +73,3 @@ export {
   simulateTransaction,
   type TransactionResult,
 } from "./utils/transaction";
-
-// Legacy math exports for backward compatibility
-export {
-  pctToBps,
-  computeSlippageOut,
-  computeSlippageIn,
-} from "./math";
-
-// ============================================================================
-// Generated Code (for advanced users)
-// ============================================================================
-
-export * as PumpGenerated from "./pumpsdk/generated";
-export * as AmmGenerated from "./ammsdk/generated";
