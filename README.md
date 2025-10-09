@@ -165,18 +165,19 @@ const { createInstruction, buyInstruction } = await mintWithFirstBuy({
 ### Add Liquidity
 
 ```typescript
-import { provideLiquidity } from "pump-kit";
+import { addLiquidity } from "pump-kit";
 
-const depositIx = await provideLiquidity({
+const depositIx = await addLiquidity({
   user: myWallet,
-  baseMint: "TokenMintAddress",
-  quoteMint: "So11111111111111111111111111111111111111112",
-  baseIn: 100_000_000n,
-  quoteIn: 50_000_000n,
-  estimatedLpOut: 70_000_000n,
-  slippageBps: 50,
-  poolIndex: 0,
+  mint: "TokenMintAddress",
+  tokenAmount: 100_000_000n,  // tokens to add
+  solAmount: 50_000_000n,     // SOL to add (lamports)
+  slippage: 50,               // optional
 });
+
+// Or use the quick version
+import { quickAddLiquidity } from "pump-kit";
+const ix = await quickAddLiquidity(myWallet, "TokenMint", 100_000_000n, 50_000_000n);
 ```
 
 ### Remove Liquidity
@@ -186,14 +187,14 @@ import { removeLiquidity } from "pump-kit";
 
 const withdrawIx = await removeLiquidity({
   user: myWallet,
-  baseMint: "TokenMintAddress",
-  quoteMint: "So11111111111111111111111111111111111111112",
-  lpAmount: 50_000_000n,
-  estimatedBaseOut: 100_000_000n,
-  estimatedQuoteOut: 50_000_000n,
-  slippageBps: 50,
-  poolIndex: 0,
+  mint: "TokenMintAddress",
+  lpAmount: 50_000_000n,  // LP tokens to burn
+  slippage: 50,           // optional
 });
+
+// Or use the quick version
+import { quickRemoveLiquidity } from "pump-kit";
+const ix = await quickRemoveLiquidity(myWallet, "TokenMint", 50_000_000n);
 ```
 
 ---
@@ -213,8 +214,8 @@ sell({ user, mint, amount, minReceive, slippage? })
 
 // Token & Liquidity
 mintWithFirstBuy({ user, mint, name, symbol, uri, ... })
-provideLiquidity({ user, baseMint, quoteMint, baseIn, quoteIn, ... })
-removeLiquidity({ user, baseMint, quoteMint, lpAmount, ... })
+addLiquidity({ user, mint, tokenAmount, solAmount })
+removeLiquidity({ user, mint, lpAmount })
 ```
 
 ### Core Functions
@@ -222,13 +223,11 @@ removeLiquidity({ user, baseMint, quoteMint, lpAmount, ... })
 - `buy()` / `quickBuy()` - Buy tokens with automatic slippage protection
 - `sell()` / `quickSell()` - Sell tokens with minimum output protection
 - `mintWithFirstBuy()` - Create and launch a new token
-- `provideLiquidity()` - Add liquidity to AMM pools
-- `removeLiquidity()` - Withdraw liquidity from pools
+- `addLiquidity()` / `quickAddLiquidity()` - Add liquidity to pools
+- `removeLiquidity()` / `quickRemoveLiquidity()` - Withdraw liquidity from pools
 
 ### Utilities
 
-- `calculateOptimalDeposit()` - Calculate balanced liquidity amounts
-- `calculateWithdrawal()` - Calculate expected withdrawal amounts
 - `validateMintParams()` - Validate token metadata before minting
 
 ---

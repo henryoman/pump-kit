@@ -18,16 +18,13 @@ export {
 } from "./recipes/mintFirstBuy";
 
 export {
-  provideLiquidity,
-  calculateOptimalDeposit,
-  type ProvideLiquidityParams,
-} from "./recipes/provideLiquidity";
-
-export {
+  addLiquidity,
   removeLiquidity,
-  calculateWithdrawal,
+  quickAddLiquidity,
+  quickRemoveLiquidity,
+  type AddLiquidityParams,
   type RemoveLiquidityParams,
-} from "./recipes/removeLiquidity";
+} from "./liquidity";
 
 // ============================================================================
 // Core Types
