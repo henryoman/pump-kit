@@ -1,7 +1,7 @@
 # 🚀 Pump Kit
 
-> **The fastest, most modern TypeScript SDK for Pump.fun**
-> Built with Bun + TypeScript + Solana Kit 3.0 + Codama. First release around 10/14/2025 stay tuned!
+> **The fastest, most modern TypeScript SDK for Pump.fun**  
+> Built with Bun + TypeScript + Solana Kit 3.0 + Codama
 
 A minimal, blazingly fast SDK exposing core user flows for Pump.fun bonding curves and AMM pools. Ship faster with automatic slippage protection, type-safe APIs, and zero legacy dependencies.
 
@@ -15,28 +15,24 @@ A minimal, blazingly fast SDK exposing core user flows for Pump.fun bonding curv
 ## ✨ Features
 
 ### 🎯 **Simple, Intuitive API**
-
 - Clean, minimal interface - just the functions you need
 - Automatic slippage protection built-in
 - Type-safe everything - catch errors at compile time
 - No boilerplate, no complexity
 
 ### ⚡ **Blazingly Fast**
-
 - **Built with Bun** - 3x faster installs, instant dev server
 - **Solana Kit 3.0** - Modern, transport-agnostic RPC (no legacy web3.js bloat)
 - **Codama-powered** - Generated clients directly from on-chain IDLs
 - **Tree-shakable** - Only bundle what you use (248 KB ESM)
 
 ### 🔧 **Modern Stack**
-
 - **Solana Kit 3.0** - Next-gen Solana library (future-proof)
 - **@solana-program/token** - Lightweight SPL token helpers
 - **No legacy dependencies** - No `@solana/web3.js`, no `@project-serum/*`
 - **TypeScript-first** - Full type safety from IDL to API
 
 ### 🧩 **Complete Feature Set**
-
 - ✅ **Mint + First Buy** - Create tokens with initial purchase
 - ✅ **Buy from Bonding Curve** - Purchase with slippage protection
 - ✅ **Sell to Bonding Curve** - Sell with minimum output guarantees
@@ -411,7 +407,6 @@ console.log(`Default slippage: ${DEFAULT_SLIPPAGE_BPS}bps = ${bpsToPercent(DEFAU
 ### ⚡ **3x Faster Development** (vs. old SDKs)
 
 #### **Old Way** (Legacy web3.js + manual PDAs)
-
 ```typescript
 // ❌ Old SDK: Manual PDA derivation, verbose APIs
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
@@ -457,7 +452,6 @@ const tx = await program.methods
 ```
 
 #### **New Way** (Pump Kit + Solana Kit 3.0)
-
 ```typescript
 // ✅ Pump Kit: Automatic PDAs, clean API
 import { buyWithSlippage } from "pump-kit";
@@ -483,20 +477,19 @@ Pump Kit uses **Solana Kit 3.0** - the next generation of Solana libraries. Here
 
 #### **Modern Architecture**
 
-| Feature                | Old `@solana/web3.js` | New Solana Kit 3.0        |
-| ---------------------- | ----------------------- | ------------------------- |
-| **Bundle Size**  | 300+ KB (legacy crypto) | 50-100 KB (modern crypto) |
-| **TypeScript**   | Partial types           | 100% type-safe            |
-| **Transport**    | HTTP-only               | HTTP, WebSocket, IPC      |
-| **Tree-shaking** | ❌ Limited              | ✅ Full support           |
-| **BigInt**       | BN.js (legacy)          | Native BigInt             |
-| **Address Type** | String / Buffer         | Branded types             |
-| **Future-proof** | ❌ Legacy               | ✅ Actively developed     |
+| Feature | Old `@solana/web3.js` | New Solana Kit 3.0 |
+|---------|----------------------|---------------------|
+| **Bundle Size** | 300+ KB (legacy crypto) | 50-100 KB (modern crypto) |
+| **TypeScript** | Partial types | 100% type-safe |
+| **Transport** | HTTP-only | HTTP, WebSocket, IPC |
+| **Tree-shaking** | ❌ Limited | ✅ Full support |
+| **BigInt** | BN.js (legacy) | Native BigInt |
+| **Address Type** | String / Buffer | Branded types |
+| **Future-proof** | ❌ Legacy | ✅ Actively developed |
 
 #### **Energy & Efficiency**
 
 **Old Stack** (`@solana/web3.js` + Anchor):
-
 - 📦 **300+ KB** base bundle
 - 🐌 **3-5 seconds** to parse/load
 - 💾 **50+ MB** node_modules
@@ -504,7 +497,6 @@ Pump Kit uses **Solana Kit 3.0** - the next generation of Solana libraries. Here
 - 🔧 Requires polyfills for modern browsers
 
 **New Stack** (Solana Kit 3.0):
-
 - 📦 **50-100 KB** base bundle (3x smaller!)
 - 🚀 **<1 second** to parse/load (3x faster!)
 - 💾 **10 MB** node_modules (5x smaller!)
@@ -512,7 +504,6 @@ Pump Kit uses **Solana Kit 3.0** - the next generation of Solana libraries. Here
 - 🔧 No polyfills needed
 
 **Real Impact**:
-
 - **Faster page loads** - Users get to trading faster
 - **Better mobile experience** - Less data transferred
 - **Lower hosting costs** - Smaller bundles = less bandwidth
@@ -542,12 +533,12 @@ bun build            # Bun:  1 second (5x faster!)
 
 #### **Bun Features for Pump Kit**
 
-✅ **Native TypeScript** - No transpilation needed
-✅ **Built-in bundler** - No webpack/rollup/vite
-✅ **Built-in test runner** - No jest/vitest
-✅ **3x faster installs** - Better caching
-✅ **10x faster startup** - Optimized runtime
-✅ **Drop-in Node.js replacement** - Works everywhere
+✅ **Native TypeScript** - No transpilation needed  
+✅ **Built-in bundler** - No webpack/rollup/vite  
+✅ **Built-in test runner** - No jest/vitest  
+✅ **3x faster installs** - Better caching  
+✅ **10x faster startup** - Optimized runtime  
+✅ **Drop-in Node.js replacement** - Works everywhere  
 
 #### **Development Experience**
 
@@ -575,7 +566,6 @@ bun test        # 0.5 seconds
 Pump Kit uses **Codama** to generate TypeScript clients directly from on-chain IDLs.
 
 **Benefits**:
-
 - ✅ **Always up-to-date** - Regenerate when program updates
 - ✅ **Type-safe** - All accounts/instructions fully typed
 - ✅ **Zero mistakes** - Can't pass wrong account types
@@ -605,29 +595,29 @@ const ix = getBuyInstruction({
 
 ### Bundle Size
 
-| SDK                | Bundle Size           | Gzipped               |
-| ------------------ | --------------------- | --------------------- |
-| **Pump Kit** | 248 KB                | ~70 KB                |
-| Old SDK (web3.js)  | 450 KB+               | ~120 KB               |
-| **Savings**  | **45% smaller** | **40% smaller** |
+| SDK | Bundle Size | Gzipped |
+|-----|------------|---------|
+| **Pump Kit** | 248 KB | ~70 KB |
+| Old SDK (web3.js) | 450 KB+ | ~120 KB |
+| **Savings** | **45% smaller** | **40% smaller** |
 
 ### Development Speed
 
-| Task            | Old SDK   | Pump Kit | Speedup     |
-| --------------- | --------- | -------- | ----------- |
-| Buy transaction | 30+ lines | 8 lines  | 3.7x faster |
-| Mint + buy      | 60+ lines | 15 lines | 4x faster   |
-| Type-checking   | 200ms     | 50ms     | 4x faster   |
-| Build time      | 5s        | 1s       | 5x faster   |
-| Install time    | 30s       | 10s      | 3x faster   |
+| Task | Old SDK | Pump Kit | Speedup |
+|------|---------|----------|---------|
+| Buy transaction | 30+ lines | 8 lines | 3.7x faster |
+| Mint + buy | 60+ lines | 15 lines | 4x faster |
+| Type-checking | 200ms | 50ms | 4x faster |
+| Build time | 5s | 1s | 5x faster |
+| Install time | 30s | 10s | 3x faster |
 
 ### Runtime Performance
 
-| Operation         | Old SDK | Pump Kit     | Improvement |
-| ----------------- | ------- | ------------ | ----------- |
-| PDA derivation    | 5ms     | 2ms          | 2.5x faster |
-| Instruction build | 10ms    | 3ms          | 3.3x faster |
-| Type validation   | Runtime | Compile-time | ∞x faster  |
+| Operation | Old SDK | Pump Kit | Improvement |
+|-----------|---------|----------|-------------|
+| PDA derivation | 5ms | 2ms | 2.5x faster |
+| Instruction build | 10ms | 3ms | 3.3x faster |
+| Type validation | Runtime | Compile-time | ∞x faster |
 
 ---
 
@@ -778,26 +768,23 @@ bun run codegen        # Regenerate from IDLs
 ## 🎯 Roadmap
 
 ### ✅ Phase 1: Core SDK (Complete)
-
-- [X] Bonding curve operations (buy, sell, create)
-- [X] PDA derivation helpers
-- [X] Slippage protection system
-- [X] Recipe functions with auto-slippage
-- [X] Full TypeScript types
-- [X] Codama integration
-- [X] Production build system
+- [x] Bonding curve operations (buy, sell, create)
+- [x] PDA derivation helpers
+- [x] Slippage protection system
+- [x] Recipe functions with auto-slippage
+- [x] Full TypeScript types
+- [x] Codama integration
+- [x] Production build system
 
 ### 🚧 Phase 2: Complete AMM (In Progress)
-
-- [X] AMM PDA helpers
-- [X] AMM instruction builders (structure)
+- [x] AMM PDA helpers
+- [x] AMM instruction builders (structure)
 - [ ] Wire deposit/withdraw instructions
 - [ ] Pool creation helpers
 - [ ] AMM swap operations
 - [ ] Multi-pool support
 
 ### 📋 Phase 3: Enhanced Features (Planned)
-
 - [ ] Transaction pipeline (send & confirm)
 - [ ] Error decoding with Codama error maps
 - [ ] Simulation & pre-flight checks
@@ -806,7 +793,6 @@ bun run codegen        # Regenerate from IDLs
 - [ ] Volume tracking integration
 
 ### 🎁 Phase 4: Developer Experience (Planned)
-
 - [ ] Interactive examples
 - [ ] React hooks package (`pump-kit-react`)
 - [ ] CLI tools
@@ -818,15 +804,11 @@ bun run codegen        # Regenerate from IDLs
 ## 📖 Learn More
 
 ### Documentation
-
-- [Setup Guide](./pump-kit-setup.md) - Initial setup blueprint
-- [Step 2: Wiring](./pump-kit-step-02-wiring.md) - PDAs and clients
-- [Step 3: Recipes](./pump-kit-step-03-recipes.md) - High-level flows
-- [Implementation Complete](./IMPLEMENTATION_COMPLETE.md) - What's built
-- [Cleanup Summary](./CLEANUP_COMPLETE.md) - Code quality
+- [Setup Guide](./md-docs/pump-kit-setup.md) - Initial setup blueprint
+- [Step 2: Wiring](./md-docs/pump-kit-step-02-wiring.md) - PDAs and clients
+- [Step 3: Recipes](./md-docs/pump-kit-step-03-recipes.md) - High-level flows
 
 ### Technical Deep-Dives
-
 - [Solana Kit 3.0](https://github.com/anza-xyz/solana-web3.js) - Next-gen Solana library
 - [Codama](https://github.com/codama-idl/codama) - IDL to TypeScript generator
 - [Bun](https://bun.sh) - Fast all-in-one JavaScript runtime
@@ -879,3 +861,4 @@ This SDK is community-built and not officially affiliated with Pump.fun. Use at 
 **Built with ❤️ by the Solana community**
 
 [GitHub](https://github.com/yourusername/pump-kit) • [Twitter](https://twitter.com/yourhandle) • [Discord](https://discord.gg/yourserver)
+
