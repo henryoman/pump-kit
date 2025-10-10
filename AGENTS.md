@@ -21,4 +21,6 @@ Never point integration tests at mainnet beta. Defaults now target devnet unless
 ## Swap & Client Notes
 - `src/clients/pump.ts` now resolves the fee config PDA (`feeConfigPda`) and creator vault using either the supplied `bondingCurveCreator` or a fetched bonding-curve account. Always pass a known creator when available to avoid RPC lookups.
 - High-level swap helpers (`buy`, `sell`, `quickBuy`, `quickSell`) accept either explicit lamport limits (`maxSolCostLamports` / `minSolOutputLamports`) or estimated values with `slippageBps`. Do not mix the two modes in a single call.
-- Liquidity and AMM helpers remain internal; avoid exporting or referencing them until the AMM client is complete. Examples and docs should note the WIP status.
+- Liquidity helpers (`src/liquidity.ts`) now leverage the AMM client to build deposit/withdraw instructions; callers may pass `poolAddress` or `poolCreator` when targeting specific pools (default index = 0, quote mint = WSOL).
+- SOL wrapping/unwrapping helpers live in `src/utils/wsol.ts` and expose `buildWrapSolInstructions` / `buildUnwrapSolInstructions` for inline wrapping or persistent WSOL strategies.
+- Transaction utilities live in `src/utils/transaction.ts` and are re-exported. They build transaction messages, accept prepend/append instruction hooks (or the new `priorityFees` object) for compute-budget/Jito flows, forward to Solana Kit send/confirm helpers, and expose simulation for pre-flight tests.

@@ -133,10 +133,10 @@ const instruction = await sell({
 ```typescript
 import { quickBuy, quickSell } from "pump-kit";
 
-// Buy with 4 parameters
+// Buy with token amount + estimated SOL (lamports)
 const buyIx = await quickBuy(myWallet, "TokenMint", 1_000_000n, 5_000_000n);
 
-// Sell with 4 parameters
+// Sell with token amount + estimated SOL (lamports)
 const sellIx = await quickSell(myWallet, "TokenMint", 250_000n, 1_000_000n);
 ```
 
@@ -162,7 +162,133 @@ const { createInstruction, buyInstruction } = await mintWithFirstBuy({
 });
 ```
 
-> **Note:** Liquidity pool helpers are under active development and intentionally not exported in the current release to avoid runtime surprises. Follow the repository updates for the first stable release of AMM tooling.
+### One-Line Create + Buy
+
+```typescript
+import { createAndBuy } from "pump-kit";
+
+const { signature, mint } = await createAndBuy({
+  creator: myWallet,
+  metadata: { name: "My Token", symbol: "MTK", uri: "https://arweave.net/meta.json" },
+  firstBuyTokenAmount: 10_000_000n,
+  estimatedFirstBuyCost: 100_000_000n,
+  priorityFees: { computeUnitLimit: 400_000, computeUnitPriceMicroLamports: 10_000n },
+});
+```
+
+> `createAndBuy` generates the mint keypair (returning it as `mint`), builds the create + buy instructions, applies optional priority fees, and submits the transaction in one call.
+
+
+### Build & Send Transactions
+
+```typescript
+import {
+  buildTransaction,
+  sendAndConfirmTransaction,
+  simulateTransaction,
+} from "pump-kit";
+
+const { transactionMessage } = await buildTransaction({
+  instructions: [buyIx],
+  payer: myWallet,
+});
+
+const { signature, slot } = await sendAndConfirmTransaction({
+  instructions: [buyIx],
+  payer: myWallet,
+});
+
+const simulation = await simulateTransaction({
+  instructions: [buyIx],
+  payer: myWallet,
+});
+```
+
+> Tip: Use `prependInstructions` / `appendInstructions` to inject compute-budget or Jito tip instructions ahead of your core SDK flows.
+
+### Priority Fees
+
+```typescript
+import { buildPriorityFeeInstructions, sendAndConfirmTransaction } from "pump-kit";
+
+const priority = buildPriorityFeeInstructions({
+  computeUnitLimit: 400_000,
+  computeUnitPriceMicroLamports: 10_000n,
+});
+
+await sendAndConfirmTransaction({
+  instructions: [tradeIx],
+  payer: myWallet,
+  prependInstructions: priority,
+});
+```
+
+> `priorityFees` is also accepted directly by `buildTransaction`, `sendAndConfirmTransaction`, and `simulateTransaction` to auto-prepend these instructions.
+
+### Wrap & Unwrap SOL
+
+```typescript
+import { buildWrapSolInstructions, buildUnwrapSolInstructions } from "pump-kit";
+
+const wrap = buildWrapSolInstructions({ owner: myWallet, amount: 1_000_000n, autoClose: true });
+
+await sendAndConfirmTransaction({
+  instructions: [tradeIx],
+  payer: myWallet,
+  prependInstructions: wrap.prepend,
+  appendInstructions: wrap.append,
+});
+```
+
+> Use `buildUnwrapSolInstructions` later if you keep a persistent WSOL balance, and check `WRAPPING.md` for detailed patterns.
+
+### Provide & Withdraw Liquidity
+
+```typescript
+import { addLiquidity, removeLiquidity, WSOL } from "pump-kit";
+
+const depositIx = await addLiquidity({
+  user: myWallet,
+  baseMint: "TokenMintAddress",
+  quoteMint: WSOL,
+  poolIndex: 0,
+  maxBaseAmountIn: 1_000_000n,
+  maxQuoteAmountIn: 5_000_000n,
+  minLpTokensOut: 0n,
+});
+
+const withdrawIx = await removeLiquidity({
+  user: myWallet,
+  baseMint: "TokenMintAddress",
+  quoteMint: WSOL,
+  lpAmountIn: 500_000n,
+  minBaseAmountOut: 0n,
+  minQuoteAmountOut: 0n,
+});
+```
+
+> Set `poolAddress` or `poolCreator` if you need to target a specific AMM pool derivation; both helpers default to pool index 0 and quote mint `WSOL`. Remember to prepend wrapping instructions or ATA creations if your wallet lacks the necessary accounts.
+
+### Pump.fun Event Feed
+
+```typescript
+import { createPumpEventManager } from "pump-kit";
+import { Connection } from "@solana/web3.js";
+
+const connection = new Connection(process.env.RPC_URL!);
+const events = createPumpEventManager(connection);
+
+const id = events.addEventListener("trade", (event) => {
+  console.log(event.type, event.signature, event.parsed ?? event.rawLog);
+});
+
+// later
+events.removeEventListener(id);
+```
+
+> Events are dispatched per log line. The `parsed` field will attempt to decode any JSON payload; inspect `rawLog` for custom handling.
+
+
 
 ---
 
@@ -171,23 +297,39 @@ const { createInstruction, buyInstruction } = await mintWithFirstBuy({
 ### Simple API (Recommended)
 
 ```typescript
-// Super simple - just 4 parameters
-quickBuy(wallet, mint, amount, maxCost)
-quickSell(wallet, mint, amount, minReceive)
+// Super simple - token amount + estimated lamports
+quickBuy(wallet, mint, tokenAmount, estimatedSolCostLamports)
+quickSell(wallet, mint, tokenAmount, estimatedSolOutputLamports)
 
 // With options (slippage expressed in basis points)
-buy({ user, mint, tokenAmount, estimatedSolCostLamports, slippageBps? })
-sell({ user, mint, tokenAmount, estimatedSolOutputLamports, slippageBps? })
+buy({ user, mint, tokenAmount, estimatedSolCostLamports, slippageBps?, feeRecipient?, bondingCurveCreator? })
+sell({ user, mint, tokenAmount, estimatedSolOutputLamports, slippageBps?, feeRecipient?, bondingCurveCreator? })
 
-// Token & Liquidity
+// Transaction helpers
+buildTransaction({ instructions, payer, prependInstructions?, appendInstructions? })
+sendAndConfirmTransaction({ instructions, payer, sendOptions? })
+simulateTransaction({ instructions, payer, options? })
+
+// Liquidity helpers
+quickAddLiquidity(wallet, baseMint, maxBaseAmountIn, maxQuoteAmountIn)
+quickRemoveLiquidity(wallet, baseMint, lpAmountIn)
+addLiquidity({ user, baseMint, quoteMint?, maxBaseAmountIn, maxQuoteAmountIn, ... })
+removeLiquidity({ user, baseMint, quoteMint?, lpAmountIn, minBaseAmountOut?, ... })
+
+// Token launch helper
 mintWithFirstBuy({ user, mint, name, symbol, uri, ... })
 ```
+> Slippage defaults to 50 bps (0.5%). Override by providing `slippageBps` when calling `buy`/`sell` or pass basis-point values into the quick helpers.
+
 
 ### Core Functions
 
 - `buy()` / `quickBuy()` - Buy tokens with automatic slippage protection
 - `sell()` / `quickSell()` - Sell tokens with minimum output protection
 - `mintWithFirstBuy()` - Create and launch a new token
+- `addLiquidity()` / `removeLiquidity()` - Provide or withdraw AMM liquidity (defaults target WSOL quote)
+- `buildTransaction()` / `sendAndConfirmTransaction()` / `simulateTransaction()` - Assemble, send, and test Solana transactions using Kit defaults
+- `buildPriorityFeeInstructions()` - Generate compute-budget instructions for priority fees (Jito tips, CU limits)
 
 ### Utilities
 
@@ -270,4 +412,3 @@ MIT License - see [LICENSE](./LICENSE) for details.
 ## Disclaimer
 
 This SDK is community-built and not officially affiliated with Pump.fun. Use at your own risk. Always test on devnet first.
-

@@ -117,3 +117,15 @@ export async function userVolumeAccumulatorPda(user: Address | string): Promise<
   });
   return address;
 }
+
+/**
+ * Derives the event authority PDA.
+ * Seed: ["__event_authority"]
+ */
+export async function eventAuthorityPda(): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
+    programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
+    seeds: [enc.encode("__event_authority")],
+  });
+  return address;
+}

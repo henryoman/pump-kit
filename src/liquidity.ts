@@ -3,108 +3,143 @@
  */
 
 import type { TransactionSigner, Instruction } from "@solana/kit";
-import { DEFAULT_SLIPPAGE_BPS } from "./utils/slippage";
+import { deposit as buildDepositInstruction, withdraw as buildWithdrawInstruction } from "./clients/amm";
+import { WSOL_ADDRESS } from "./utils/wsol";
 
 // Wrapped SOL address
-const WSOL = "So11111111111111111111111111111111111111112";
+export const WSOL = WSOL_ADDRESS;
 
 export interface AddLiquidityParams {
-  /** Your wallet */
   user: TransactionSigner;
-  /** Token mint address */
-  mint: string;
-  /** Amount of tokens to add */
-  tokenAmount: bigint;
-  /** Amount of SOL to add (in lamports) */
-  solAmount: bigint;
-  /** Slippage tolerance (optional, default 0.5%) */
-  slippage?: number;
+  baseMint: string;
+  quoteMint?: string;
+  poolIndex?: number;
+  poolAddress?: string;
+  poolCreator?: string;
+  maxBaseAmountIn: bigint;
+  maxQuoteAmountIn: bigint;
+  minLpTokensOut?: bigint;
+  tokenProgram?: string;
+  token2022Program?: string;
 }
 
 export interface RemoveLiquidityParams {
-  /** Your wallet */
   user: TransactionSigner;
-  /** Token mint address */
-  mint: string;
-  /** Amount of LP tokens to burn */
-  lpAmount: bigint;
-  /** Slippage tolerance (optional, default 0.5%) */
-  slippage?: number;
+  baseMint: string;
+  quoteMint?: string;
+  poolIndex?: number;
+  poolAddress?: string;
+  poolCreator?: string;
+  lpAmountIn: bigint;
+  minBaseAmountOut?: bigint;
+  minQuoteAmountOut?: bigint;
+  tokenProgram?: string;
+  token2022Program?: string;
 }
 
 /**
- * Add liquidity to a pool - ultra simple
- * 
- * Pool Index Explanation:
- * - Most tokens have 1 main pool (index 0)
- * - This is automatically used, you don't need to specify it
- * - Only advanced users with multiple pools need to worry about this
+ * Add liquidity to the Pump AMM pool.
  */
 export async function addLiquidity(params: AddLiquidityParams): Promise<Instruction> {
   const {
     user,
-    mint,
-    tokenAmount,
-    solAmount,
-    slippage = DEFAULT_SLIPPAGE_BPS,
+    baseMint,
+    quoteMint = WSOL_ADDRESS,
+    poolIndex,
+    poolAddress,
+    poolCreator,
+    maxBaseAmountIn,
+    maxQuoteAmountIn,
+    minLpTokensOut,
+    tokenProgram,
+    token2022Program,
   } = params;
 
-  if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
-  if (solAmount <= 0n) throw new Error("SOL amount must be positive");
+  if (maxBaseAmountIn <= 0n) throw new Error("maxBaseAmountIn must be positive");
+  if (maxQuoteAmountIn <= 0n) throw new Error("maxQuoteAmountIn must be positive");
 
-  // TODO: Implement using AMM client
-  // This will:
-  // 1. Find the main pool (index 0) for this token
-  // 2. Calculate optimal ratio automatically
-  // 3. Add liquidity with slippage protection
-  // 4. Return LP tokens to user
-  
-  throw new Error("addLiquidity not yet implemented - coming soon!");
+  return await buildDepositInstruction({
+    user,
+    baseMint,
+    quoteMint,
+    index: poolIndex,
+    poolAddress,
+    poolCreator,
+    maxBaseIn: maxBaseAmountIn,
+    maxQuoteIn: maxQuoteAmountIn,
+    minLpOut: minLpTokensOut ?? 0n,
+    tokenProgram,
+    token2022Program,
+  });
 }
 
 /**
- * Remove liquidity from a pool - equally simple
+ * Remove liquidity from the Pump AMM pool.
  */
 export async function removeLiquidity(params: RemoveLiquidityParams): Promise<Instruction> {
   const {
     user,
-    mint,
-    lpAmount,
-    slippage = DEFAULT_SLIPPAGE_BPS,
+    baseMint,
+    quoteMint = WSOL_ADDRESS,
+    poolIndex,
+    poolAddress,
+    poolCreator,
+    lpAmountIn,
+    minBaseAmountOut,
+    minQuoteAmountOut,
+    tokenProgram,
+    token2022Program,
   } = params;
 
-  if (lpAmount <= 0n) throw new Error("LP amount must be positive");
+  if (lpAmountIn <= 0n) throw new Error("lpAmountIn must be positive");
 
-  // TODO: Implement using AMM client
-  // This will:
-  // 1. Find the pool automatically
-  // 2. Calculate your share of tokens + SOL
-  // 3. Withdraw with slippage protection
-  // 4. Return tokens + SOL to your wallet
-  
-  throw new Error("removeLiquidity not yet implemented - coming soon!");
+  return await buildWithdrawInstruction({
+    user,
+    baseMint,
+    quoteMint,
+    index: poolIndex,
+    poolAddress,
+    poolCreator,
+    lpAmountIn,
+    minBaseOut: minBaseAmountOut ?? 0n,
+    minQuoteOut: minQuoteAmountOut ?? 0n,
+    tokenProgram,
+    token2022Program,
+  });
 }
 
 /**
- * Quick add liquidity - even simpler with just 4 parameters
+ * Quick helper to add liquidity with sensible defaults (quote defaults to wSOL, min LP = 0).
  */
 export async function quickAddLiquidity(
   user: TransactionSigner,
-  mint: string,
-  tokenAmount: bigint,
-  solAmount: bigint
+  baseMint: string,
+  maxBaseAmountIn: bigint,
+  maxQuoteAmountIn: bigint,
+  options: Omit<AddLiquidityParams, "user" | "baseMint" | "maxBaseAmountIn" | "maxQuoteAmountIn"> = {}
 ): Promise<Instruction> {
-  return addLiquidity({ user, mint, tokenAmount, solAmount });
+  return addLiquidity({
+    user,
+    baseMint,
+    maxBaseAmountIn,
+    maxQuoteAmountIn,
+    ...options,
+  });
 }
 
 /**
- * Quick remove liquidity - just 3 parameters
+ * Quick helper to remove liquidity with defaults (min outputs set to zero).
  */
 export async function quickRemoveLiquidity(
   user: TransactionSigner,
-  mint: string,
-  lpAmount: bigint
+  baseMint: string,
+  lpAmountIn: bigint,
+  options: Omit<RemoveLiquidityParams, "user" | "baseMint" | "lpAmountIn"> = {}
 ): Promise<Instruction> {
-  return removeLiquidity({ user, mint, lpAmount });
+  return removeLiquidity({
+    user,
+    baseMint,
+    lpAmountIn,
+    ...options,
+  });
 }
-

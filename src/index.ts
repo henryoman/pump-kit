@@ -17,6 +17,23 @@ export {
   type MintWithFirstBuyParams,
 } from "./recipes/mintFirstBuy";
 
+export {
+  createAndBuy,
+  type CreateAndBuyOptions,
+  type CreateAndBuyResult,
+  type TokenMetadata,
+} from "./helpers/createAndBuy";
+
+export {
+  addLiquidity,
+  removeLiquidity,
+  quickAddLiquidity,
+  quickRemoveLiquidity,
+  type AddLiquidityParams,
+  type RemoveLiquidityParams,
+  WSOL,
+} from "./liquidity";
+
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -54,3 +71,34 @@ export {
   bpsToPercent,
   DEFAULT_SLIPPAGE_BPS,
 } from "./utils/slippage";
+
+export {
+  buildTransaction,
+  sendAndConfirmTransaction,
+  simulateTransaction,
+  type TransactionResult,
+  type BuildTransactionParams,
+  type SendAndConfirmTransactionParams,
+  type SimulateTransactionParams,
+  type SimulationResponse,
+  type PriorityFeeOptions,
+  type SendOptions,
+  buildPriorityFeeInstructions,
+} from "./utils/transaction";
+
+export {
+  buildWrapSolInstructions,
+  buildUnwrapSolInstructions,
+  type WrapSolParams,
+  type WrapSolInstructions,
+  WSOL_ADDRESS,
+} from "./utils/wsol";
+
+export {
+  createPumpEventManager,
+  PumpEventManager,
+  type PumpEvent,
+  type PumpEventListener,
+  type PumpEventManagerOptions,
+  type PumpEventType,
+} from "./events/pumpEvents";
