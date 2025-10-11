@@ -12,8 +12,7 @@ async function main() {
   const buyIx = await buy({
     user: wallet,
     mint: "TokenMintAddress",
-    tokenAmount: 1_000_000n,
-    estimatedSolCostLamports: 5_000_000n,
+    solAmountLamports: 5_000_000n,
     slippageBps: 100,  // 100 bps = 1%
   });
 
@@ -24,7 +23,6 @@ async function main() {
     user: wallet,
     mint: "TokenMintAddress",
     tokenAmount: 500_000n,
-    estimatedSolOutputLamports: 2_000_000n,
     slippageBps: 25,  // 25 bps = 0.25%
   });
 

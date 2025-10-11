@@ -178,11 +178,11 @@ Verify slippage calculations work as expected:
 ```typescript
 import { addSlippage, subSlippage } from "pump-kit";
 
-// Test max input with 0.5% slippage
-const maxCost = addSlippage(5_000_000n, 50); // 5.025M lamports
-console.log("Max cost with slippage:", maxCost);
+// Expand a SOL budget by 0.5% to cover price movement
+const maxBudget = addSlippage(5_000_000n, 50); // 5.025M lamports
+console.log("Max budget with slippage:", maxBudget);
 
-// Test min output with 0.5% slippage
+// Tighten a SOL output floor by 0.5%
 const minOut = subSlippage(1_000_000n, 50); // 995k lamports
 console.log("Min output with slippage:", minOut);
 ```
@@ -334,4 +334,3 @@ If you encounter issues while testing:
    - Test output
    - Environment details
    - Minimal reproduction code
-

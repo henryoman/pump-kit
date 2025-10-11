@@ -11,7 +11,7 @@
 
 - Liquidity helpers rely on the AMM client (`src/clients/amm.ts`) to derive pool PDAs and user ATAs; callers can specify `poolAddress` or `poolCreator` when they need to target specific pools.- Transaction utilities in `src/utils/transaction.ts` accept a `priorityFees` object, auto-generate compute-budget instructions, and pair with the new wrap helpers so callers can prepare WSOL inside the same transaction.
 
-- Swap APIs now use explicit lamport-based naming (`tokenAmount`, `estimatedSolCostLamports`, `slippageBps`) and enforce one of two input modes (explicit max cost or estimated cost with slippage).
+- Swap APIs now accept input-side budgets (`solAmountLamports` for buys, `tokenAmount` for sells), derive curve quotes automatically, and still expose lamport-based slippage guards.
 - `mintWithFirstBuy` aligns with swap defaults by accepting an optional fee recipient and defaulting to `DEFAULT_FEE_RECIPIENT` when omitted.
 - RPC configuration defaults to devnet to match the non-production guidance (`src/config/rpc.ts`).
 

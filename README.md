@@ -89,8 +89,7 @@ const wallet = await generateKeyPair();
 const instruction = await quickBuy(
   wallet,
   "TokenMintAddress",
-  1_000_000n,      // amount
-  5_000_000n       // max SOL (lamports)
+  5_000_000n       // SOL budget (lamports)
 );
 
 // That's it! Auto slippage, auto PDAs, zero complexity.
@@ -108,9 +107,10 @@ import { buy } from "pump-kit";
 const instruction = await buy({
   user: myWallet,
   mint: "TokenMintAddress",
-  amount: 1_000_000n,
-  maxCost: 5_000_000n, // Max SOL in lamports
+  solAmountLamports: 5_000_000n, // Spend up to ~0.005 SOL
 });
+
+// Pump Kit fetches the bonding curve, quotes the token amount, and applies your slippage guard automatically.
 
 // Auto slippage protection included (0.5% default)
 ```
@@ -123,9 +123,11 @@ import { sell } from "pump-kit";
 const instruction = await sell({
   user: myWallet,
   mint: "TokenMintAddress",
-  amount: 250_000n,
-  minReceive: 1_000_000n, // Min SOL in lamports
+  tokenAmount: 250_000n,
+  slippageBps: 75, // optional, defaults to 50 bps (0.5%)
 });
+
+// The SDK computes the expected SOL output and derives a min-out guard from your slippage.
 ```
 
 ### Even Simpler
@@ -133,11 +135,11 @@ const instruction = await sell({
 ```typescript
 import { quickBuy, quickSell } from "pump-kit";
 
-// Buy with token amount + estimated SOL (lamports)
-const buyIx = await quickBuy(myWallet, "TokenMint", 1_000_000n, 5_000_000n);
+// Buy with SOL budget (lamports)
+const buyIx = await quickBuy(myWallet, "TokenMint", 5_000_000n);
 
-// Sell with token amount + estimated SOL (lamports)
-const sellIx = await quickSell(myWallet, "TokenMint", 250_000n, 1_000_000n);
+// Sell with token amount (tokens in)
+const sellIx = await quickSell(myWallet, "TokenMint", 250_000n);
 ```
 
 ### Mint New Token
@@ -298,12 +300,12 @@ events.removeEventListener(id);
 
 ```typescript
 // Super simple - token amount + estimated lamports
-quickBuy(wallet, mint, tokenAmount, estimatedSolCostLamports)
-quickSell(wallet, mint, tokenAmount, estimatedSolOutputLamports)
+quickBuy(wallet, mint, solAmountLamports, options?)
+quickSell(wallet, mint, tokenAmount, options?)
 
 // With options (slippage expressed in basis points)
-buy({ user, mint, tokenAmount, estimatedSolCostLamports, slippageBps?, feeRecipient?, bondingCurveCreator? })
-sell({ user, mint, tokenAmount, estimatedSolOutputLamports, slippageBps?, feeRecipient?, bondingCurveCreator? })
+buy({ user, mint, solAmountLamports, slippageBps?, feeRecipient?, bondingCurveCreator?, trackVolume? })
+sell({ user, mint, tokenAmount, slippageBps?, feeRecipient?, bondingCurveCreator? })
 
 // Transaction helpers
 buildTransaction({ instructions, payer, prependInstructions?, appendInstructions? })
