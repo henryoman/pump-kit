@@ -9,16 +9,16 @@ import { DEFAULT_SLIPPAGE_BPS, subSlippage, validateSlippage } from "../utils/sl
 import { tokensToRaw, solToLamports } from "../utils/amounts";
 import { getDefaultCommitment } from "../config/commitment";
 
+const DEFAULT_TOKEN_DECIMALS = 6;
+
 type RpcClient = Parameters<typeof buildSellInstruction>[0]["rpc"];
 type CommitmentLevel = Parameters<typeof buildSellInstruction>[0]["commitment"];
 
 export interface SellWithSlippageParams {
   user: TransactionSigner;
   mint: Address | string;
-  /** Human-readable token amount to sell. */
+  /** Amount of tokens to sell (human-readable). */
   tokenAmount: number;
-  /** Token decimals (defaults to 6). */
-  tokenDecimals?: number;
   /** Estimated SOL output in SOL units. */
   estimatedSolOutSol: number;
   slippageBps?: number;
@@ -33,7 +33,6 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
     user,
     mint,
     tokenAmount,
-    tokenDecimals = 6,
     estimatedSolOutSol,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
     feeRecipient = DEFAULT_FEE_RECIPIENT,
@@ -46,7 +45,7 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
   if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) throw new Error("Token amount must be a positive number");
   if (!Number.isFinite(estimatedSolOutSol) || estimatedSolOutSol < 0) throw new Error("Estimated SOL output cannot be negative");
 
-  const tokenAmountRaw = tokensToRaw(tokenAmount, tokenDecimals);
+  const tokenAmountRaw = tokensToRaw(tokenAmount, DEFAULT_TOKEN_DECIMALS);
   const estimatedSolOutLamports = solToLamports(estimatedSolOutSol);
   const minSolOutputLamports = subSlippage(estimatedSolOutLamports, slippageBps);
 
@@ -66,7 +65,6 @@ export interface SimpleSellParams {
   user: TransactionSigner;
   mint: Address | string;
   tokenAmount: number;
-  tokenDecimals?: number;
   minSolOutputSol: number;
   feeRecipient?: Address | string;
   bondingCurveCreator?: Address | string;
@@ -79,7 +77,6 @@ export async function sellSimple(params: SimpleSellParams): Promise<Instruction>
     user,
     mint,
     tokenAmount,
-    tokenDecimals = 6,
     minSolOutputSol,
     feeRecipient = DEFAULT_FEE_RECIPIENT,
     bondingCurveCreator,
@@ -90,7 +87,7 @@ export async function sellSimple(params: SimpleSellParams): Promise<Instruction>
   if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) throw new Error("Token amount must be a positive number");
   if (!Number.isFinite(minSolOutputSol) || minSolOutputSol < 0) throw new Error("Min SOL output cannot be negative");
 
-  const tokenAmountRaw = tokensToRaw(tokenAmount, tokenDecimals);
+  const tokenAmountRaw = tokensToRaw(tokenAmount, DEFAULT_TOKEN_DECIMALS);
   const minSolOutputLamports = solToLamports(minSolOutputSol);
 
   return await buildSellInstruction({

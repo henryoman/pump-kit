@@ -1,7 +1,13 @@
 import { describe, test, expect, beforeAll } from "bun:test";
 import { buy, sell } from "../../src/swap";
-import { quoteBuyWithSolAmount, quoteSellForTokenAmount, type BondingCurveState, type FeeStructure } from "../../src/ammsdk/bondingCurveMath";
+import {
+  quoteBuyWithSolAmount,
+  quoteSellForTokenAmount,
+  type BondingCurveState,
+  type FeeStructure,
+} from "../../src/ammsdk/bondingCurveMath";
 import { addSlippage, subSlippage } from "../../src/utils/slippage";
+import { solToLamports, tokensToRaw } from "../../src/utils/amounts";
 import type { TransactionSigner } from "@solana/kit";
 import { createTestWallet } from "../setup";
 import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
@@ -50,15 +56,16 @@ describe("Swap helpers", () => {
 
   test("buy() derives token amount from SOL budget", async () => {
     const slippageBps = 75;
-    const solBudget = 1_000_000n;
+    const solBudgetSol = 0.8;
+    const solBudgetLamports = solToLamports(solBudgetSol);
     const curveState = mockCurve(testWallet.address);
-    const quote = quoteBuyWithSolAmount(curveState, mockFees, solBudget);
+    const quote = quoteBuyWithSolAmount(curveState, mockFees, solBudgetLamports);
     const expectedMaxCost = addSlippage(quote.totalSolCostLamports, slippageBps);
 
     const instruction = await buy({
       user: testWallet,
       mint: mintAddress,
-      solAmountLamports: solBudget,
+      solAmount: solBudgetSol,
       slippageBps,
       feeRecipient: DEFAULT_FEE_RECIPIENT,
       bondingCurveCreator: testWallet.address,
@@ -75,7 +82,7 @@ describe("Swap helpers", () => {
     const instruction = await buy({
       user: testWallet,
       mint: mintAddress,
-      solAmountLamports: 500_000n,
+      solAmount: 0.4,
       bondingCurveCreator: testWallet.address,
       feeRecipient: DEFAULT_FEE_RECIPIENT,
       curveStateOverride: mockCurve(testWallet.address),
@@ -118,17 +125,20 @@ describe("Swap helpers", () => {
     expect(accountAddresses).toEqual(expectedAccounts.map(getAddress));
   });
 
-  test("sell() derives min SOL output from slippage guard", async () => {
-    const tokenAmount = 750_000n;
+  test("sell() derives min SOL output from slippage guard (fixed amount)", async () => {
+    const tokenAmountHuman = 0.75;
+    const decimals = 6;
+    const tokenAmountRaw = tokensToRaw(tokenAmountHuman, decimals);
     const slippageBps = 100;
     const curveState = mockCurve(testWallet.address);
-    const quote = quoteSellForTokenAmount(curveState, mockFees, tokenAmount);
+    const quote = quoteSellForTokenAmount(curveState, mockFees, tokenAmountRaw);
     const expectedMinOut = subSlippage(quote.solOutputLamports, slippageBps);
 
     const instruction = await sell({
       user: testWallet,
       mint: mintAddress,
-      tokenAmount,
+      tokenAmount: tokenAmountHuman,
+      tokenDecimals: decimals,
       slippageBps,
       feeRecipient: DEFAULT_FEE_RECIPIENT,
       bondingCurveCreator: testWallet.address,
@@ -138,6 +148,8 @@ describe("Swap helpers", () => {
 
     const decoded = getSellInstructionDataDecoder().decode(instruction.data);
     expect(decoded.minSolOutput).toBe(expectedMinOut);
-    expect(decoded.amount).toBe(tokenAmount);
+    expect(decoded.amount).toBe(tokenAmountRaw);
   });
+
+  // TODO: add percentage-based sell tests once swap helpers expose balance injection hooks.
 });

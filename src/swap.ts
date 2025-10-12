@@ -4,6 +4,7 @@
  */
 
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
+import { address as toAddress } from "@solana/kit";
 import type { RpcClient } from "./config/connection";
 import { buySimple } from "./recipes/buy";
 import { sellSimple } from "./recipes/sell";
@@ -21,6 +22,8 @@ import {
 import type { Fees } from "./pumpsdk/generated/types/fees";
 import { solToLamports, tokensToRaw } from "./utils/amounts";
 import { getDefaultCommitment } from "./config/commitment";
+import { findAssociatedTokenPda } from "@solana-program/token";
+import { TOKEN_PROGRAM_ID } from "./config/addresses";
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
@@ -32,7 +35,7 @@ type WithRpcOptions = {
 export type BuyParams = WithRpcOptions & {
   user: TransactionSigner;
   mint: Address | string;
-  /** SOL budget (before slippage), expressed in whole SOL. */
+  /** SOL budget (before slippage), expressed in SOL. */
   solAmount: number;
   /** Optional slippage tolerance applied to the SOL budget (default 0.5%). */
   slippageBps?: number;
@@ -46,9 +49,13 @@ export type BuyParams = WithRpcOptions & {
 export type SellParams = WithRpcOptions & {
   user: TransactionSigner;
   mint: Address | string;
-  /** Token amount the user wants to sell (human-readable quantity). */
-  tokenAmount: number;
-  /** Token decimals (defaults to 6 for Pump tokens). */
+  /** Human-readable token amount to sell. */
+  tokenAmount?: number;
+  /** Use a percentage of the wallet balance instead of fixed token amount. */
+  useWalletPercentage?: boolean;
+  /** Percentage of the wallet balance to sell (0-100]. */
+  walletPercentage?: number;
+  /** Token decimals (defaults to 6). */
   tokenDecimals?: number;
   slippageBps?: number;
   feeRecipient?: Address | string;
@@ -142,9 +149,16 @@ export async function buy(params: BuyParams): Promise<Instruction> {
   });
 }
 
-export async function sell(params: SellParams): Promise<Instruction> {
-  ensurePositiveNumber(params.tokenAmount, "tokenAmount");
+const PERCENTAGE_SCALE = 10_000;
 
+function percentageToScaled(percentage: number): bigint {
+  if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+    throw new Error("walletPercentage must be between 0 and 100");
+  }
+  return BigInt(Math.round(percentage * 100));
+}
+
+export async function sell(params: SellParams): Promise<Instruction> {
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
 
@@ -158,8 +172,42 @@ export async function sell(params: SellParams): Promise<Instruction> {
   });
   const creator = params.bondingCurveCreator ?? curve.creator;
 
-  const decimals = params.tokenDecimals ?? 6;
-  const tokenAmountRaw = tokensToRaw(params.tokenAmount, decimals);
+  const useWalletPercentage = params.useWalletPercentage ?? false;
+  const mintAddress = toAddress(params.mint);
+  let tokenAmountRaw: bigint;
+
+  if (useWalletPercentage) {
+    const percentage = params.walletPercentage ?? 100;
+    const scaled = percentageToScaled(percentage);
+
+    const [associatedUser] = await findAssociatedTokenPda({
+      owner: toAddress(params.user.address),
+      mint: mintAddress,
+      tokenProgram: toAddress(TOKEN_PROGRAM_ID),
+    });
+
+    const balanceResponse = await rpcClient
+      .getTokenAccountBalance(associatedUser)
+      .send();
+
+    const rawBalance = BigInt(balanceResponse.value.amount);
+    if (rawBalance === 0n) {
+      throw new Error("Wallet token balance is zero; nothing to sell");
+    }
+
+    tokenAmountRaw = (rawBalance * scaled) / BigInt(PERCENTAGE_SCALE);
+    if (tokenAmountRaw <= 0n) {
+      tokenAmountRaw = 1n;
+    }
+  } else {
+    if (params.tokenAmount === undefined) {
+      throw new Error("tokenAmount is required when useWalletPercentage is false");
+    }
+    ensurePositiveNumber(params.tokenAmount, "tokenAmount");
+    const decimals = params.tokenDecimals ?? 6;
+    tokenAmountRaw = tokensToRaw(params.tokenAmount, decimals);
+  }
+
   const quote = quoteSellForTokenAmount(curve, fees, tokenAmountRaw);
   const minSolOutputLamports = subSlippage(quote.solOutputLamports, slippageBps);
 
