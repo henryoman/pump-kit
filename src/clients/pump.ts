@@ -29,9 +29,10 @@ import {
   getCreateInstruction,
 } from "../pumpsdk/generated/instructions";
 import { fetchBondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
-import { rpc as defaultRpc, defaultCommitment } from "../config/rpc";
+import type { RpcClient } from "../config/connection";
+import { getDefaultCommitment } from "../config/commitment";
 
-type RpcClient = Parameters<typeof fetchBondingCurve>[0];
+type FetchClient = Parameters<typeof fetchBondingCurve>[0];
 type Commitment = "processed" | "confirmed" | "finalized";
 
 export interface BuyParams {
@@ -49,8 +50,8 @@ export interface BuyParams {
   trackVolume?: boolean;
   /** Optional bonding curve creator (skips RPC lookup) */
   bondingCurveCreator?: Address | string;
-  /** Optional RPC client */
-  rpc?: RpcClient;
+  /** RPC client used to fetch Pump accounts */
+  rpc: RpcClient;
   /** Optional commitment level */
   commitment?: Commitment;
 }
@@ -67,8 +68,8 @@ export async function buy(params: BuyParams) {
     feeRecipient,
     trackVolume = true,
     bondingCurveCreator,
-    rpc = defaultRpc,
-    commitment = defaultCommitment,
+    rpc,
+    commitment = getDefaultCommitment(),
   } = params;
 
   const mint = getAddress(mintStr);
@@ -153,8 +154,8 @@ export interface SellParams {
   feeRecipient: Address | string;
   /** Optional bonding curve creator (skips RPC lookup) */
   bondingCurveCreator?: Address | string;
-  /** Optional RPC client */
-  rpc?: RpcClient;
+  /** RPC client used to fetch bonding curve and fee config */
+  rpc: RpcClient;
   /** Optional commitment level */
   commitment?: Commitment;
 }
@@ -170,8 +171,8 @@ export async function sell(params: SellParams) {
     minSolOutputLamports,
     feeRecipient,
     bondingCurveCreator,
-    rpc = defaultRpc,
-    commitment = defaultCommitment,
+    rpc,
+    commitment = getDefaultCommitment(),
   } = params;
 
   const mint = getAddress(mintStr);
@@ -306,8 +307,8 @@ import { getProgramDerivedAddress } from "@solana/kit";
 async function resolveCreatorAddress(args: {
   bondingCurve: Address;
   providedCreator?: Address | string;
-  rpc: RpcClient;
-  commitment: Commitment;
+  rpc: FetchClient;
+  commitment: InternalCommitment;
 }): Promise<Address> {
   const { bondingCurve, providedCreator, rpc, commitment } = args;
 

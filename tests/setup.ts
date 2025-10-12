@@ -7,12 +7,14 @@ import { createSolanaRpc } from "@solana/kit";
 import type { TransactionSigner, Address } from "@solana/kit";
 import { generateKeyPairSigner } from "@solana/signers";
 
-/**
- * Get the test RPC endpoint from environment or use devnet
- */
+const RPC_URL = process.env.SOLANA_RPC;
+
+if (!RPC_URL) {
+  throw new Error("SOLANA_RPC must be set to run Pump Kit integration tests");
+}
+
 export function getTestRpc() {
-  const rpcUrl = process.env.SOLANA_RPC || "https://api.devnet.solana.com";
-  return createSolanaRpc(rpcUrl);
+  return createSolanaRpc(RPC_URL);
 }
 
 /**

@@ -72,6 +72,9 @@ export {
   DEFAULT_SLIPPAGE_BPS,
 } from "./utils/slippage";
 
+export type { RpcClient, RpcSubscriptionsClient } from "./config/connection";
+export { setDefaultCommitment, getDefaultCommitment } from "./config/commitment";
+
 export {
   buildTransaction,
   sendAndConfirmTransaction,

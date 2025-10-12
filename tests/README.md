@@ -40,14 +40,10 @@ bun test --watch
 
 ## Configuration
 
-Tests use environment variables for configuration. Copy `.env.example` to `.env` and update:
+Tests use environment variables for configuration. Provide the RPC endpoint you want to exercise:
 
 ```bash
-# Use devnet for testing
-SOLANA_CLUSTER=devnet
-
-# Or use a custom RPC
-SOLANA_RPC=https://api.devnet.solana.com
+SOLANA_RPC=https://your-dev-or-mainnet-endpoint
 ```
 
 ## Test Philosophy

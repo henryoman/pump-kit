@@ -2,7 +2,7 @@
 
 # Pump Kit
 
-**A modern TypeScript SDK for Pump.fun**  
+**A production-grade TypeScript SDK for Pump.fun**  
 Built with Bun + TypeScript + Solana Kit 4.0
 
 A minimal, type-safe SDK for Pump.fun bonding curves and AMM pools with automatic slippage protection and zero legacy dependencies.
@@ -14,16 +14,25 @@ A minimal, type-safe SDK for Pump.fun bonding curves and AMM pools with automati
 
 ---
 
-## ⚠️ Not Ready for Production
+## Bring Your Own RPC
 
-**This SDK is currently in active development and is NOT ready for production use.**
+Pump Kit no longer ships opinionated RPC defaults. You **must** supply your own Solana Kit client when using the SDK:
 
-- Core functionality is being tested
-- APIs may change without notice
-- Use at your own risk on devnet only
-- Do not use with real funds on mainnet
+```ts
+import { createSolanaRpc } from "@solana/kit";
+import { quickBuy } from "pump-kit";
 
-We'll remove this notice once the SDK has been thoroughly tested and audited.
+const rpc = createSolanaRpc("https://your-mainnet-rpc");
+
+await quickBuy(
+  wallet,
+  mint,
+  solBudgetLamports,
+  { rpc }
+);
+```
+
+Pass the same `rpc` client through any helper or recipe that touches on-chain state (buy/sell flows, mint recipes, liquidity, transaction utilities). This keeps production deployments in full control of endpoints, rate limits, and auth headers.
 
 ---
 
@@ -80,19 +89,17 @@ bun add pump-kit
 
 ```typescript
 import { quickBuy } from "pump-kit";
-import { generateKeyPair } from "@solana/kit";
+import { generateKeyPair, createSolanaRpc } from "@solana/kit";
 
-// 1. Create wallet
 const wallet = await generateKeyPair();
+const rpc = createSolanaRpc("https://your-mainnet-rpc");
 
-// 2. Buy tokens - 4 parameters, done!
 const instruction = await quickBuy(
   wallet,
   "TokenMintAddress",
-  5_000_000n       // SOL budget (lamports)
+  5_000_000n,
+  { rpc }
 );
-
-// That's it! Auto slippage, auto PDAs, zero complexity.
 ```
 
 ---
@@ -103,11 +110,15 @@ const instruction = await quickBuy(
 
 ```typescript
 import { buy } from "pump-kit";
+import { createSolanaRpc } from "@solana/kit";
+
+const rpc = createSolanaRpc("https://your-mainnet-rpc");
 
 const instruction = await buy({
   user: myWallet,
   mint: "TokenMintAddress",
-  solAmountLamports: 5_000_000n, // Spend up to ~0.005 SOL
+  solAmountLamports: 5_000_000n,
+  rpc,
 });
 
 // Pump Kit fetches the bonding curve, quotes the token amount, and applies your slippage guard automatically.
@@ -119,12 +130,16 @@ const instruction = await buy({
 
 ```typescript
 import { sell } from "pump-kit";
+import { createSolanaRpc } from "@solana/kit";
+
+const rpc = createSolanaRpc("https://your-mainnet-rpc");
 
 const instruction = await sell({
   user: myWallet,
   mint: "TokenMintAddress",
   tokenAmount: 250_000n,
-  slippageBps: 75, // optional, defaults to 50 bps (0.5%)
+  slippageBps: 75,
+  rpc,
 });
 
 // The SDK computes the expected SOL output and derives a min-out guard from your slippage.
@@ -136,10 +151,10 @@ const instruction = await sell({
 import { quickBuy, quickSell } from "pump-kit";
 
 // Buy with SOL budget (lamports)
-const buyIx = await quickBuy(myWallet, "TokenMint", 5_000_000n);
+const buyIx = await quickBuy(myWallet, "TokenMint", 5_000_000n, { rpc });
 
 // Sell with token amount (tokens in)
-const sellIx = await quickSell(myWallet, "TokenMint", 250_000n);
+const sellIx = await quickSell(myWallet, "TokenMint", 250_000n, { rpc });
 ```
 
 ### Mint New Token
@@ -161,6 +176,7 @@ const { createInstruction, buyInstruction } = await mintWithFirstBuy({
   estimatedFirstBuyCost: 100_000_000n,
   slippageBps: 50,
   feeRecipient: "FeeRecipientAddress",
+  rpc,
 });
 ```
 
@@ -175,6 +191,7 @@ const { signature, mint } = await createAndBuy({
   firstBuyTokenAmount: 10_000_000n,
   estimatedFirstBuyCost: 100_000_000n,
   priorityFees: { computeUnitLimit: 400_000, computeUnitPriceMicroLamports: 10_000n },
+  rpc,
 });
 ```
 
@@ -193,16 +210,20 @@ import {
 const { transactionMessage } = await buildTransaction({
   instructions: [buyIx],
   payer: myWallet,
+  rpc,
 });
 
 const { signature, slot } = await sendAndConfirmTransaction({
   instructions: [buyIx],
   payer: myWallet,
+  rpc,
+  rpcSubscriptions,
 });
 
 const simulation = await simulateTransaction({
   instructions: [buyIx],
   payer: myWallet,
+  rpc,
 });
 ```
 
@@ -222,6 +243,8 @@ await sendAndConfirmTransaction({
   instructions: [tradeIx],
   payer: myWallet,
   prependInstructions: priority,
+  rpc,
+  rpcSubscriptions,
 });
 ```
 
@@ -257,6 +280,7 @@ const depositIx = await addLiquidity({
   maxBaseAmountIn: 1_000_000n,
   maxQuoteAmountIn: 5_000_000n,
   minLpTokensOut: 0n,
+  rpc,
 });
 
 const withdrawIx = await removeLiquidity({
@@ -266,6 +290,7 @@ const withdrawIx = await removeLiquidity({
   lpAmountIn: 500_000n,
   minBaseAmountOut: 0n,
   minQuoteAmountOut: 0n,
+  rpc,
 });
 ```
 
@@ -323,6 +348,19 @@ mintWithFirstBuy({ user, mint, name, symbol, uri, ... })
 ```
 > Slippage defaults to 50 bps (0.5%). Override by providing `slippageBps` when calling `buy`/`sell` or pass basis-point values into the quick helpers.
 
+### Global Commitment Defaults
+
+Pump Kit exposes helpers for setting a global default commitment:
+
+```ts
+import { setDefaultCommitment } from "pump-kit";
+
+setDefaultCommitment("finalized");
+```
+
+Every recipe and transaction helper will now default to `"finalized"` unless you override the `commitment` field for that call. Supported values are `"processed"`, `"confirmed"`, and `"finalized"`.
+
+You can still override `commitment` per call on recipes and transaction helpers.
 
 ### Core Functions
 
@@ -359,23 +397,21 @@ bun test:watch
 
 ### Test Configuration
 
-Configure your test environment by setting the `SOLANA_CLUSTER` environment variable:
+Configure your test environment by pointing the SDK to **your own** Solana RPC endpoint. Export the URL that your tests should hit:
 
 ```bash
-# Use devnet for testing (recommended)
-export SOLANA_CLUSTER=devnet
-bun test
-
-# Or use a custom RPC endpoint
-export SOLANA_RPC=https://api.devnet.solana.com
+export SOLANA_RPC=https://your-dev-or-mainnet-endpoint
 bun test
 ```
+
+For local development you can still target devnet or a private validator, but we no longer ship defaults—tests will skip if `SOLANA_RPC` is missing.
 
 ### Test Philosophy
 
 - **Unit tests** - Fast, deterministic, no network access required
 - **Integration tests** - Build instructions and verify correctness without sending transactions
-- **Always use devnet** - Never test on mainnet to avoid costs
+- **Configure RPC explicitly** - Provide a dedicated devnet/mainnet endpoint for integration tests
+- **Skip when unreachable** - Use environment guards if your CI cannot access the RPC
 
 For more details, see the [test documentation](./tests/README.md).
 
@@ -413,4 +449,4 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 ## Disclaimer
 
-This SDK is community-built and not officially affiliated with Pump.fun. Use at your own risk. Always test on devnet first.
+This SDK is community-built and not officially affiliated with Pump.fun. Use at your own risk. Always supply your own RPC endpoint and validate flows in a staging environment before executing on mainnet.

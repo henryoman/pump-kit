@@ -1,7 +1,8 @@
-import type { Commitment } from "@solana/rpc-types";
 import type { Instruction, TransactionSigner } from "@solana/kit";
 import { generateKeyPairSigner } from "@solana/signers";
 
+import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
+import { getDefaultCommitment } from "../config/commitment";
 import {
   mintWithFirstBuy,
   type MintWithFirstBuyParams,
@@ -34,7 +35,9 @@ export interface CreateAndBuyOptions {
   appendInstructions?: readonly Instruction[];
   additionalSigners?: readonly TransactionSigner[];
   sendOptions?: SendOptions;
-  commitment?: Commitment;
+  commitment?: ReturnType<typeof getDefaultCommitment>;
+  rpc: RpcClient;
+  rpcSubscriptions?: RpcSubscriptionsClient;
 }
 
 export interface CreateAndBuyResult extends TransactionResult {
@@ -59,7 +62,9 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
     appendInstructions,
     additionalSigners,
     sendOptions,
-    commitment,
+    commitment = getDefaultCommitment(),
+    rpc,
+    rpcSubscriptions,
   } = options;
 
   const mintSigner = providedMint ?? (await generateKeyPairSigner());
@@ -76,11 +81,11 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
     slippageBps,
     feeRecipient,
     bondingCurveCreator: bondingCurveCreator ?? creator.address,
+    rpc,
+    commitment,
   };
 
-  const { createInstruction, buyInstruction } = await mintWithFirstBuy(
-    mintParams
-  );
+  const { createInstruction, buyInstruction } = await mintWithFirstBuy(mintParams);
 
   const result = await sendAndConfirmTransaction({
     instructions: [createInstruction, buyInstruction],
@@ -94,6 +99,8 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
       ...(additionalSigners ?? []),
     ]),
     sendOptions,
+    rpc,
+    rpcSubscriptions,
   });
 
   return {

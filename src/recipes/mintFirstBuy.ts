@@ -5,6 +5,7 @@
 import type { TransactionSigner, Instruction, Address } from "@solana/kit";
 import { create as buildCreateInstruction, buy as buildBuyInstruction } from "../clients/pump";
 import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
+import { getDefaultCommitment } from "../config/commitment";
 import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 
 export interface MintWithFirstBuyParams {
@@ -32,8 +33,8 @@ export interface MintWithFirstBuyParams {
   bondingCurveCreator?: Address | string;
   /** Whether to track user volume for the initial buy (default true) */
   trackVolume?: boolean;
-  /** Optional RPC client */
-  rpc?: Parameters<typeof buildBuyInstruction>[0]["rpc"];
+  /** RPC client used to fetch Pump accounts */
+  rpc: Parameters<typeof buildBuyInstruction>[0]["rpc"];
   /** Optional commitment */
   commitment?: Parameters<typeof buildBuyInstruction>[0]["commitment"];
 }
@@ -60,7 +61,7 @@ export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<
     bondingCurveCreator,
     trackVolume,
     rpc,
-    commitment,
+    commitment = getDefaultCommitment(),
   } = params;
 
   // Validate inputs

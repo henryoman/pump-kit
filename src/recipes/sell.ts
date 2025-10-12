@@ -6,6 +6,7 @@ import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { sell as buildSellInstruction } from "../clients/pump";
 import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 import { DEFAULT_SLIPPAGE_BPS, subSlippage, validateSlippage } from "../utils/slippage";
+import { getDefaultCommitment } from "../config/commitment";
 
 type RpcClient = Parameters<typeof buildSellInstruction>[0]["rpc"];
 type CommitmentLevel = Parameters<typeof buildSellInstruction>[0]["commitment"];
@@ -25,8 +26,8 @@ export interface SellWithSlippageParams {
   feeRecipient?: Address | string;
   /** Optional override to skip fetching the bonding curve account */
   bondingCurveCreator?: Address | string;
-  /** Optional RPC client override */
-  rpc?: RpcClient;
+  /** RPC client used to fetch Pump accounts */
+  rpc: RpcClient;
   /** Optional commitment override */
   commitment?: CommitmentLevel;
 }
@@ -45,7 +46,7 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
     feeRecipient = DEFAULT_FEE_RECIPIENT,
     bondingCurveCreator,
     rpc,
-    commitment,
+    commitment = getDefaultCommitment(),
   } = params;
 
   // Validate inputs
@@ -64,7 +65,7 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
     feeRecipient,
     bondingCurveCreator,
     rpc,
-    commitment,
+    commitment = getDefaultCommitment(),
   });
 }
 
@@ -78,7 +79,7 @@ export interface SimpleSellParams {
   minSolOutputLamports: bigint;
   feeRecipient?: Address | string;
   bondingCurveCreator?: Address | string;
-  rpc?: RpcClient;
+  rpc: RpcClient;
   commitment?: CommitmentLevel;
 }
 

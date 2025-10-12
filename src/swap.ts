@@ -4,6 +4,8 @@
  */
 
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
+import type { RpcClient } from "./config/connection";
+import { getDefaultCommitment } from "./config/commitment";
 import { buySimple } from "./recipes/buy";
 import { sellSimple } from "./recipes/sell";
 import { DEFAULT_SLIPPAGE_BPS, addSlippage, subSlippage, validateSlippage } from "./utils/slippage";
@@ -17,7 +19,6 @@ import {
   type FeeStructure,
   type BondingCurveState,
 } from "./ammsdk/bondingCurveMath";
-import { defaultCommitment, rpc as defaultRpc } from "./config/rpc";
 import type { Fees } from "./pumpsdk/generated/types/fees";
 
 type BuyImplementationParams = Parameters<typeof buySimple>[0];
@@ -26,8 +27,8 @@ type SellImplementationParams = Parameters<typeof sellSimple>[0];
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
 type WithRpcOptions = {
-  /** Optional RPC client override */
-  rpc?: BuyImplementationParams["rpc"];
+  /** RPC client used to fetch Pump accounts. */
+  rpc: RpcClient;
   /** Optional commitment override */
   commitment?: BuyImplementationParams["commitment"];
 };
@@ -127,8 +128,8 @@ export async function buy(params: BuyParams): Promise<Instruction> {
   validateSlippage(slippageBps);
 
   const feeRecipient = params.feeRecipient ?? DEFAULT_FEE_RECIPIENT_ADDRESS;
-  const rpcClient = params.rpc ?? defaultRpc;
-  const commitment = params.commitment ?? defaultCommitment;
+  const rpcClient = params.rpc;
+  const commitment = params.commitment ?? getDefaultCommitment();
 
   const { curve, fees } = await loadCurveState(params.mint, rpcClient, commitment, {
     curve: params.curveStateOverride,
@@ -163,8 +164,8 @@ export async function sell(params: SellParams): Promise<Instruction> {
   validateSlippage(slippageBps);
 
   const feeRecipient = params.feeRecipient ?? DEFAULT_FEE_RECIPIENT_ADDRESS;
-  const rpcClient = params.rpc ?? defaultRpc;
-  const commitment = params.commitment ?? defaultCommitment;
+  const rpcClient = params.rpc;
+  const commitment = params.commitment ?? getDefaultCommitment();
 
   const { curve, fees } = await loadCurveState(params.mint, rpcClient, commitment, {
     curve: params.curveStateOverride,

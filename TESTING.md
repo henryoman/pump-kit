@@ -49,10 +49,7 @@ Integration tests verify instruction building works correctly but don't send tra
 
 ```bash
 # Set your RPC endpoint first
-export SOLANA_CLUSTER=devnet
-
-# Or use a custom RPC
-export SOLANA_RPC=https://api.devnet.solana.com
+export SOLANA_RPC=https://your-dev-or-mainnet-endpoint
 
 # Run integration tests
 bun test tests/integration
@@ -90,16 +87,13 @@ bun test:coverage
 
 ### Environment Variables
 
-Configure tests using environment variables:
+Configure tests using the following environment variables:
 
 ```bash
-# Cluster selection (devnet, testnet, mainnet)
-export SOLANA_CLUSTER=devnet
+# RPC endpoint to use during integration tests
+export SOLANA_RPC=https://your-dev-or-mainnet-endpoint
 
-# Custom RPC endpoint (overrides SOLANA_CLUSTER)
-export SOLANA_RPC=https://api.devnet.solana.com
-
-# Commitment level
+# Commitment level (optional, defaults to "confirmed")
 export SOLANA_COMMITMENT=confirmed
 ```
 

@@ -6,6 +6,7 @@ import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { buy as buildBuyInstruction } from "../clients/pump";
 import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
+import { getDefaultCommitment } from "../config/commitment";
 
 type RpcClient = Parameters<typeof buildBuyInstruction>[0]["rpc"];
 type CommitmentLevel = Parameters<typeof buildBuyInstruction>[0]["commitment"];
@@ -27,8 +28,8 @@ export interface BuyWithSlippageParams {
   bondingCurveCreator?: Address | string;
   /** Whether to track user volume (default true) */
   trackVolume?: boolean;
-  /** Optional RPC client override */
-  rpc?: RpcClient;
+  /** RPC client used to fetch Pump accounts */
+  rpc: RpcClient;
   /** Optional commitment override */
   commitment?: CommitmentLevel;
 }
@@ -48,7 +49,7 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
     bondingCurveCreator,
     trackVolume = true,
     rpc,
-    commitment,
+    commitment = getDefaultCommitment(),
   } = params;
 
   // Validate inputs
@@ -68,7 +69,7 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
     trackVolume,
     bondingCurveCreator,
     rpc,
-    commitment,
+    commitment = getDefaultCommitment(),
   });
 }
 
@@ -83,7 +84,7 @@ export interface SimpleBuyParams {
   feeRecipient?: Address | string;
   trackVolume?: boolean;
   bondingCurveCreator?: Address | string;
-  rpc?: RpcClient;
+  rpc: RpcClient;
   commitment?: CommitmentLevel;
 }
 

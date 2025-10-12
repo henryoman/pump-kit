@@ -2,18 +2,21 @@
  * Transaction building, sending, confirmation, and simulation utilities.
  */
 
+import { address as toAddress } from "@solana/addresses";
+import { sendAndConfirmTransactionFactory } from "@solana/kit";
+import type { Commitment } from "@solana/rpc-types";
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
+import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
+import { getDefaultCommitment } from "../config/commitment";
 import {
   addSignersToTransactionMessage,
-  isTransactionSigner,
-  setTransactionMessageFeePayerSigner,
-  signTransactionMessageWithSigners,
-} from "@solana/kit";
-import {
   appendTransactionMessageInstruction,
   createTransactionMessage,
+  isTransactionSigner,
   setTransactionMessageFeePayer,
+  setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
   type TransactionMessageWithBlockhashLifetime,
   type TransactionMessageWithFeePayer,
 } from "@solana/transaction-messages";
@@ -21,10 +24,6 @@ import {
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
 } from "@solana/transactions";
-import { address as toAddress } from "@solana/addresses";
-import { rpc, rpcSubscriptions, defaultCommitment } from "../config/rpc";
-import { sendAndConfirmTransactionFactory } from "@solana/kit";
-import type { Commitment } from "@solana/rpc-types";
 
 const COMPUTE_BUDGET_PROGRAM = toAddress(
   "ComputeBudget111111111111111111111111111111"
@@ -53,7 +52,7 @@ export interface BuildTransactionParams {
   /** Transaction message version. Defaults to legacy. */
   version?: "legacy" | 0;
   /** Custom RPC client (useful for testing). */
-  rpc?: typeof rpc;
+  rpc: RpcClient;
   /** Commitment to use when fetching the latest blockhash. */
   commitment?: Commitment;
 }
@@ -78,8 +77,8 @@ export interface SendAndConfirmTransactionParams
   extends Omit<BuildTransactionParams, "payer"> {
   payer: TransactionSigner;
   sendOptions?: SendOptions;
-  rpc?: typeof rpc;
-  rpcSubscriptions?: typeof rpcSubscriptions;
+  rpc: RpcClient;
+  rpcSubscriptions?: RpcSubscriptionsClient;
   commitment?: Commitment;
 }
 
@@ -99,7 +98,7 @@ export interface SimulateTransactionParams
   payer: TransactionSigner;
   additionalSigners?: readonly TransactionSigner[];
   options?: SimulateTransactionOptions;
-  rpc?: typeof rpc;
+  rpc: RpcClient;
   commitment?: Commitment;
 }
 
@@ -127,8 +126,8 @@ export async function buildTransaction({
   latestBlockhash,
   lastValidBlockHeight,
   version = "legacy",
-  rpc: rpcClient = rpc,
-  commitment = defaultCommitment,
+  rpc: rpcClient,
+  commitment = getDefaultCommitment(),
   prependInstructions = [],
   appendInstructions = [],
   priorityFees,
@@ -219,9 +218,9 @@ export async function sendAndConfirmTransaction({
   prependInstructions,
   appendInstructions,
   priorityFees,
-  rpc: rpcClient = rpc,
-  rpcSubscriptions: rpcSubscriptionsClient = rpcSubscriptions,
-  commitment = defaultCommitment,
+  rpc: rpcClient,
+  rpcSubscriptions: rpcSubscriptionsClient,
+  commitment = getDefaultCommitment(),
   sendOptions = {},
 }: SendAndConfirmTransactionParams): Promise<TransactionResult> {
   const built = await buildTransaction({
@@ -289,8 +288,8 @@ export async function simulateTransaction({
   prependInstructions,
   appendInstructions,
   priorityFees,
-  rpc: rpcClient = rpc,
-  commitment = defaultCommitment,
+  rpc: rpcClient,
+  commitment = getDefaultCommitment(),
   options = {},
 }: SimulateTransactionParams): Promise<SimulationResponse> {
   const built = await buildTransaction({
