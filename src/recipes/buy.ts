@@ -6,20 +6,19 @@ import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { buy as buildBuyInstruction } from "../clients/pump";
 import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
+import { solToLamports } from "../utils/amounts";
 import { getDefaultCommitment } from "../config/commitment";
 
 type RpcClient = Parameters<typeof buildBuyInstruction>[0]["rpc"];
 type CommitmentLevel = Parameters<typeof buildBuyInstruction>[0]["commitment"];
 
 export interface BuyWithSlippageParams {
-  /** User's wallet/signer */
   user: TransactionSigner;
-  /** Token mint address */
   mint: Address | string;
-  /** Amount of tokens to buy */
+  /** Token amount to buy (raw bigint). */
   tokenAmount: bigint;
-  /** Estimated SOL cost in lamports (will add slippage) */
-  estimatedSolCost: bigint;
+  /** Estimated SOL cost in SOL units. */
+  estimatedSolCostSol: number;
   /** Slippage tolerance in basis points (default: 50 = 0.5%) */
   slippageBps?: number;
   /** Fee recipient address */
@@ -43,7 +42,7 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
     user,
     mint,
     tokenAmount,
-    estimatedSolCost,
+    estimatedSolCostSol,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
     feeRecipient = DEFAULT_FEE_RECIPIENT,
     bondingCurveCreator,
@@ -55,10 +54,12 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
   // Validate inputs
   validateSlippage(slippageBps);
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
-  if (estimatedSolCost <= 0n) throw new Error("Estimated SOL cost must be positive");
+  if (!Number.isFinite(estimatedSolCostSol) || estimatedSolCostSol <= 0) {
+    throw new Error("Estimated SOL cost must be a positive number");
+  }
 
-  // Calculate max SOL cost with slippage
-  const maxSolCostLamports = addSlippage(estimatedSolCost, slippageBps);
+  const estimatedLamports = solToLamports(estimatedSolCostSol);
+  const maxSolCostLamports = addSlippage(estimatedLamports, slippageBps);
 
   return await buildBuyInstruction({
     user,
@@ -80,7 +81,7 @@ export interface SimpleBuyParams {
   user: TransactionSigner;
   mint: Address | string;
   tokenAmount: bigint;
-  maxSolCostLamports: bigint;
+  maxSolCostSol: number;
   feeRecipient?: Address | string;
   trackVolume?: boolean;
   bondingCurveCreator?: Address | string;
@@ -93,7 +94,7 @@ export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
     user,
     mint,
     tokenAmount,
-    maxSolCostLamports,
+    maxSolCostSol,
     feeRecipient = DEFAULT_FEE_RECIPIENT,
     trackVolume = true,
     bondingCurveCreator,
@@ -102,7 +103,11 @@ export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
   } = params;
 
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
-  if (maxSolCostLamports <= 0n) throw new Error("Max SOL cost must be positive");
+  if (!Number.isFinite(maxSolCostSol) || maxSolCostSol <= 0) {
+    throw new Error("Max SOL cost must be a positive number");
+  }
+
+  const maxSolCostLamports = solToLamports(maxSolCostSol);
 
   return await buildBuyInstruction({
     user,

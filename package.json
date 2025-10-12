@@ -27,6 +27,8 @@
     "build:js": "bun build ./src/index.ts --outdir dist --format esm --minify --sourcemap=external",
     "build:types": "tsc -p tsconfig.build.json",
     "build": "rm -rf dist && bun run build:js && bun run build:types",
+    "release:prepare": "bun run build && bun run test",
+    "release:publish": "bun publish --access public",
     "codegen": "bun run scripts/codama-generate.ts",
     "test": "bun test",
     "test:unit": "bun test tests/unit",

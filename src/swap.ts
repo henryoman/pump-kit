@@ -5,7 +5,6 @@
 
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import type { RpcClient } from "./config/connection";
-import { getDefaultCommitment } from "./config/commitment";
 import { buySimple } from "./recipes/buy";
 import { sellSimple } from "./recipes/sell";
 import { DEFAULT_SLIPPAGE_BPS, addSlippage, subSlippage, validateSlippage } from "./utils/slippage";
@@ -20,58 +19,49 @@ import {
   type BondingCurveState,
 } from "./ammsdk/bondingCurveMath";
 import type { Fees } from "./pumpsdk/generated/types/fees";
-
-type BuyImplementationParams = Parameters<typeof buySimple>[0];
-type SellImplementationParams = Parameters<typeof sellSimple>[0];
+import { solToLamports, tokensToRaw } from "./utils/amounts";
+import { getDefaultCommitment } from "./config/commitment";
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
 type WithRpcOptions = {
-  /** RPC client used to fetch Pump accounts. */
   rpc: RpcClient;
-  /** Optional commitment override */
-  commitment?: BuyImplementationParams["commitment"];
+  commitment?: CommitmentLevel;
 };
 
 export type BuyParams = WithRpcOptions & {
   user: TransactionSigner;
   mint: Address | string;
-  /** Target SOL spend (lamports) before applying slippage */
-  solAmountLamports: bigint;
-  /** Optional slippage tolerance applied to the SOL budget (default 0.5%) */
+  /** SOL budget (before slippage), expressed in whole SOL. */
+  solAmount: number;
+  /** Optional slippage tolerance applied to the SOL budget (default 0.5%). */
   slippageBps?: number;
-  /** Optional override for fee recipient */
   feeRecipient?: Address | string;
-  /** Optional override for bonding curve creator (skips extra RPC) */
   bondingCurveCreator?: Address | string;
-  /** Whether to track user volume (defaults to true) */
   trackVolume?: boolean;
-  /** Advanced: provide pre-fetched bonding curve reserves to skip RPC */
   curveStateOverride?: BondingCurveState;
-  /** Advanced: provide pre-resolved fee structure to skip RPC */
   feeStructureOverride?: FeeStructure;
 };
 
 export type SellParams = WithRpcOptions & {
   user: TransactionSigner;
   mint: Address | string;
-  /** Token amount (input mint) to sell */
-  tokenAmount: bigint;
-  /** Optional slippage tolerance applied to SOL output (default 0.5%) */
+  /** Token amount the user wants to sell (human-readable quantity). */
+  tokenAmount: number;
+  /** Token decimals (defaults to 6 for Pump tokens). */
+  tokenDecimals?: number;
   slippageBps?: number;
   feeRecipient?: Address | string;
   bondingCurveCreator?: Address | string;
-  /** Advanced: provide pre-fetched bonding curve reserves to skip RPC */
   curveStateOverride?: BondingCurveState;
-  /** Advanced: provide pre-resolved fee structure to skip RPC */
   feeStructureOverride?: FeeStructure;
 };
 
 const DEFAULT_FEE_RECIPIENT_ADDRESS = DEFAULT_FEE_RECIPIENT;
 
-const ensurePositive = (value: bigint, field: string) => {
-  if (value <= 0n) {
-    throw new Error(`${field} must be a positive bigint`);
+const ensurePositiveNumber = (value: number, field: string) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${field} must be a positive number`);
   }
 };
 
@@ -81,14 +71,16 @@ const toFeeStructure = (flatFees: Fees): FeeStructure => ({
   creatorFeeBps: flatFees.creatorFeeBps,
 });
 
+type CurveLoadOverrides = {
+  curve?: BondingCurveState;
+  fees?: FeeStructure;
+};
+
 async function loadCurveState(
   mint: Address | string,
-  rpcClient: NonNullable<BuyImplementationParams["rpc"]>,
-  commitment: CommitmentLevel | undefined,
-  overrides?: {
-    curve?: BondingCurveState;
-    fees?: FeeStructure;
-  }
+  rpcClient: RpcClient,
+  commitment: CommitmentLevel,
+  overrides?: CurveLoadOverrides
 ) {
   const curvePromise = overrides?.curve
     ? Promise.resolve(overrides.curve)
@@ -111,18 +103,14 @@ async function loadCurveState(
     return { curve, fees };
   } catch (error) {
     throw new Error(
-      "Failed to load bonding curve state. Provide `curveStateOverride`/`feeStructureOverride` or ensure the RPC endpoint can access Pump accounts.",
+      "Failed to load bonding curve state. Provide overrides or ensure the RPC endpoint can access Pump accounts.",
       { cause: error }
     );
   }
 }
 
-/**
- * Buy tokens by specifying the SOL budget (input mint).
- * Slippage is applied to the SOL budget; the helper computes the token amount automatically.
- */
 export async function buy(params: BuyParams): Promise<Instruction> {
-  ensurePositive(params.solAmountLamports, "solAmountLamports");
+  ensurePositiveNumber(params.solAmount, "solAmount");
 
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
@@ -137,7 +125,8 @@ export async function buy(params: BuyParams): Promise<Instruction> {
   });
   const creator = params.bondingCurveCreator ?? curve.creator;
 
-  const quote = quoteBuyWithSolAmount(curve, fees, params.solAmountLamports);
+  const solBudgetLamports = solToLamports(params.solAmount);
+  const quote = quoteBuyWithSolAmount(curve, fees, solBudgetLamports);
   const maxSolCostLamports = addSlippage(quote.totalSolCostLamports, slippageBps);
 
   return await buySimple({
@@ -153,12 +142,8 @@ export async function buy(params: BuyParams): Promise<Instruction> {
   });
 }
 
-/**
- * Sell tokens by specifying the input token amount.
- * Slippage is applied to the SOL output floor; min output is derived automatically.
- */
 export async function sell(params: SellParams): Promise<Instruction> {
-  ensurePositive(params.tokenAmount, "tokenAmount");
+  ensurePositiveNumber(params.tokenAmount, "tokenAmount");
 
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
@@ -173,7 +158,9 @@ export async function sell(params: SellParams): Promise<Instruction> {
   });
   const creator = params.bondingCurveCreator ?? curve.creator;
 
-  const quote = quoteSellForTokenAmount(curve, fees, params.tokenAmount);
+  const decimals = params.tokenDecimals ?? 6;
+  const tokenAmountRaw = tokensToRaw(params.tokenAmount, decimals);
+  const quote = quoteSellForTokenAmount(curve, fees, tokenAmountRaw);
   const minSolOutputLamports = subSlippage(quote.solOutputLamports, slippageBps);
 
   if (minSolOutputLamports <= 0n) {
@@ -183,7 +170,7 @@ export async function sell(params: SellParams): Promise<Instruction> {
   return await sellSimple({
     user: params.user,
     mint: params.mint,
-    tokenAmount: params.tokenAmount,
+    tokenAmount: tokenAmountRaw,
     minSolOutputLamports,
     feeRecipient,
     bondingCurveCreator: creator,
@@ -192,36 +179,30 @@ export async function sell(params: SellParams): Promise<Instruction> {
   });
 }
 
-/**
- * Quick buy helper that takes a SOL budget and applies the default slippage guard.
- */
 export async function quickBuy(
   user: TransactionSigner,
   mint: Address | string,
-  solAmountLamports: bigint,
-  options?: Omit<BuyParams, "user" | "mint" | "solAmountLamports">
+  solAmount: number,
+  options: Omit<BuyParams, "user" | "mint" | "solAmount"> = {}
 ): Promise<Instruction> {
   return buy({
     user,
     mint,
-    solAmountLamports,
-    ...(options ?? {}),
+    solAmount,
+    ...options,
   });
 }
 
-/**
- * Quick sell helper that takes a token amount and applies the default slippage guard.
- */
 export async function quickSell(
   user: TransactionSigner,
   mint: Address | string,
-  tokenAmount: bigint,
-  options?: Omit<SellParams, "user" | "mint" | "tokenAmount">
+  tokenAmount: number,
+  options: Omit<SellParams, "user" | "mint" | "tokenAmount"> = {}
 ): Promise<Instruction> {
   return sell({
     user,
     mint,
     tokenAmount,
-    ...(options ?? {}),
+    ...options,
   });
 }
