@@ -80,7 +80,7 @@ export interface SendAndConfirmTransactionParams
   payer: TransactionSigner;
   sendOptions?: SendOptions;
   rpc: RpcClient;
-  rpcSubscriptions?: RpcSubscriptionsClient;
+  rpcSubscriptions: RpcSubscriptionsClient;
   commitment?: Commitment;
 }
 
