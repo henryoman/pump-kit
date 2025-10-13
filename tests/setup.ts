@@ -4,17 +4,43 @@
  */
 
 import { createSolanaRpc } from "@solana/kit";
-import type { TransactionSigner, Address } from "@solana/kit";
+import type { TransactionSigner } from "@solana/kit";
 import { generateKeyPairSigner } from "@solana/signers";
 
 const RPC_URL = process.env.SOLANA_RPC;
 
-if (!RPC_URL) {
-  throw new Error("SOLANA_RPC must be set to run Pump Kit integration tests");
+function createMockRpc() {
+  const handler: ProxyHandler<Record<string, unknown>> = {
+    get(_target, property) {
+      if (property === Symbol.toStringTag) return undefined;
+      if (property === "toString") {
+        return () => "[MockSolanaRpc]";
+      }
+
+      return () => ({
+        async send() {
+          throw new Error(
+            `Mock RPC cannot perform \`${String(
+              property
+            )}\`. Set SOLANA_RPC to run network-dependent integration tests.`
+          );
+        },
+      });
+    },
+  };
+
+  return new Proxy({}, handler);
 }
 
 export function getTestRpc() {
-  return createSolanaRpc(RPC_URL);
+  if (RPC_URL) {
+    return createSolanaRpc(RPC_URL);
+  }
+
+  console.warn(
+    "⚠️  SOLANA_RPC not set; using mock RPC stub for deterministic integration tests."
+  );
+  return createMockRpc();
 }
 
 /**
@@ -42,8 +68,10 @@ export function isCIEnvironment(): boolean {
  * Skip test if we're not in the right environment
  */
 export function skipIfNoRpc() {
-  if (!process.env.SOLANA_RPC && !process.env.SOLANA_CLUSTER) {
-    console.warn("⚠️  Skipping test: No RPC endpoint configured");
+  if (!RPC_URL) {
+    console.warn(
+      "⚠️  Skipping test: SOLANA_RPC not configured for live RPC validation."
+    );
     return true;
   }
   return false;

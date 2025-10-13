@@ -70,7 +70,7 @@ export async function buyWithSlippage(params: BuyWithSlippageParams): Promise<In
     trackVolume,
     bondingCurveCreator,
     rpc,
-    commitment = getDefaultCommitment(),
+    commitment,
   });
 }
 
@@ -81,7 +81,10 @@ export interface SimpleBuyParams {
   user: TransactionSigner;
   mint: Address | string;
   tokenAmount: bigint;
-  maxSolCostSol: number;
+  /** Maximum SOL budget expressed in SOL units. */
+  maxSolCostSol?: number;
+  /** Optional lamport-denominated SOL budget. Takes precedence when provided. */
+  maxSolCostLamports?: bigint;
   feeRecipient?: Address | string;
   trackVolume?: boolean;
   bondingCurveCreator?: Address | string;
@@ -95,25 +98,40 @@ export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
     mint,
     tokenAmount,
     maxSolCostSol,
+    maxSolCostLamports,
     feeRecipient = DEFAULT_FEE_RECIPIENT,
     trackVolume = true,
     bondingCurveCreator,
     rpc,
-    commitment,
+    commitment = getDefaultCommitment(),
   } = params;
 
   if (tokenAmount <= 0n) throw new Error("Token amount must be positive");
-  if (!Number.isFinite(maxSolCostSol) || maxSolCostSol <= 0) {
-    throw new Error("Max SOL cost must be a positive number");
+  let maxSolCostLamportsValue: bigint | null = null;
+
+  if (maxSolCostLamports !== undefined) {
+    if (maxSolCostLamports <= 0n) {
+      throw new Error("Max SOL cost lamports must be positive");
+    }
+    maxSolCostLamportsValue = maxSolCostLamports;
+  } else if (maxSolCostSol !== undefined) {
+    if (!Number.isFinite(maxSolCostSol) || maxSolCostSol <= 0) {
+      throw new Error("Max SOL cost must be a positive number");
+    }
+    maxSolCostLamportsValue = solToLamports(maxSolCostSol);
   }
 
-  const maxSolCostLamports = solToLamports(maxSolCostSol);
+  if (maxSolCostLamportsValue === null) {
+    throw new Error(
+      "Provide either maxSolCostLamports or maxSolCostSol when calling buySimple"
+    );
+  }
 
   return await buildBuyInstruction({
     user,
     mint,
     tokenAmount,
-    maxSolCostLamports,
+    maxSolCostLamports: maxSolCostLamportsValue,
     feeRecipient,
     trackVolume,
     bondingCurveCreator,

@@ -9,17 +9,19 @@ import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
 import {
-  addSignersToTransactionMessage,
   appendTransactionMessageInstruction,
   createTransactionMessage,
-  isTransactionSigner,
   setTransactionMessageFeePayer,
-  setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
-  signTransactionMessageWithSigners,
   type TransactionMessageWithBlockhashLifetime,
   type TransactionMessageWithFeePayer,
 } from "@solana/transaction-messages";
+import {
+  addSignersToTransactionMessage,
+  isTransactionSigner,
+  setTransactionMessageFeePayerSigner,
+  signTransactionMessageWithSigners,
+} from "@solana/signers";
 import {
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
@@ -63,7 +65,7 @@ export interface BuiltTransaction {
   lastValidBlockHeight: bigint;
 }
 
-type TransactionMessageWithSignersLifetime = any;
+type TransactionMessageWithSignersLifetime = TransactionMessageWithBlockhashLifetime;
 
 export interface SendOptions {
   abortSignal?: AbortSignal;

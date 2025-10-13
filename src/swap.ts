@@ -218,7 +218,7 @@ export async function sell(params: SellParams): Promise<Instruction> {
   return await sellSimple({
     user: params.user,
     mint: params.mint,
-    tokenAmount: tokenAmountRaw,
+    tokenAmountRaw,
     minSolOutputLamports,
     feeRecipient,
     bondingCurveCreator: creator,

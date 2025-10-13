@@ -64,8 +64,14 @@ export async function sellWithSlippage(params: SellWithSlippageParams): Promise<
 export interface SimpleSellParams {
   user: TransactionSigner;
   mint: Address | string;
-  tokenAmount: number;
-  minSolOutputSol: number;
+  /** Human-readable token amount to sell (defaults to 6 decimals). */
+  tokenAmount?: number;
+  /** Raw token amount expressed in the mint's base units. */
+  tokenAmountRaw?: bigint;
+  /** Minimum SOL output expressed in SOL units. */
+  minSolOutputSol?: number;
+  /** Optional lamport-denominated minimum SOL output. */
+  minSolOutputLamports?: bigint;
   feeRecipient?: Address | string;
   bondingCurveCreator?: Address | string;
   rpc: RpcClient;
@@ -77,24 +83,58 @@ export async function sellSimple(params: SimpleSellParams): Promise<Instruction>
     user,
     mint,
     tokenAmount,
+    tokenAmountRaw,
     minSolOutputSol,
+    minSolOutputLamports,
     feeRecipient = DEFAULT_FEE_RECIPIENT,
     bondingCurveCreator,
     rpc,
     commitment,
   } = params;
 
-  if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) throw new Error("Token amount must be a positive number");
-  if (!Number.isFinite(minSolOutputSol) || minSolOutputSol < 0) throw new Error("Min SOL output cannot be negative");
+  let tokenAmountRawValue: bigint | null = null;
+  if (tokenAmountRaw !== undefined) {
+    if (tokenAmountRaw <= 0n) {
+      throw new Error("Token amount lamports must be positive");
+    }
+    tokenAmountRawValue = tokenAmountRaw;
+  } else if (tokenAmount !== undefined) {
+    if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) {
+      throw new Error("Token amount must be a positive number");
+    }
+    tokenAmountRawValue = tokensToRaw(tokenAmount, DEFAULT_TOKEN_DECIMALS);
+  }
 
-  const tokenAmountRaw = tokensToRaw(tokenAmount, DEFAULT_TOKEN_DECIMALS);
-  const minSolOutputLamports = solToLamports(minSolOutputSol);
+  if (tokenAmountRawValue === null) {
+    throw new Error(
+      "Provide either tokenAmountRaw or tokenAmount when calling sellSimple"
+    );
+  }
+
+  let minSolOutputLamportsValue: bigint | null = null;
+  if (minSolOutputLamports !== undefined) {
+    if (minSolOutputLamports < 0n) {
+      throw new Error("Min SOL output lamports cannot be negative");
+    }
+    minSolOutputLamportsValue = minSolOutputLamports;
+  } else if (minSolOutputSol !== undefined) {
+    if (!Number.isFinite(minSolOutputSol) || minSolOutputSol < 0) {
+      throw new Error("Min SOL output cannot be negative");
+    }
+    minSolOutputLamportsValue = solToLamports(minSolOutputSol);
+  }
+
+  if (minSolOutputLamportsValue === null) {
+    throw new Error(
+      "Provide either minSolOutputLamports or minSolOutputSol when calling sellSimple"
+    );
+  }
 
   return await buildSellInstruction({
     user,
     mint,
-    tokenAmount: tokenAmountRaw,
-    minSolOutputLamports,
+    tokenAmount: tokenAmountRawValue,
+    minSolOutputLamports: minSolOutputLamportsValue,
     feeRecipient,
     bondingCurveCreator,
     rpc,
