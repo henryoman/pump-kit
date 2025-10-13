@@ -2,6 +2,21 @@
 
 # Pump Kit
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/pump-kit">
+    <img src="https://img.shields.io/npm/v/pump-kit.svg?logo=npm&label=npm" alt="npm version" />
+  </a>
+  <a href="https://www.npmjs.com/package/pump-kit">
+    <img src="https://img.shields.io/npm/dm/pump-kit.svg?logo=npm&label=downloads" alt="npm downloads" />
+  </a>
+  <a href="https://bun.sh">
+    <img src="https://img.shields.io/badge/bun-%3E%3D1.1.0-000000?logo=bun&logoColor=fff" alt="Bun >= 1.1.0" />
+  </a>
+  <a href="https://nodejs.org/en">
+    <img src="https://img.shields.io/badge/node-%3E%3D18-43853d?logo=node.js&logoColor=fff" alt="Node.js >= 18" />
+  </a>
+</p>
+
 Pump Kit is a lightweight TypeScript helper for Pump.fun. It keeps all the lamport math under the hood so you work with SOL amounts, token counts, and wallet percentages.
 
 What you get:
