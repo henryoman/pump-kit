@@ -28,6 +28,8 @@ await sendAndConfirmTransaction({
   payer: myWallet,
   prependInstructions: wrap.prepend,
   appendInstructions: wrap.append,
+  rpc,
+  rpcSubscriptions,
 });
 ```
 

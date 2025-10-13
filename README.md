@@ -64,6 +64,8 @@ const buyInstruction = await quickBuy(myWallet, "TokenMint", 0.25, { rpc });
 const sellInstruction = await quickSell(myWallet, "TokenMint", 100_000, { rpc });
 ```
 
+> **Note:** The quick helpers require an RPC client. Always pass `{ rpc }` (and any optional overrides) as the final argument.
+
 ### Mint New Token
 
 ```ts
@@ -97,14 +99,14 @@ const { createInstruction, buyInstruction } = await mintWithFirstBuy({
 ### Simple API (Recommended)
 
 ```ts
-quickBuy(wallet, mint, solAmount, options?)
-quickSell(wallet, mint, tokenAmount, options?)
+quickBuy(wallet, mint, solAmount, { rpc, ...options })
+quickSell(wallet, mint, tokenAmount, { rpc, ...options })
 
 buy({ user, mint, solAmount, slippageBps?, ... })
 sell({ user, mint, tokenAmount?, useWalletPercentage?, walletPercentage?, ... })
 
 buildTransaction({ instructions, payer, prependInstructions?, appendInstructions?, rpc })
-sendAndConfirmTransaction({ instructions, payer, rpc, rpcSubscriptions?, ... })
+sendAndConfirmTransaction({ instructions, payer, rpc, rpcSubscriptions, ... })
 simulateTransaction({ instructions, payer, rpc, options? })
 
 addLiquidity({ user, baseMint, quoteMint?, maxBaseAmountIn, maxQuoteAmountIn, ... })

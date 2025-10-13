@@ -3,6 +3,8 @@
  * Everything you need, nothing you don't.
  */
 
+import "./config/polyfills";
+
 export { buy, sell, quickBuy, quickSell } from "./swap";
 export type { BuyParams, SellParams } from "./swap";
 

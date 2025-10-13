@@ -9,7 +9,7 @@ import {
 import { addSlippage, subSlippage } from "../../src/utils/slippage";
 import { solToLamports, tokensToRaw } from "../../src/utils/amounts";
 import type { TransactionSigner } from "@solana/kit";
-import { createTestWallet } from "../setup";
+import { createTestWallet, getTestRpc } from "../setup";
 import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
 import { getBuyInstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/buy";
 import { getSellInstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/sell";
@@ -34,6 +34,7 @@ import {
 
 describe("Swap helpers", () => {
   let testWallet: TransactionSigner;
+  let rpc: ReturnType<typeof getTestRpc>;
   const mintAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
   const mockCurve = (creator: string): BondingCurveState => ({
@@ -51,6 +52,7 @@ describe("Swap helpers", () => {
   };
 
   beforeAll(async () => {
+    rpc = getTestRpc();
     testWallet = await createTestWallet();
   });
 
@@ -71,6 +73,7 @@ describe("Swap helpers", () => {
       bondingCurveCreator: testWallet.address,
       curveStateOverride: curveState,
       feeStructureOverride: mockFees,
+      rpc,
     });
 
     const decoded = getBuyInstructionDataDecoder().decode(instruction.data);
@@ -87,6 +90,7 @@ describe("Swap helpers", () => {
       feeRecipient: DEFAULT_FEE_RECIPIENT,
       curveStateOverride: mockCurve(testWallet.address),
       feeStructureOverride: mockFees,
+      rpc,
     });
 
     const bondingCurve = await bondingCurvePda(mintAddress);
@@ -144,6 +148,7 @@ describe("Swap helpers", () => {
       bondingCurveCreator: testWallet.address,
       curveStateOverride: curveState,
       feeStructureOverride: mockFees,
+      rpc,
     });
 
     const decoded = getSellInstructionDataDecoder().decode(instruction.data);

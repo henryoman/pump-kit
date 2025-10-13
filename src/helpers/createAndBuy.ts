@@ -37,7 +37,7 @@ export interface CreateAndBuyOptions {
   sendOptions?: SendOptions;
   commitment?: ReturnType<typeof getDefaultCommitment>;
   rpc: RpcClient;
-  rpcSubscriptions?: RpcSubscriptionsClient;
+  rpcSubscriptions: RpcSubscriptionsClient;
 }
 
 export interface CreateAndBuyResult extends TransactionResult {

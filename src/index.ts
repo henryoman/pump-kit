@@ -1,8 +1,10 @@
 /**
  * Pump Kit - The simplest TypeScript SDK for Pump.fun
- * 
+ *
  * Clean, minimal API - just buy, sell, mint, and manage liquidity.
  */
+
+import "./config/polyfills";
 
 // ============================================================================
 // Simple API (recommended - start here!)

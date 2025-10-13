@@ -8,7 +8,7 @@
 
 import { describe, test, expect, beforeAll } from "bun:test";
 import { buyWithSlippage } from "../../src/recipes/buy";
-import { createTestWallet } from "../setup";
+import { createTestWallet, getTestRpc } from "../setup";
 import type { TransactionSigner } from "@solana/kit";
 import { address as getAddress } from "@solana/kit";
 import {
@@ -32,10 +32,12 @@ import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
 
 describe("Buy Operations", () => {
   let testWallet: TransactionSigner;
+  let rpc: ReturnType<typeof getTestRpc>;
   const mintAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const feeRecipient = DEFAULT_FEE_RECIPIENT;
 
   beforeAll(async () => {
+    rpc = getTestRpc();
     testWallet = await createTestWallet();
   });
 
@@ -44,10 +46,11 @@ describe("Buy Operations", () => {
       user: testWallet,
       mint: mintAddress,
       tokenAmount: 1_000_000n,
-      estimatedSolCost: 5_000_000n,
+      estimatedSolCostSol: 0.5,
       slippageBps: 50,
       feeRecipient,
       bondingCurveCreator: testWallet.address,
+      rpc,
     });
 
     // Verify instruction structure
@@ -62,9 +65,10 @@ describe("Buy Operations", () => {
       user: testWallet,
       mint: mintAddress,
       tokenAmount: 1_000_000n,
-      estimatedSolCost: 5_000_000n,
+      estimatedSolCostSol: 0.5,
       feeRecipient,
       bondingCurveCreator: testWallet.address,
+      rpc,
     });
 
     expect(instruction).toBeDefined();
@@ -75,10 +79,11 @@ describe("Buy Operations", () => {
       user: testWallet,
       mint: mintAddress,
       tokenAmount: 1_000_000n,
-      estimatedSolCost: 5_000_000n,
+      estimatedSolCostSol: 0.5,
       slippageBps: 100, // 1% slippage
       feeRecipient,
       bondingCurveCreator: testWallet.address,
+      rpc,
     });
 
     expect(instruction).toBeDefined();
@@ -89,9 +94,10 @@ describe("Buy Operations", () => {
       user: testWallet,
       mint: mintAddress,
       tokenAmount: 1_000_000n,
-      estimatedSolCost: 5_000_000n,
+      estimatedSolCostSol: 0.5,
       bondingCurveCreator: testWallet.address,
       feeRecipient,
+      rpc,
     });
 
     expect(instruction.programAddress).toBe(getAddress(PUMP_PROGRAM_ID));

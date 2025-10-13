@@ -4,7 +4,7 @@
 
 import { describe, test, expect, beforeAll } from "bun:test";
 import { sellWithSlippage } from "../../src/recipes/sell";
-import { createTestWallet } from "../setup";
+import { createTestWallet, getTestRpc } from "../setup";
 import type { TransactionSigner } from "@solana/kit";
 import { address as getAddress } from "@solana/kit";
 import {
@@ -26,10 +26,12 @@ import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
 
 describe("Sell Operations", () => {
   let testWallet: TransactionSigner;
+  let rpc: ReturnType<typeof getTestRpc>;
   const mintAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const feeRecipient = DEFAULT_FEE_RECIPIENT;
 
   beforeAll(async () => {
+    rpc = getTestRpc();
     testWallet = await createTestWallet();
   });
 
@@ -37,11 +39,12 @@ describe("Sell Operations", () => {
     const instruction = await sellWithSlippage({
       user: testWallet,
       mint: mintAddress,
-      tokenAmount: 250_000n,
-      estimatedSolOut: 1_000_000n,
+      tokenAmount: 250_000,
+      estimatedSolOutSol: 0.25,
       slippageBps: 50,
       feeRecipient,
       bondingCurveCreator: testWallet.address,
+      rpc,
     });
 
     expect(instruction).toBeDefined();
@@ -53,10 +56,11 @@ describe("Sell Operations", () => {
     const instruction = await sellWithSlippage({
       user: testWallet,
       mint: mintAddress,
-      tokenAmount: 250_000n,
-      estimatedSolOut: 1_000_000n,
+      tokenAmount: 250_000,
+      estimatedSolOutSol: 0.25,
       feeRecipient,
       bondingCurveCreator: testWallet.address,
+      rpc,
     });
 
     expect(instruction).toBeDefined();
@@ -66,10 +70,11 @@ describe("Sell Operations", () => {
     const instruction = await sellWithSlippage({
       user: testWallet,
       mint: mintAddress,
-      tokenAmount: 250_000n,
-      estimatedSolOut: 1_000_000n,
+      tokenAmount: 250_000,
+      estimatedSolOutSol: 0.25,
       bondingCurveCreator: testWallet.address,
       feeRecipient,
+      rpc,
     });
 
     expect(instruction.programAddress).toBe(getAddress(PUMP_PROGRAM_ID));

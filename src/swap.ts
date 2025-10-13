@@ -218,7 +218,7 @@ export async function sell(params: SellParams): Promise<Instruction> {
   return await sellSimple({
     user: params.user,
     mint: params.mint,
-    tokenAmount: tokenAmountRaw,
+    tokenAmountRaw,
     minSolOutputLamports,
     feeRecipient,
     bondingCurveCreator: creator,
@@ -227,17 +227,27 @@ export async function sell(params: SellParams): Promise<Instruction> {
   });
 }
 
+type QuickBuyOptions = Omit<BuyParams, "user" | "mint" | "solAmount">;
+type QuickSellOptions = Omit<SellParams, "user" | "mint" | "tokenAmount">;
+
 export async function quickBuy(
   user: TransactionSigner,
   mint: Address | string,
   solAmount: number,
-  options: Omit<BuyParams, "user" | "mint" | "solAmount"> = {}
+  options?: QuickBuyOptions
 ): Promise<Instruction> {
+  if (!options) {
+    throw new Error("quickBuy requires options with an RPC client (options.rpc)");
+  }
+
+  const { rpc, ...rest } = options;
+
   return buy({
     user,
     mint,
     solAmount,
-    ...options,
+    rpc,
+    ...rest,
   });
 }
 
@@ -245,12 +255,19 @@ export async function quickSell(
   user: TransactionSigner,
   mint: Address | string,
   tokenAmount: number,
-  options: Omit<SellParams, "user" | "mint" | "tokenAmount"> = {}
+  options?: QuickSellOptions
 ): Promise<Instruction> {
+  if (!options) {
+    throw new Error("quickSell requires options with an RPC client (options.rpc)");
+  }
+
+  const { rpc, ...rest } = options;
+
   return sell({
     user,
     mint,
     tokenAmount,
-    ...options,
+    rpc,
+    ...rest,
   });
 }

@@ -123,7 +123,7 @@ const instruction = await buyWithSlippage({
   user: testWallet,
   mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   tokenAmount: 1_000_000n,
-  estimatedSolCost: 5_000_000n,
+  estimatedSolCostSol: 0.5,
   feeRecipient: "11111111111111111111111111111111",
 });
 

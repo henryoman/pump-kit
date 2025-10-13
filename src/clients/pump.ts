@@ -308,7 +308,7 @@ async function resolveCreatorAddress(args: {
   bondingCurve: Address;
   providedCreator?: Address | string;
   rpc: FetchClient;
-  commitment: InternalCommitment;
+  commitment: Commitment;
 }): Promise<Address> {
   const { bondingCurve, providedCreator, rpc, commitment } = args;
 
