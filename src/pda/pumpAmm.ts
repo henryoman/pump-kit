@@ -129,3 +129,33 @@ export async function eventAuthorityPda(): Promise<Address> {
   });
   return address;
 }
+
+/**
+ * Derives the coin creator vault authority PDA.
+ * Seed: ["creator_vault", coinCreator]
+ */
+export async function coinCreatorVaultAuthorityPda(
+  coinCreator: Address | string
+): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
+    programAddress: getAddress(PUMP_AMM_PROGRAM_ID),
+    seeds: [enc.encode("creator_vault"), addressEncoder.encode(getAddress(coinCreator))],
+  });
+  return address;
+}
+
+/**
+ * Derives the coin creator vault ATA for the quote mint using the provided token program.
+ */
+export async function coinCreatorVaultAta(
+  coinCreatorVaultAuthority: Address | string,
+  quoteMint: Address | string,
+  tokenProgram: Address | string
+): Promise<Address> {
+  const [address] = await findATA2022({
+    owner: getAddress(coinCreatorVaultAuthority),
+    mint: getAddress(quoteMint),
+    tokenProgram: getAddress(tokenProgram),
+  });
+  return address;
+}

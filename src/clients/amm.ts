@@ -12,6 +12,8 @@ import {
   SYSTEM_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  FEE_PROGRAM_ID,
 } from "../config/addresses";
 import {
   poolPda,
@@ -19,8 +21,13 @@ import {
   userLpAta,
   poolTokenAta,
   globalConfigPda,
+  globalVolumeAccumulatorPda,
+  userVolumeAccumulatorPda,
   eventAuthorityPda,
+  coinCreatorVaultAuthorityPda,
+  coinCreatorVaultAta,
 } from "../pda/pumpAmm";
+import { feeConfigPda } from "../pda/pump";
 import {
   getDepositInstruction,
   getWithdrawInstruction,
@@ -28,6 +35,10 @@ import {
   getSellInstruction,
   getCreatePoolInstruction,
 } from "../ammsdk/generated/instructions";
+import { fetchPool } from "../ammsdk/generated/accounts/pool";
+import { fetchGlobalConfig } from "../ammsdk/generated/accounts/globalConfig";
+import type { RpcClient } from "../config/connection";
+import { getDefaultCommitment } from "../config/commitment";
 
 const DEFAULT_POOL_INDEX = 0;
 
@@ -257,18 +268,17 @@ export async function withdraw(params: WithdrawParams) {
 }
 
 export interface AmmBuyParams {
-  /** The user's wallet/signer */
   user: TransactionSigner;
-  /** Base token mint (token to buy) */
   baseMint: Address | string;
-  /** Quote token mint (token to pay with) */
   quoteMint: Address | string;
-  /** Pool index */
-  index: number;
-  /** Amount of base tokens to buy */
+  index?: number;
+  poolAddress?: Address | string;
+  poolCreator?: Address | string;
   tokenAmountOut: bigint;
-  /** Maximum quote tokens to spend (slippage protection) */
   maxQuoteIn: bigint;
+  allowTrackVolume?: boolean;
+  rpc: RpcClient;
+  commitment?: "processed" | "confirmed" | "finalized";
 }
 
 /**
@@ -276,23 +286,114 @@ export interface AmmBuyParams {
  * 
  * TODO: Complete implementation once we verify the generated instruction signature.
  */
-export function ammBuy(params: AmmBuyParams) {
-  throw new Error("ammBuy not yet implemented - needs generated instruction verification");
+export async function ammBuy(params: AmmBuyParams) {
+  const {
+    user,
+    baseMint,
+    quoteMint,
+    tokenAmountOut,
+    maxQuoteIn,
+    rpc,
+    allowTrackVolume = true,
+    commitment: commitmentOverride,
+  } = params;
+
+  if (tokenAmountOut <= 0n) throw new Error("tokenAmountOut must be positive");
+  if (maxQuoteIn <= 0n) throw new Error("maxQuoteIn must be positive");
+
+  const commitment = commitmentOverride ?? getDefaultCommitment();
+  const userAddr = getAddress(user.address);
+  const base = getAddress(baseMint);
+  const quote = getAddress(quoteMint);
+  const tokenProgramAddr = getAddress(TOKEN_PROGRAM_ID);
+
+  const pool = await resolvePoolAddress(params, userAddr);
+  const { poolData, globalConfigData, globalConfigAddress } = await resolvePoolState(
+    rpc,
+    pool,
+    commitment
+  );
+
+  const protocolFeeRecipient = pickProtocolFeeRecipient(globalConfigData.protocolFeeRecipients);
+  if (!protocolFeeRecipient) {
+    throw new Error("Global config does not define a protocol fee recipient");
+  }
+
+  const coinCreatorVaultAuthority = await coinCreatorVaultAuthorityPda(poolData.coinCreator);
+  const coinCreatorVaultTokenAccount = await coinCreatorVaultAta(
+    coinCreatorVaultAuthority,
+    quote,
+    tokenProgramAddr
+  );
+
+  const [userBaseAta] = await findAssociatedTokenPda({
+    owner: userAddr,
+    tokenProgram: tokenProgramAddr,
+    mint: base,
+  });
+  const [userQuoteAta] = await findAssociatedTokenPda({
+    owner: userAddr,
+    tokenProgram: tokenProgramAddr,
+    mint: quote,
+  });
+
+  const poolBaseAta = await poolTokenAta(pool, base, tokenProgramAddr);
+  const poolQuoteAta = await poolTokenAta(pool, quote, tokenProgramAddr);
+  const [protocolFeeRecipientAta] = await findAssociatedTokenPda({
+    owner: protocolFeeRecipient,
+    tokenProgram: tokenProgramAddr,
+    mint: quote,
+  });
+  const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
+  const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
+  const eventAuthority = await eventAuthorityPda();
+  const feeConfig = await feeConfigPda();
+
+  return getBuyInstruction(
+    {
+      pool,
+      user,
+      globalConfig: globalConfigAddress,
+      baseMint: base,
+      quoteMint: quote,
+      userBaseTokenAccount: userBaseAta,
+      userQuoteTokenAccount: userQuoteAta,
+      poolBaseTokenAccount: poolBaseAta,
+      poolQuoteTokenAccount: poolQuoteAta,
+      protocolFeeRecipient,
+      protocolFeeRecipientTokenAccount: protocolFeeRecipientAta,
+      baseTokenProgram: tokenProgramAddr,
+      quoteTokenProgram: tokenProgramAddr,
+      systemProgram: getAddress(SYSTEM_PROGRAM_ID),
+      associatedTokenProgram: getAddress(ASSOCIATED_TOKEN_PROGRAM_ID),
+      eventAuthority,
+      program: getAddress(PUMP_AMM_PROGRAM_ID),
+      coinCreatorVaultAta: coinCreatorVaultTokenAccount,
+      coinCreatorVaultAuthority,
+      globalVolumeAccumulator,
+      userVolumeAccumulator,
+      feeConfig,
+      feeProgram: getAddress(FEE_PROGRAM_ID),
+      baseAmountOut: tokenAmountOut,
+      maxQuoteAmountIn: maxQuoteIn,
+      trackVolume: [allowTrackVolume] as const,
+    },
+    { programAddress: getAddress(PUMP_AMM_PROGRAM_ID) }
+  );
 }
 
 export interface AmmSellParams {
-  /** The user's wallet/signer */
   user: TransactionSigner;
-  /** Base token mint (token to sell) */
   baseMint: Address | string;
-  /** Quote token mint (token to receive) */
   quoteMint: Address | string;
-  /** Pool index */
-  index: number;
-  /** Amount of base tokens to sell */
+  index?: number;
+  poolAddress?: Address | string;
+  poolCreator?: Address | string;
   tokenAmountIn: bigint;
-  /** Minimum quote tokens to receive (slippage protection) */
   minQuoteOut: bigint;
+  allowTrackVolume?: boolean;
+  rpc: RpcClient;
+  commitment?: "processed" | "confirmed" | "finalized";
 }
 
 /**
@@ -300,6 +401,137 @@ export interface AmmSellParams {
  * 
  * TODO: Complete implementation once we verify the generated instruction signature.
  */
-export function ammSell(params: AmmSellParams) {
-  throw new Error("ammSell not yet implemented - needs generated instruction verification");
+export async function ammSell(params: AmmSellParams) {
+  const {
+    user,
+    baseMint,
+    quoteMint,
+    tokenAmountIn,
+    minQuoteOut,
+    rpc,
+    allowTrackVolume = true,
+    commitment: commitmentOverride,
+  } = params;
+
+  if (tokenAmountIn <= 0n) throw new Error("tokenAmountIn must be positive");
+  if (minQuoteOut <= 0n) throw new Error("minQuoteOut must be positive");
+
+  const commitment = commitmentOverride ?? getDefaultCommitment();
+  const userAddr = getAddress(user.address);
+  const base = getAddress(baseMint);
+  const quote = getAddress(quoteMint);
+  const tokenProgramAddr = getAddress(TOKEN_PROGRAM_ID);
+
+  const pool = await resolvePoolAddress(params, userAddr);
+  const { poolData, globalConfigData, globalConfigAddress } = await resolvePoolState(
+    rpc,
+    pool,
+    commitment
+  );
+
+  const protocolFeeRecipient = pickProtocolFeeRecipient(globalConfigData.protocolFeeRecipients);
+  if (!protocolFeeRecipient) {
+    throw new Error("Global config does not define a protocol fee recipient");
+  }
+
+  const coinCreatorVaultAuthority = await coinCreatorVaultAuthorityPda(poolData.coinCreator);
+  const coinCreatorVaultTokenAccount = await coinCreatorVaultAta(
+    coinCreatorVaultAuthority,
+    quote,
+    tokenProgramAddr
+  );
+
+  const [userBaseAta] = await findAssociatedTokenPda({
+    owner: userAddr,
+    tokenProgram: tokenProgramAddr,
+    mint: base,
+  });
+  const [userQuoteAta] = await findAssociatedTokenPda({
+    owner: userAddr,
+    tokenProgram: tokenProgramAddr,
+    mint: quote,
+  });
+
+  const poolBaseAta = await poolTokenAta(pool, base, tokenProgramAddr);
+  const poolQuoteAta = await poolTokenAta(pool, quote, tokenProgramAddr);
+  const [protocolFeeRecipientAta] = await findAssociatedTokenPda({
+    owner: protocolFeeRecipient,
+    tokenProgram: tokenProgramAddr,
+    mint: quote,
+  });
+  const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
+  const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
+  const eventAuthority = await eventAuthorityPda();
+  const feeConfig = await feeConfigPda();
+
+  return getSellInstruction(
+    {
+      pool,
+      user,
+      globalConfig: globalConfigAddress,
+      baseMint: base,
+      quoteMint: quote,
+      userBaseTokenAccount: userBaseAta,
+      userQuoteTokenAccount: userQuoteAta,
+      poolBaseTokenAccount: poolBaseAta,
+      poolQuoteTokenAccount: poolQuoteAta,
+      protocolFeeRecipient,
+      protocolFeeRecipientTokenAccount: protocolFeeRecipientAta,
+      baseTokenProgram: tokenProgramAddr,
+      quoteTokenProgram: tokenProgramAddr,
+      systemProgram: getAddress(SYSTEM_PROGRAM_ID),
+      associatedTokenProgram: getAddress(ASSOCIATED_TOKEN_PROGRAM_ID),
+      eventAuthority,
+      program: getAddress(PUMP_AMM_PROGRAM_ID),
+      coinCreatorVaultAta: coinCreatorVaultTokenAccount,
+      coinCreatorVaultAuthority,
+      feeConfig,
+      feeProgram: getAddress(FEE_PROGRAM_ID),
+      baseAmountIn: tokenAmountIn,
+      minQuoteAmountOut: minQuoteOut,
+    },
+    { programAddress: getAddress(PUMP_AMM_PROGRAM_ID) }
+  );
+}
+
+async function resolvePoolAddress(
+  params: {
+    index?: number;
+    poolAddress?: Address | string;
+    poolCreator?: Address | string;
+    baseMint: Address | string;
+    quoteMint: Address | string;
+  },
+  userAddress: Address | string
+): Promise<Address> {
+  if (params.poolAddress) {
+    return getAddress(params.poolAddress);
+  }
+
+  const index = params.index ?? DEFAULT_POOL_INDEX;
+  const creator = getAddress(params.poolCreator ?? userAddress);
+  return await poolPda(index, creator, getAddress(params.baseMint), getAddress(params.quoteMint));
+}
+
+async function resolvePoolState(
+  rpc: RpcClient,
+  pool: Address,
+  commitment: "processed" | "confirmed" | "finalized"
+) {
+  const globalConfigAddress = await globalConfigPda();
+  const [poolAccount, globalConfigAccount] = await Promise.all([
+    fetchPool(rpc, pool, { commitment }),
+    fetchGlobalConfig(rpc, globalConfigAddress, { commitment }),
+  ]);
+
+  return {
+    poolData: poolAccount.data,
+    globalConfigData: globalConfigAccount.data,
+    globalConfigAddress,
+  };
+}
+
+function pickProtocolFeeRecipient(protocolFeeRecipients: readonly Address[]): Address | null {
+  const candidates = protocolFeeRecipients.filter(Boolean);
+  return candidates.length > 0 ? getAddress(candidates[0]!) : null;
 }
