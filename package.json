@@ -16,7 +16,8 @@
     "dist",
     "README.md",
     "MIGRATION.md",
-    "LICENSE"
+    "LICENSE",
+    "@pump-kit.png"
   ],
   "engines": {
     "node": ">=18",
