@@ -1,4 +1,4 @@
-![Pump Kit](pump-kit.jpeg)
+![Pump Kit](@pump-kit.png)
 
 # Pump Kit
 
