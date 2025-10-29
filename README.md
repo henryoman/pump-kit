@@ -17,6 +17,8 @@
   </a>
 </p>
 
+> Social card metadata lives in [`metadata/social.json`](metadata/social.json) and points to the same `@pump-kit.png` preview used here.
+
 Pump Kit is a lightweight TypeScript helper for Pump.fun. It keeps all the lamport math under the hood so you work with SOL amounts, token counts, and wallet percentages.
 
 What you get:
