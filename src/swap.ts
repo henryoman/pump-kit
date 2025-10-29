@@ -22,7 +22,7 @@ import {
 import type { Fees } from "./pumpsdk/generated/types/fees";
 import { solToLamports, tokensToRaw } from "./utils/amounts";
 import { getDefaultCommitment } from "./config/commitment";
-import { findAssociatedTokenPda } from "@solana-program/token";
+import { findAssociatedTokenPda } from "./pda/ata";
 import { TOKEN_PROGRAM_ID } from "./config/addresses";
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";

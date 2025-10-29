@@ -5,7 +5,7 @@
 
 import type { Address, TransactionSigner } from "@solana/kit";
 import { address as getAddress } from "@solana/kit";
-import { findAssociatedTokenPda } from "@solana-program/token";
+import { findAssociatedTokenPda } from "../pda/ata";
 
 import {
   PUMP_PROGRAM_ID,

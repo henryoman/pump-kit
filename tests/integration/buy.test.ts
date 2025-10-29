@@ -21,7 +21,7 @@ import {
   feeConfigPda,
   eventAuthorityPda,
 } from "../../src/pda/pump";
-import { findAssociatedTokenPda } from "@solana-program/token";
+import { findAssociatedTokenPda } from "../../src/pda/ata";
 import {
   PUMP_PROGRAM_ID,
   SYSTEM_PROGRAM_ID,

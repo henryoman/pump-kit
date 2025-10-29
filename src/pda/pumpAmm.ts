@@ -5,8 +5,8 @@
 
 import { getProgramDerivedAddress, address as getAddress, getAddressEncoder } from "@solana/kit";
 import type { Address } from "@solana/kit";
-import { PUMP_AMM_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "../config/addresses";
-import { findAssociatedTokenPda as findATA2022 } from "@solana-program/token-2022";
+import { PUMP_AMM_PROGRAM_ID } from "../config/addresses";
+import { findAssociatedTokenPda, findAssociatedTokenPda2022 } from "./ata";
 
 const enc = new TextEncoder();
 const addressEncoder = getAddressEncoder();
@@ -57,10 +57,9 @@ export async function lpMintPda(pool: Address | string): Promise<Address> {
  * Owner: user, Mint: lpMint, TokenProgram: TOKEN_2022_PROGRAM_ID
  */
 export async function userLpAta(user: Address | string, lpMint: Address | string): Promise<Address> {
-  const [address] = await findATA2022({
-    owner: getAddress(user),
-    mint: getAddress(lpMint),
-    tokenProgram: getAddress(TOKEN_2022_PROGRAM_ID),
+  const [address] = await findAssociatedTokenPda2022({
+    owner: user,
+    mint: lpMint,
   });
   return address;
 }
@@ -74,10 +73,10 @@ export async function poolTokenAta(
   tokenMint: Address | string,
   tokenProgram: Address | string
 ): Promise<Address> {
-  const [address] = await findATA2022({
-    owner: getAddress(pool),
-    mint: getAddress(tokenMint),
-    tokenProgram: getAddress(tokenProgram),
+  const [address] = await findAssociatedTokenPda({
+    owner: pool,
+    mint: tokenMint,
+    tokenProgram,
   });
   return address;
 }
@@ -152,10 +151,10 @@ export async function coinCreatorVaultAta(
   quoteMint: Address | string,
   tokenProgram: Address | string
 ): Promise<Address> {
-  const [address] = await findATA2022({
-    owner: getAddress(coinCreatorVaultAuthority),
-    mint: getAddress(quoteMint),
-    tokenProgram: getAddress(tokenProgram),
+  const [address] = await findAssociatedTokenPda({
+    owner: coinCreatorVaultAuthority,
+    mint: quoteMint,
+    tokenProgram,
   });
   return address;
 }

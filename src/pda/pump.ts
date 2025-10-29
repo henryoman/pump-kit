@@ -6,7 +6,7 @@
 import { getProgramDerivedAddress, address as getAddress, getAddressEncoder } from "@solana/kit";
 import type { Address } from "@solana/kit";
 import { FEE_PROGRAM_ID, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
-import { findAssociatedTokenPda } from "@solana-program/token";
+import { findAssociatedTokenPda } from "./ata";
 
 const enc = new TextEncoder();
 const addressEncoder = getAddressEncoder();
