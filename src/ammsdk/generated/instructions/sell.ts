@@ -90,7 +90,7 @@ export type SellInstruction<
   InstructionWithAccounts<
     [
       TAccountPool extends string
-        ? ReadonlyAccount<TAccountPool>
+        ? WritableAccount<TAccountPool>
         : TAccountPool,
       TAccountUser extends string
         ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
@@ -323,7 +323,7 @@ export async function getSellInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isWritable: true },
     user: { value: input.user ?? null, isWritable: true },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     baseMint: { value: input.baseMint ?? null, isWritable: false },
@@ -646,7 +646,7 @@ export function getSellInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isWritable: true },
     user: { value: input.user ?? null, isWritable: true },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     baseMint: { value: input.baseMint ?? null, isWritable: false },

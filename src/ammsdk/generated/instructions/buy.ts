@@ -98,7 +98,7 @@ export type BuyInstruction<
   InstructionWithAccounts<
     [
       TAccountPool extends string
-        ? ReadonlyAccount<TAccountPool>
+        ? WritableAccount<TAccountPool>
         : TAccountPool,
       TAccountUser extends string
         ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
@@ -352,7 +352,7 @@ export async function getBuyInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isWritable: true },
     user: { value: input.user ?? null, isWritable: true },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     baseMint: { value: input.baseMint ?? null, isWritable: false },
@@ -723,7 +723,7 @@ export function getBuyInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isWritable: true },
     user: { value: input.user ?? null, isWritable: true },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     baseMint: { value: input.baseMint ?? null, isWritable: false },
