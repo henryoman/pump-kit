@@ -9,6 +9,7 @@
 export * from './adminSetCoinCreator';
 export * from './adminUpdateTokenIncentives';
 export * from './buy';
+export * from './buyExactQuoteIn';
 export * from './claimTokenIncentives';
 export * from './closeUserVolumeAccumulator';
 export * from './collectCoinCreatorFee';

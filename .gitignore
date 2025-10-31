@@ -44,3 +44,6 @@ temp/
 
 # Bun
 .bun/
+
+# Test swap script keypair (NEVER commit private keys!)
+test-swap/keypair.json

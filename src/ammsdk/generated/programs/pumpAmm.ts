@@ -16,6 +16,7 @@ import {
 import {
   type ParsedAdminSetCoinCreatorInstruction,
   type ParsedAdminUpdateTokenIncentivesInstruction,
+  type ParsedBuyExactQuoteInInstruction,
   type ParsedBuyInstruction,
   type ParsedClaimTokenIncentivesInstruction,
   type ParsedCloseUserVolumeAccumulatorInstruction,
@@ -125,6 +126,7 @@ export enum PumpAmmInstruction {
   AdminSetCoinCreator,
   AdminUpdateTokenIncentives,
   Buy,
+  BuyExactQuoteIn,
   ClaimTokenIncentives,
   CloseUserVolumeAccumulator,
   CollectCoinCreatorFee,
@@ -178,6 +180,17 @@ export function identifyPumpAmmInstruction(
     )
   ) {
     return PumpAmmInstruction.Buy;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([198, 46, 21, 82, 180, 217, 232, 112])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.BuyExactQuoteIn;
   }
   if (
     containsBytes(
@@ -361,6 +374,9 @@ export type ParsedPumpAmmInstruction<
   | ({
       instructionType: PumpAmmInstruction.Buy;
     } & ParsedBuyInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.BuyExactQuoteIn;
+    } & ParsedBuyExactQuoteInInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.ClaimTokenIncentives;
     } & ParsedClaimTokenIncentivesInstruction<TProgram>)

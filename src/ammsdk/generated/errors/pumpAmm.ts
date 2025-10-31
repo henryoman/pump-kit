@@ -92,11 +92,17 @@ export const PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX = 0x1794; // 6036
 export const PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE = 0x1795; // 6037
 /** InvalidIncentiveMint:  */
 export const PUMP_AMM_ERROR__INVALID_INCENTIVE_MINT = 0x1796; // 6038
+/** BuyNotEnoughQuoteTokensToCoverFees: buy: Not enough quote tokens to cover for fees. */
+export const PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES = 0x1797; // 6039
+/** BuySlippageBelowMinBaseAmountOut: buy: slippage - would buy less tokens than expected min_base_amount_out */
+export const PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT = 0x1798; // 6040
 
 export type PumpAmmError =
   | typeof PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED
   | typeof PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
   | typeof PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES
+  | typeof PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES
+  | typeof PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT
   | typeof PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE
   | typeof PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX
   | typeof PUMP_AMM_ERROR__DISABLED_BUY
@@ -140,6 +146,8 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED]: ``,
     [PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
     [PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES]: ``,
+    [PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES]: `buy: Not enough quote tokens to cover for fees.`,
+    [PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT]: `buy: slippage - would buy less tokens than expected min_base_amount_out`,
     [PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE]: ``,
     [PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX]: ``,
     [PUMP_AMM_ERROR__DISABLED_BUY]: ``,

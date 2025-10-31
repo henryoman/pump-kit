@@ -94,6 +94,12 @@ export const PUMP_ERROR__DAY_INDEX_AFTER_END_INDEX = 0x1795; // 6037
 export const PUMP_ERROR__DAY_IN_ACTIVE_RANGE = 0x1796; // 6038
 /** InvalidIncentiveMint:  */
 export const PUMP_ERROR__INVALID_INCENTIVE_MINT = 0x1797; // 6039
+/** BuyNotEnoughSolToCoverRent: Buy: Not enough SOL to cover for rent exemption. */
+export const PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT = 0x1798; // 6040
+/** BuyNotEnoughSolToCoverFees: Buy: Not enough SOL to cover for fees. */
+export const PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES = 0x1799; // 6041
+/** BuySlippageBelowMinTokensOut: Slippage: Would buy less tokens than expected min_tokens_out */
+export const PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT = 0x179a; // 6042
 
 export type PumpError =
   | typeof PUMP_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED
@@ -102,6 +108,9 @@ export type PumpError =
   | typeof PUMP_ERROR__ALREADY_INITIALIZED
   | typeof PUMP_ERROR__BONDING_CURVE_COMPLETE
   | typeof PUMP_ERROR__BONDING_CURVE_NOT_COMPLETE
+  | typeof PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES
+  | typeof PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT
+  | typeof PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT
   | typeof PUMP_ERROR__BUY_ZERO_AMOUNT
   | typeof PUMP_ERROR__CREATOR_SHOULD_NOT_BE_ZERO
   | typeof PUMP_ERROR__DAY_IN_ACTIVE_RANGE
@@ -146,6 +155,9 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__ALREADY_INITIALIZED]: `The program is already initialized.`,
     [PUMP_ERROR__BONDING_CURVE_COMPLETE]: `The bonding curve has completed and liquidity migrated to raydium.`,
     [PUMP_ERROR__BONDING_CURVE_NOT_COMPLETE]: `The bonding curve has not completed.`,
+    [PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES]: `Buy: Not enough SOL to cover for fees.`,
+    [PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT]: `Buy: Not enough SOL to cover for rent exemption.`,
+    [PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT]: `Slippage: Would buy less tokens than expected min_tokens_out`,
     [PUMP_ERROR__BUY_ZERO_AMOUNT]: `Buy zero amount`,
     [PUMP_ERROR__CREATOR_SHOULD_NOT_BE_ZERO]: `Creator should not be zero`,
     [PUMP_ERROR__DAY_IN_ACTIVE_RANGE]: ``,

@@ -47,15 +47,17 @@ import {
   type OptionBoolArgs,
 } from '../types';
 
-export const BUY_DISCRIMINATOR = new Uint8Array([
-  102, 6, 61, 18, 1, 218, 235, 234,
+export const BUY_EXACT_SOL_IN_DISCRIMINATOR = new Uint8Array([
+  56, 252, 116, 8, 158, 223, 205, 95,
 ]);
 
-export function getBuyDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(BUY_DISCRIMINATOR);
+export function getBuyExactSolInDiscriminatorBytes() {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(
+    BUY_EXACT_SOL_IN_DISCRIMINATOR
+  );
 }
 
-export type BuyInstruction<
+export type BuyExactSolInInstruction<
   TProgram extends string = typeof PUMP_PROGRAM_ADDRESS,
   TAccountGlobal extends string | AccountMeta<string> = string,
   TAccountFeeRecipient extends string | AccountMeta<string> = string,
@@ -138,51 +140,51 @@ export type BuyInstruction<
     ]
   >;
 
-export type BuyInstructionData = {
+export type BuyExactSolInInstructionData = {
   discriminator: ReadonlyUint8Array;
-  amount: bigint;
-  maxSolCost: bigint;
+  spendableSolIn: bigint;
+  minTokensOut: bigint;
   trackVolume: OptionBool;
 };
 
-export type BuyInstructionDataArgs = {
-  amount: number | bigint;
-  maxSolCost: number | bigint;
+export type BuyExactSolInInstructionDataArgs = {
+  spendableSolIn: number | bigint;
+  minTokensOut: number | bigint;
   trackVolume: OptionBoolArgs;
 };
 
-export function getBuyInstructionDataEncoder(): FixedSizeEncoder<BuyInstructionDataArgs> {
+export function getBuyExactSolInInstructionDataEncoder(): FixedSizeEncoder<BuyExactSolInInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['amount', getU64Encoder()],
-      ['maxSolCost', getU64Encoder()],
+      ['spendableSolIn', getU64Encoder()],
+      ['minTokensOut', getU64Encoder()],
       ['trackVolume', getOptionBoolEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: BUY_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: BUY_EXACT_SOL_IN_DISCRIMINATOR })
   );
 }
 
-export function getBuyInstructionDataDecoder(): FixedSizeDecoder<BuyInstructionData> {
+export function getBuyExactSolInInstructionDataDecoder(): FixedSizeDecoder<BuyExactSolInInstructionData> {
   return getStructDecoder([
     ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['amount', getU64Decoder()],
-    ['maxSolCost', getU64Decoder()],
+    ['spendableSolIn', getU64Decoder()],
+    ['minTokensOut', getU64Decoder()],
     ['trackVolume', getOptionBoolDecoder()],
   ]);
 }
 
-export function getBuyInstructionDataCodec(): FixedSizeCodec<
-  BuyInstructionDataArgs,
-  BuyInstructionData
+export function getBuyExactSolInInstructionDataCodec(): FixedSizeCodec<
+  BuyExactSolInInstructionDataArgs,
+  BuyExactSolInInstructionData
 > {
   return combineCodec(
-    getBuyInstructionDataEncoder(),
-    getBuyInstructionDataDecoder()
+    getBuyExactSolInInstructionDataEncoder(),
+    getBuyExactSolInInstructionDataDecoder()
   );
 }
 
-export type BuyAsyncInput<
+export type BuyExactSolInAsyncInput<
   TAccountGlobal extends string = string,
   TAccountFeeRecipient extends string = string,
   TAccountMint extends string = string,
@@ -216,12 +218,12 @@ export type BuyAsyncInput<
   userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
   feeConfig?: Address<TAccountFeeConfig>;
   feeProgram?: Address<TAccountFeeProgram>;
-  amount: BuyInstructionDataArgs['amount'];
-  maxSolCost: BuyInstructionDataArgs['maxSolCost'];
-  trackVolume: BuyInstructionDataArgs['trackVolume'];
+  spendableSolIn: BuyExactSolInInstructionDataArgs['spendableSolIn'];
+  minTokensOut: BuyExactSolInInstructionDataArgs['minTokensOut'];
+  trackVolume: BuyExactSolInInstructionDataArgs['trackVolume'];
 };
 
-export async function getBuyInstructionAsync<
+export async function getBuyExactSolInInstructionAsync<
   TAccountGlobal extends string,
   TAccountFeeRecipient extends string,
   TAccountMint extends string,
@@ -240,7 +242,7 @@ export async function getBuyInstructionAsync<
   TAccountFeeProgram extends string,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
-  input: BuyAsyncInput<
+  input: BuyExactSolInAsyncInput<
     TAccountGlobal,
     TAccountFeeRecipient,
     TAccountMint,
@@ -260,7 +262,7 @@ export async function getBuyInstructionAsync<
   >,
   config?: { programAddress?: TProgramAddress }
 ): Promise<
-  BuyInstruction<
+  BuyExactSolInInstruction<
     TProgramAddress,
     TAccountGlobal,
     TAccountFeeRecipient,
@@ -453,9 +455,11 @@ export async function getBuyInstructionAsync<
       getAccountMeta(accounts.feeConfig),
       getAccountMeta(accounts.feeProgram),
     ],
-    data: getBuyInstructionDataEncoder().encode(args as BuyInstructionDataArgs),
+    data: getBuyExactSolInInstructionDataEncoder().encode(
+      args as BuyExactSolInInstructionDataArgs
+    ),
     programAddress,
-  } as BuyInstruction<
+  } as BuyExactSolInInstruction<
     TProgramAddress,
     TAccountGlobal,
     TAccountFeeRecipient,
@@ -476,7 +480,7 @@ export async function getBuyInstructionAsync<
   >);
 }
 
-export type BuyInput<
+export type BuyExactSolInInput<
   TAccountGlobal extends string = string,
   TAccountFeeRecipient extends string = string,
   TAccountMint extends string = string,
@@ -510,12 +514,12 @@ export type BuyInput<
   userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
   feeConfig: Address<TAccountFeeConfig>;
   feeProgram?: Address<TAccountFeeProgram>;
-  amount: BuyInstructionDataArgs['amount'];
-  maxSolCost: BuyInstructionDataArgs['maxSolCost'];
-  trackVolume: BuyInstructionDataArgs['trackVolume'];
+  spendableSolIn: BuyExactSolInInstructionDataArgs['spendableSolIn'];
+  minTokensOut: BuyExactSolInInstructionDataArgs['minTokensOut'];
+  trackVolume: BuyExactSolInInstructionDataArgs['trackVolume'];
 };
 
-export function getBuyInstruction<
+export function getBuyExactSolInInstruction<
   TAccountGlobal extends string,
   TAccountFeeRecipient extends string,
   TAccountMint extends string,
@@ -534,7 +538,7 @@ export function getBuyInstruction<
   TAccountFeeProgram extends string,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
-  input: BuyInput<
+  input: BuyExactSolInInput<
     TAccountGlobal,
     TAccountFeeRecipient,
     TAccountMint,
@@ -553,7 +557,7 @@ export function getBuyInstruction<
     TAccountFeeProgram
   >,
   config?: { programAddress?: TProgramAddress }
-): BuyInstruction<
+): BuyExactSolInInstruction<
   TProgramAddress,
   TAccountGlobal,
   TAccountFeeRecipient,
@@ -649,9 +653,11 @@ export function getBuyInstruction<
       getAccountMeta(accounts.feeConfig),
       getAccountMeta(accounts.feeProgram),
     ],
-    data: getBuyInstructionDataEncoder().encode(args as BuyInstructionDataArgs),
+    data: getBuyExactSolInInstructionDataEncoder().encode(
+      args as BuyExactSolInInstructionDataArgs
+    ),
     programAddress,
-  } as BuyInstruction<
+  } as BuyExactSolInInstruction<
     TProgramAddress,
     TAccountGlobal,
     TAccountFeeRecipient,
@@ -672,7 +678,7 @@ export function getBuyInstruction<
   >);
 }
 
-export type ParsedBuyInstruction<
+export type ParsedBuyExactSolInInstruction<
   TProgram extends string = typeof PUMP_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
@@ -695,17 +701,17 @@ export type ParsedBuyInstruction<
     feeConfig: TAccountMetas[14];
     feeProgram: TAccountMetas[15];
   };
-  data: BuyInstructionData;
+  data: BuyExactSolInInstructionData;
 };
 
-export function parseBuyInstruction<
+export function parseBuyExactSolInInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
-): ParsedBuyInstruction<TProgram, TAccountMetas> {
+): ParsedBuyExactSolInInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 16) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
@@ -736,6 +742,6 @@ export function parseBuyInstruction<
       feeConfig: getNextAccount(),
       feeProgram: getNextAccount(),
     },
-    data: getBuyInstructionDataDecoder().decode(instruction.data),
+    data: getBuyExactSolInInstructionDataDecoder().decode(instruction.data),
   };
 }

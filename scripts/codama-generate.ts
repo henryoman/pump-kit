@@ -26,17 +26,17 @@ async function render(idlPath: string, outDir: string) {
 async function main() {
   console.log("🚀 Starting Codama code generation...\n");
   
-  // Generate pump bonding curve client
+  // Generate pump bonding curve client (pumpfun)
   await render(
-    "idl/pump.idl.json",
+    "idl/pumpfun.idl.json",
     "src/pumpsdk/generated"
   );
   
   console.log("");
   
-  // Generate pump AMM client
+  // Generate pump AMM client (pumpswap)
   await render(
-    "idl/pump_amm.idl.json",
+    "idl/pumpswap.idl.json",
     "src/ammsdk/generated"
   );
   

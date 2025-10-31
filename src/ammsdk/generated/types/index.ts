@@ -20,6 +20,7 @@ export * from './extendAccountEvent';
 export * from './fees';
 export * from './feeTier';
 export * from './initUserVolumeAccumulatorEvent';
+export * from './optionBool';
 export * from './sellEvent';
 export * from './setBondingCurveCoinCreatorEvent';
 export * from './setMetaplexCoinCreatorEvent';

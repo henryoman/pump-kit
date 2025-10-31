@@ -47,15 +47,17 @@ import {
   type OptionBoolArgs,
 } from '../types';
 
-export const BUY_DISCRIMINATOR = new Uint8Array([
-  102, 6, 61, 18, 1, 218, 235, 234,
+export const BUY_EXACT_QUOTE_IN_DISCRIMINATOR = new Uint8Array([
+  198, 46, 21, 82, 180, 217, 232, 112,
 ]);
 
-export function getBuyDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(BUY_DISCRIMINATOR);
+export function getBuyExactQuoteInDiscriminatorBytes() {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(
+    BUY_EXACT_QUOTE_IN_DISCRIMINATOR
+  );
 }
 
-export type BuyInstruction<
+export type BuyExactQuoteInInstruction<
   TProgram extends string = typeof PUMP_AMM_PROGRAM_ADDRESS,
   TAccountPool extends string | AccountMeta<string> = string,
   TAccountUser extends string | AccountMeta<string> = string,
@@ -170,51 +172,51 @@ export type BuyInstruction<
     ]
   >;
 
-export type BuyInstructionData = {
+export type BuyExactQuoteInInstructionData = {
   discriminator: ReadonlyUint8Array;
-  baseAmountOut: bigint;
-  maxQuoteAmountIn: bigint;
+  spendableQuoteIn: bigint;
+  minBaseAmountOut: bigint;
   trackVolume: OptionBool;
 };
 
-export type BuyInstructionDataArgs = {
-  baseAmountOut: number | bigint;
-  maxQuoteAmountIn: number | bigint;
+export type BuyExactQuoteInInstructionDataArgs = {
+  spendableQuoteIn: number | bigint;
+  minBaseAmountOut: number | bigint;
   trackVolume: OptionBoolArgs;
 };
 
-export function getBuyInstructionDataEncoder(): FixedSizeEncoder<BuyInstructionDataArgs> {
+export function getBuyExactQuoteInInstructionDataEncoder(): FixedSizeEncoder<BuyExactQuoteInInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['baseAmountOut', getU64Encoder()],
-      ['maxQuoteAmountIn', getU64Encoder()],
+      ['spendableQuoteIn', getU64Encoder()],
+      ['minBaseAmountOut', getU64Encoder()],
       ['trackVolume', getOptionBoolEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: BUY_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: BUY_EXACT_QUOTE_IN_DISCRIMINATOR })
   );
 }
 
-export function getBuyInstructionDataDecoder(): FixedSizeDecoder<BuyInstructionData> {
+export function getBuyExactQuoteInInstructionDataDecoder(): FixedSizeDecoder<BuyExactQuoteInInstructionData> {
   return getStructDecoder([
     ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['baseAmountOut', getU64Decoder()],
-    ['maxQuoteAmountIn', getU64Decoder()],
+    ['spendableQuoteIn', getU64Decoder()],
+    ['minBaseAmountOut', getU64Decoder()],
     ['trackVolume', getOptionBoolDecoder()],
   ]);
 }
 
-export function getBuyInstructionDataCodec(): FixedSizeCodec<
-  BuyInstructionDataArgs,
-  BuyInstructionData
+export function getBuyExactQuoteInInstructionDataCodec(): FixedSizeCodec<
+  BuyExactQuoteInInstructionDataArgs,
+  BuyExactQuoteInInstructionData
 > {
   return combineCodec(
-    getBuyInstructionDataEncoder(),
-    getBuyInstructionDataDecoder()
+    getBuyExactQuoteInInstructionDataEncoder(),
+    getBuyExactQuoteInInstructionDataDecoder()
   );
 }
 
-export type BuyAsyncInput<
+export type BuyExactQuoteInAsyncInput<
   TAccountPool extends string = string,
   TAccountUser extends string = string,
   TAccountGlobalConfig extends string = string,
@@ -262,12 +264,12 @@ export type BuyAsyncInput<
   userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
   feeConfig?: Address<TAccountFeeConfig>;
   feeProgram?: Address<TAccountFeeProgram>;
-  baseAmountOut: BuyInstructionDataArgs['baseAmountOut'];
-  maxQuoteAmountIn: BuyInstructionDataArgs['maxQuoteAmountIn'];
-  trackVolume: BuyInstructionDataArgs['trackVolume'];
+  spendableQuoteIn: BuyExactQuoteInInstructionDataArgs['spendableQuoteIn'];
+  minBaseAmountOut: BuyExactQuoteInInstructionDataArgs['minBaseAmountOut'];
+  trackVolume: BuyExactQuoteInInstructionDataArgs['trackVolume'];
 };
 
-export async function getBuyInstructionAsync<
+export async function getBuyExactQuoteInInstructionAsync<
   TAccountPool extends string,
   TAccountUser extends string,
   TAccountGlobalConfig extends string,
@@ -293,7 +295,7 @@ export async function getBuyInstructionAsync<
   TAccountFeeProgram extends string,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
-  input: BuyAsyncInput<
+  input: BuyExactQuoteInAsyncInput<
     TAccountPool,
     TAccountUser,
     TAccountGlobalConfig,
@@ -320,7 +322,7 @@ export async function getBuyInstructionAsync<
   >,
   config?: { programAddress?: TProgramAddress }
 ): Promise<
-  BuyInstruction<
+  BuyExactQuoteInInstruction<
     TProgramAddress,
     TAccountPool,
     TAccountUser,
@@ -557,9 +559,11 @@ export async function getBuyInstructionAsync<
       getAccountMeta(accounts.feeConfig),
       getAccountMeta(accounts.feeProgram),
     ],
-    data: getBuyInstructionDataEncoder().encode(args as BuyInstructionDataArgs),
+    data: getBuyExactQuoteInInstructionDataEncoder().encode(
+      args as BuyExactQuoteInInstructionDataArgs
+    ),
     programAddress,
-  } as BuyInstruction<
+  } as BuyExactQuoteInInstruction<
     TProgramAddress,
     TAccountPool,
     TAccountUser,
@@ -587,7 +591,7 @@ export async function getBuyInstructionAsync<
   >);
 }
 
-export type BuyInput<
+export type BuyExactQuoteInInput<
   TAccountPool extends string = string,
   TAccountUser extends string = string,
   TAccountGlobalConfig extends string = string,
@@ -635,12 +639,12 @@ export type BuyInput<
   userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
   feeConfig: Address<TAccountFeeConfig>;
   feeProgram?: Address<TAccountFeeProgram>;
-  baseAmountOut: BuyInstructionDataArgs['baseAmountOut'];
-  maxQuoteAmountIn: BuyInstructionDataArgs['maxQuoteAmountIn'];
-  trackVolume: BuyInstructionDataArgs['trackVolume'];
+  spendableQuoteIn: BuyExactQuoteInInstructionDataArgs['spendableQuoteIn'];
+  minBaseAmountOut: BuyExactQuoteInInstructionDataArgs['minBaseAmountOut'];
+  trackVolume: BuyExactQuoteInInstructionDataArgs['trackVolume'];
 };
 
-export function getBuyInstruction<
+export function getBuyExactQuoteInInstruction<
   TAccountPool extends string,
   TAccountUser extends string,
   TAccountGlobalConfig extends string,
@@ -666,7 +670,7 @@ export function getBuyInstruction<
   TAccountFeeProgram extends string,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
-  input: BuyInput<
+  input: BuyExactQuoteInInput<
     TAccountPool,
     TAccountUser,
     TAccountGlobalConfig,
@@ -692,7 +696,7 @@ export function getBuyInstruction<
     TAccountFeeProgram
   >,
   config?: { programAddress?: TProgramAddress }
-): BuyInstruction<
+): BuyExactQuoteInInstruction<
   TProgramAddress,
   TAccountPool,
   TAccountUser,
@@ -839,9 +843,11 @@ export function getBuyInstruction<
       getAccountMeta(accounts.feeConfig),
       getAccountMeta(accounts.feeProgram),
     ],
-    data: getBuyInstructionDataEncoder().encode(args as BuyInstructionDataArgs),
+    data: getBuyExactQuoteInInstructionDataEncoder().encode(
+      args as BuyExactQuoteInInstructionDataArgs
+    ),
     programAddress,
-  } as BuyInstruction<
+  } as BuyExactQuoteInInstruction<
     TProgramAddress,
     TAccountPool,
     TAccountUser,
@@ -869,7 +875,7 @@ export function getBuyInstruction<
   >);
 }
 
-export type ParsedBuyInstruction<
+export type ParsedBuyExactQuoteInInstruction<
   TProgram extends string = typeof PUMP_AMM_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
@@ -899,17 +905,17 @@ export type ParsedBuyInstruction<
     feeConfig: TAccountMetas[21];
     feeProgram: TAccountMetas[22];
   };
-  data: BuyInstructionData;
+  data: BuyExactQuoteInInstructionData;
 };
 
-export function parseBuyInstruction<
+export function parseBuyExactQuoteInInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
-): ParsedBuyInstruction<TProgram, TAccountMetas> {
+): ParsedBuyExactQuoteInInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 23) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
@@ -947,6 +953,6 @@ export function parseBuyInstruction<
       feeConfig: getNextAccount(),
       feeProgram: getNextAccount(),
     },
-    data: getBuyInstructionDataDecoder().decode(instruction.data),
+    data: getBuyExactQuoteInInstructionDataDecoder().decode(instruction.data),
   };
 }

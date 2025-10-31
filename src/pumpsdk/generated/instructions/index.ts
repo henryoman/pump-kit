@@ -10,6 +10,7 @@ export * from './adminSetCreator';
 export * from './adminSetIdlAuthority';
 export * from './adminUpdateTokenIncentives';
 export * from './buy';
+export * from './buyExactSolIn';
 export * from './claimTokenIncentives';
 export * from './closeUserVolumeAccumulator';
 export * from './collectCreatorFee';

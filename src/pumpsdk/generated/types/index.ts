@@ -19,6 +19,7 @@ export * from './extendAccountEvent';
 export * from './fees';
 export * from './feeTier';
 export * from './initUserVolumeAccumulatorEvent';
+export * from './optionBool';
 export * from './setCreatorEvent';
 export * from './setMetaplexCreatorEvent';
 export * from './setParamsEvent';

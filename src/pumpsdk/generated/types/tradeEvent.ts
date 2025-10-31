@@ -7,6 +7,8 @@
  */
 
 import {
+  addDecoderSizePrefix,
+  addEncoderSizePrefix,
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
@@ -16,14 +18,19 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
+  getUtf8Decoder,
+  getUtf8Encoder,
   type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+  type Codec,
+  type Decoder,
+  type Encoder,
 } from '@solana/kit';
 
+/** ix_name: "buy" | "sell" | "buy_exact_sol_in" */
 export type TradeEvent = {
   mint: Address;
   solAmount: bigint;
@@ -46,6 +53,7 @@ export type TradeEvent = {
   totalClaimedTokens: bigint;
   currentSolVolume: bigint;
   lastUpdateTimestamp: bigint;
+  ixName: string;
 };
 
 export type TradeEventArgs = {
@@ -70,9 +78,10 @@ export type TradeEventArgs = {
   totalClaimedTokens: number | bigint;
   currentSolVolume: number | bigint;
   lastUpdateTimestamp: number | bigint;
+  ixName: string;
 };
 
-export function getTradeEventEncoder(): FixedSizeEncoder<TradeEventArgs> {
+export function getTradeEventEncoder(): Encoder<TradeEventArgs> {
   return getStructEncoder([
     ['mint', getAddressEncoder()],
     ['solAmount', getU64Encoder()],
@@ -95,10 +104,11 @@ export function getTradeEventEncoder(): FixedSizeEncoder<TradeEventArgs> {
     ['totalClaimedTokens', getU64Encoder()],
     ['currentSolVolume', getU64Encoder()],
     ['lastUpdateTimestamp', getI64Encoder()],
+    ['ixName', addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
   ]);
 }
 
-export function getTradeEventDecoder(): FixedSizeDecoder<TradeEvent> {
+export function getTradeEventDecoder(): Decoder<TradeEvent> {
   return getStructDecoder([
     ['mint', getAddressDecoder()],
     ['solAmount', getU64Decoder()],
@@ -121,12 +131,10 @@ export function getTradeEventDecoder(): FixedSizeDecoder<TradeEvent> {
     ['totalClaimedTokens', getU64Decoder()],
     ['currentSolVolume', getU64Decoder()],
     ['lastUpdateTimestamp', getI64Decoder()],
+    ['ixName', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
   ]);
 }
 
-export function getTradeEventCodec(): FixedSizeCodec<
-  TradeEventArgs,
-  TradeEvent
-> {
+export function getTradeEventCodec(): Codec<TradeEventArgs, TradeEvent> {
   return combineCodec(getTradeEventEncoder(), getTradeEventDecoder());
 }
