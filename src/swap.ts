@@ -24,6 +24,7 @@ import { solToLamports, tokensToRaw } from "./utils/amounts";
 import { getDefaultCommitment } from "./config/commitment";
 import { findAssociatedTokenPda } from "./pda/ata";
 import { TOKEN_PROGRAM_ID } from "./config/addresses";
+import { buildCreateAtaInstruction } from "./utils/ata";
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
@@ -136,7 +137,35 @@ export async function buy(params: BuyParams): Promise<Instruction> {
   const quote = quoteBuyWithSolAmount(curve, fees, solBudgetLamports);
   const maxSolCostLamports = addSlippage(quote.totalSolCostLamports, slippageBps);
 
-  return await buySimple({
+  const mintAddress = toAddress(params.mint);
+  const [userAta] = await findAssociatedTokenPda({
+    owner: toAddress(params.user.address),
+    mint: mintAddress,
+    tokenProgram: toAddress(TOKEN_PROGRAM_ID),
+  });
+
+  // Check if user ATA exists - if not, we need to create it
+  let createAtaInstruction: Instruction | null = null;
+  try {
+    const ataAccount = await rpcClient.getAccountInfo(userAta).send();
+    if (!ataAccount.value) {
+      // ATA doesn't exist, create it
+      createAtaInstruction = buildCreateAtaInstruction({
+        payer: params.user,
+        owner: params.user,
+        mint: mintAddress,
+      });
+    }
+  } catch {
+    // If we can't check, assume it needs to be created (safe to create even if exists)
+    createAtaInstruction = buildCreateAtaInstruction({
+      payer: params.user,
+      owner: params.user,
+      mint: mintAddress,
+    });
+  }
+
+  const buyInstruction = await buySimple({
     user: params.user,
     mint: params.mint,
     tokenAmount: quote.tokenAmount,
@@ -147,6 +176,21 @@ export async function buy(params: BuyParams): Promise<Instruction> {
     rpc: rpcClient,
     commitment,
   });
+
+  // If we need to create ATA, return both instructions
+  // The caller will need to handle prepending
+  if (createAtaInstruction) {
+    // Return a special instruction that includes both
+    // For now, we'll modify the buy instruction to include prepend info
+    // Actually, better to throw an error or return both instructions
+    // Let's create a wrapper that handles this
+    return {
+      ...buyInstruction,
+      prepend: [createAtaInstruction],
+    } as Instruction & { prepend?: Instruction[] };
+  }
+
+  return buyInstruction;
 }
 
 const PERCENTAGE_SCALE = 10_000;

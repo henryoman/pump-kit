@@ -141,15 +141,43 @@ export async function buildTransaction({
 
   const priorityInstructions = buildPriorityFeeInstructions(priorityFees);
 
+  // Extract any prepend instructions from instruction objects themselves
+  const instructionPrepend: Instruction[] = [];
+  const cleanedInstructions: Instruction[] = [];
+  
+  for (const instruction of instructions) {
+    if ('prepend' in instruction && Array.isArray(instruction.prepend)) {
+      instructionPrepend.push(...instruction.prepend);
+      // Remove prepend property for clean instruction
+      const { prepend, ...cleanInstruction } = instruction as any;
+      cleanedInstructions.push(cleanInstruction);
+    } else {
+      cleanedInstructions.push(instruction);
+    }
+  }
+
   const orderedInstructions = [
     ...priorityInstructions,
+    ...instructionPrepend,
     ...(prependInstructions ?? []),
-    ...instructions,
+    ...cleanedInstructions,
     ...(appendInstructions ?? []),
   ];
 
+  // Extract all signers from instructions first
+  const instructionSigners = new Map<string, TransactionSigner>();
+  
   for (const instruction of orderedInstructions) {
     message = appendTransactionMessageInstruction(instruction, message);
+    // Extract signers from instruction accounts
+    if (instruction.accounts) {
+      for (const account of instruction.accounts) {
+        if ('signer' in account && account.signer && typeof account.signer === 'object' && 'address' in account.signer) {
+          const signer = account.signer as TransactionSigner;
+          instructionSigners.set(signer.address, signer);
+        }
+      }
+    }
   }
 
   let messageWithFeePayer = setTransactionMessageFeePayer(
@@ -167,8 +195,19 @@ export async function buildTransaction({
     signers.push(payer);
   }
 
+  // Add signers from instructions (avoid duplicates)
+  for (const signer of instructionSigners.values()) {
+    if (!signers.some(s => s.address === signer.address)) {
+      signers.push(signer);
+    }
+  }
+
   if (additionalSigners.length > 0) {
-    signers.push(...additionalSigners.filter(isTransactionSigner));
+    for (const signer of additionalSigners) {
+      if (isTransactionSigner(signer) && !signers.some(s => s.address === signer.address)) {
+        signers.push(signer);
+      }
+    }
   }
 
   const messageWithSigners =
