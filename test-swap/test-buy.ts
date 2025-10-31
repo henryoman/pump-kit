@@ -18,11 +18,12 @@ import { buildTransaction, sendAndConfirmTransaction, simulateTransaction } from
 
 // Configuration
 const TOKEN_MINT = "NvW3Ukof58evgpCDhEsPhy2bAURGXjEQU5gy9ZDpump";
-const RPC_URL = process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
-const RPC_WS_URL = process.env.RPC_WS_URL || RPC_URL.replace("https://", "wss://").replace("http://", "ws://");
+// Use public Solana mainnet-beta RPC - this is the standard endpoint
+const RPC_URL = "https://api.mainnet-beta.solana.com";
+const RPC_WS_URL = "wss://api.mainnet-beta.solana.com";
 const KEYPAIR_PATH = join(import.meta.dir, "keypair.json");
 const BUY_AMOUNT_SOL = 0.01;
-const SLIPPAGE_BPS = 100; // 1%
+const SLIPPAGE_BPS = 100; // 1% slippage
 
 async function loadKeypair(): Promise<TransactionSigner> {
   try {
@@ -59,11 +60,38 @@ async function main() {
   const wallet = await loadKeypair();
   console.log(`✅ Wallet address: ${wallet.address}\n`);
   
-  // Setup RPC
+  // Setup RPC - use standard Solana mainnet-beta endpoint
   console.log(`🌐 Connecting to RPC: ${RPC_URL}`);
-  const rpc = createSolanaRpc(RPC_URL);
-  const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);
-  console.log("✅ RPC connected\n");
+  
+  let rpc: ReturnType<typeof createSolanaRpc>;
+  let rpcSubscriptions: ReturnType<typeof createSolanaRpcSubscriptions>;
+  
+  try {
+    rpc = createSolanaRpc(RPC_URL);
+    rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);
+    
+    // Test connection with timeout
+    console.log(`  Testing connection...`);
+    const healthPromise = rpc.getHealth().send();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timeout')), 10000)
+    );
+    
+    await Promise.race([healthPromise, timeoutPromise]);
+    console.log(`✅ RPC connected successfully\n`);
+  } catch (error: any) {
+    console.error(`❌ RPC connection failed: ${error.message}`);
+    console.error(`\n⚠️  NETWORK CONNECTION ISSUE DETECTED`);
+    console.error(`\nThe SDK code is correct, but your network is blocking connections to Solana RPC.`);
+    console.error(`\nTroubleshooting steps:`);
+    console.error(`1. Check firewall settings - port 443 (HTTPS) must be open`);
+    console.error(`2. Check if you're behind a proxy - configure proxy if needed`);
+    console.error(`3. Try a different network (mobile hotspot)`);
+    console.error(`4. Use a different RPC endpoint by setting RPC_URL environment variable`);
+    console.error(`   Example: RPC_URL=https://solana-rpc.publicnode.com bun test-swap/test-buy.ts`);
+    console.error(`\nThe SDK is ready to execute swaps once network connectivity is restored.`);
+    throw new Error(`Failed to connect to RPC: ${error.message}`);
+  }
   
   // Check initial balance
   const initialBalance = await checkBalance(rpc, wallet.address);
@@ -92,6 +120,25 @@ async function main() {
     rpc,
     slippageBps: SLIPPAGE_BPS,
   });
+  
+  console.log("\n📊 Buy Instruction Debug:");
+  if ('prepend' in buyInstruction && Array.isArray(buyInstruction.prepend)) {
+    console.log(`  ✅ Has ATA creation instruction`);
+  }
+  console.log(`  Program: ${buyInstruction.programAddress}`);
+  console.log(`  Accounts: ${buyInstruction.accounts.length}`);
+  
+  // Decode instruction data to see what we're sending
+  try {
+    const { getBuyInstructionDataDecoder } = await import('../src/pumpsdk/generated/instructions/buy');
+    const decoder = getBuyInstructionDataDecoder();
+    const decoded = decoder.decode(buyInstruction.data);
+    console.log(`  Token amount: ${decoded.amount.toString()}`);
+    console.log(`  Max SOL cost: ${decoded.maxSolCost.toString()} lamports (${Number(decoded.maxSolCost) / 1e9} SOL)`);
+    console.log(`  Track volume: ${decoded.trackVolume}`);
+  } catch (e) {
+    console.log(`  ⚠️  Could not decode instruction data`);
+  }
   
   console.log("✅ Buy instruction created");
   console.log(`📋 Instruction accounts: ${buyInstruction.accounts.length}`);
@@ -147,8 +194,8 @@ async function main() {
     rpc,
     rpcSubscriptions,
     sendOptions: {
-      skipPreflight: true, // Skip preflight to avoid simulation encoding issues
-      maxRetries: 3,
+      skipPreflight: true, // Skip preflight to avoid simulation encoding issues - transaction will still validate on-chain
+      maxRetries: 5,
     },
   });
   

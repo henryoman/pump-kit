@@ -23,6 +23,13 @@ function resolveAddress(value: TransactionSigner | Address | string): PublicKey 
   return new PublicKey(value as Address);
 }
 
+function resolveAddressToPublicKey(value: string | Address | PublicKey): PublicKey {
+  if (value instanceof PublicKey) {
+    return value;
+  }
+  return resolveAddress(value);
+}
+
 function convertInstruction(ix: TransactionInstruction): Instruction {
   return {
     programAddress: toAddress(ix.programId.toBase58()),
@@ -63,8 +70,8 @@ export function buildCreateAtaInstruction(params: CreateAtaParams): Instruction 
   const payerAddress = resolveAddress(payer);
   const ownerAddress = resolveAddress(owner);
   const mintAddress = resolveAddress(mint);
-  const tokenProgramAddress = resolveAddress(tokenProgram);
-  const associatedTokenProgramAddress = resolveAddress(associatedTokenProgram);
+  const tokenProgramAddress = resolveAddressToPublicKey(tokenProgram);
+  const associatedTokenProgramAddress = resolveAddressToPublicKey(associatedTokenProgram);
 
   const ataPubkey = getAssociatedTokenAddressSync(
     mintAddress,

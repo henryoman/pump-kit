@@ -310,6 +310,49 @@ export async function sendAndConfirmTransaction({
     .send();
   const status = statusResponse.value?.[0] ?? null;
 
+  // CRITICAL: Check if transaction actually succeeded
+  if (status?.err) {
+    // Get transaction details for better error message
+    try {
+      const txResponse = await rpcClient
+        .getTransaction(signature, { commitment, encoding: "json", maxSupportedTransactionVersion: 0 })
+        .send();
+      const tx = txResponse;
+      
+      let errorMessage = `Transaction failed`;
+      if (status.err) {
+        // Convert BigInt to string for JSON serialization
+        const errStr = typeof status.err === 'object' 
+          ? JSON.stringify(status.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)
+          : String(status.err);
+        errorMessage = `Transaction failed: ${errStr}`;
+      }
+      if (tx?.meta?.err) {
+        const errStr = typeof tx.meta.err === 'object'
+          ? JSON.stringify(tx.meta.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)
+          : String(tx.meta.err);
+        errorMessage = `Transaction failed: ${errStr}`;
+      }
+      if (tx?.meta?.logMessages) {
+        const errorLogs = tx.meta.logMessages.filter((log: string) => 
+          log.toLowerCase().includes('error') || 
+          log.includes('Program log:')
+        );
+        if (errorLogs.length > 0) {
+          errorMessage += `\nProgram logs:\n${errorLogs.slice(0, 10).join('\n')}`;
+        }
+      }
+      
+      throw new Error(errorMessage);
+    } catch (error: any) {
+      // If we can't get transaction details, just throw with status error
+      const errStr = status.err && typeof status.err === 'object'
+        ? JSON.stringify(status.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)
+        : String(status.err);
+      throw new Error(`Transaction failed: ${errStr}`);
+    }
+  }
+
   return {
     signature,
     slot: status?.slot ?? null,
