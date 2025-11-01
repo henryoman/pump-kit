@@ -16,16 +16,19 @@
   </a>
 </p>
 
-A lightweight TypeScript SDK for Pump.fun that handles all the lamport math for you. Work with human-readable SOL amounts, token counts, and wallet percentages.
+A TypeScript SDK for Pump.fun built on **Solana Kit 5.0**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices. 
+
+**Production-ready package coming soon.**
 
 ## Features
 
-- **Human-readable inputs** – Use SOL amounts and percentages instead of lamports
+- **Solana Kit 5.0** – Built on the latest Solana development framework
+- **Modern transaction patterns** – Optimized for speed and reliability
+- **Human-readable API** – Work with SOL amounts and percentages instead of raw lamports
 - **Automatic slippage protection** – Built-in guards for buy/sell operations
-- **Token launches** – Create and buy tokens in one transaction
-- **Liquidity management** – Add/remove liquidity with simple helpers
-- **Full TypeScript support** – Strong types throughout
-- **Bun-optimized** – Built and tested with Bun
+- **Launch capabilities** – Create and buy tokens in one atomic transaction
+- **Liquidity operations** – Add/remove liquidity with simple helpers
+- **Full TypeScript support** – Strongly typed throughout with complete type coverage
 
 ---
 
