@@ -5,8 +5,19 @@
 
 import "./config/polyfills";
 
-export { buy, sell, quickBuy, quickSell } from "./swap";
-export type { BuyParams, SellParams } from "./swap";
+export {
+  buy,
+  sell,
+  curveBuy,
+  curveSell,
+} from "./swap";
+
+export type {
+  BuyParams,
+  SellParams,
+  CurveBuyParams,
+  CurveSellParams,
+} from "./swap";
 
 export { mintWithFirstBuy, validateMintParams } from "./recipes/mintFirstBuy";
 export type { MintWithFirstBuyParams } from "./recipes/mintFirstBuy";

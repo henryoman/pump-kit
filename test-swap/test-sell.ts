@@ -13,7 +13,7 @@ import { join } from "path";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { createKeyPairSignerFromBytes } from "@solana/signers";
 import type { TransactionSigner } from "@solana/kit";
-import { sell } from "../src/swap";
+import { curveSell } from "../src/swap";
 import { buildTransaction, sendAndConfirmTransaction } from "../src/utils/transaction";
 
 // Configuration
@@ -83,7 +83,7 @@ async function main() {
   console.log("Selling all tokens");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
   
-  const sellInstruction = await sell({
+  const sellInstruction = await curveSell({
     user: wallet,
     mint: TOKEN_MINT,
     useWalletPercentage: true,

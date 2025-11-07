@@ -24,11 +24,16 @@ A TypeScript SDK for Pump.fun built on **Solana Kit 5.0**. Designed for high-per
 
 - **Solana Kit 5.0** – Built on the latest Solana development framework
 - **Modern transaction patterns** – Optimized for speed and reliability
-- **Human-readable API** – Work with SOL amounts and percentages instead of raw lamports
+- **Unified swaps** – `buy`/`sell` auto-route between bonding curves and AMM pools
+- **Curve helpers** – Direct access to bonding-curve instructions when you need them (`curveBuy`, `curveSell`)
+- **AMM helpers** – Deterministic AMM operations with percentage-aware selling (`ammBuy`, `ammSell`)
 - **Automatic slippage protection** – Built-in guards for buy/sell operations
-- **Launch capabilities** – Create and buy tokens in one atomic transaction
-- **Liquidity operations** – Add/remove liquidity with simple helpers
 - **Full TypeScript support** – Strongly typed throughout with complete type coverage
+
+### Coming Soon
+
+- **Launch & mint helpers** – Create and seed new Pump.fun tokens once integration is ready
+- **Liquidity tooling** – Add/remove liquidity with tested helpers
 
 ---
 
@@ -50,12 +55,12 @@ import { createSolanaRpc } from "@solana/kit";
 const rpc = createSolanaRpc("https://api.mainnet-beta.solana.com");
 ```
 
-### Buy Tokens
+### Buy Tokens (Curve)
 
 ```ts
-import { buy } from "pump-kit";
+import { curveBuy } from "pump-kit";
 
-await buy({
+await curveBuy({
   user: myWallet,
   mint: "TokenMintAddress",
   solAmount: 0.5,        // 0.5 SOL
@@ -64,13 +69,13 @@ await buy({
 });
 ```
 
-### Sell Tokens
+### Sell Tokens (Curve)
 
 ```ts
-import { sell } from "pump-kit";
+import { curveSell } from "pump-kit";
 
 // Sell specific amount
-await sell({
+await curveSell({
   user: myWallet,
   mint: "TokenMintAddress",
   tokenAmount: 125_000,
@@ -78,7 +83,7 @@ await sell({
 });
 
 // Sell percentage of wallet
-await sell({
+await curveSell({
   user: myWallet,
   mint: "TokenMintAddress",
   useWalletPercentage: true,
@@ -87,68 +92,78 @@ await sell({
 });
 ```
 
-### Create and Buy Token
+### Buy Tokens (AMM)
 
 ```ts
-import { mintWithFirstBuy } from "pump-kit";
-import { generateKeyPair } from "@solana/kit";
+import { ammBuy } from "pump-kit";
 
-const mintKeypair = await generateKeyPair();
-
-const { createInstruction, buyInstruction } = await mintWithFirstBuy({
+await ammBuy({
   user: myWallet,
-  mint: mintKeypair,
-  mintAuthority: myWallet.address,
-  name: "My Token",
-  symbol: "MTK",
-  uri: "https://arweave.net/metadata.json",
-  firstBuyTokenAmount: 1_000_000,
-  firstBuySolBudget: 1.0,
+  mint: "TokenMintAddress",
+  solAmount: 0.5,
+  poolCreator: "CreatorAddress", // optional if auto detection works
   rpc,
 });
 ```
 
-### Quick Helpers
+### Sell Tokens (AMM)
 
 ```ts
-import { quickBuy, quickSell } from "pump-kit";
+import { ammSell } from "pump-kit";
 
-// Get buy instruction
-const buyIx = await quickBuy(myWallet, "TokenMint", 0.25, { rpc });
-
-// Get sell instruction
-const sellIx = await quickSell(myWallet, "TokenMint", 100_000, { rpc });
+await ammSell({
+  user: myWallet,
+  mint: "TokenMintAddress",
+  useWalletPercentage: true,
+  walletPercentage: 100,
+  poolCreator: "CreatorAddress",
+  rpc,
+});
 ```
 
 ---
 
 ## API Reference
 
-### Core Functions
+### Curve Swap Helpers
 
 ```ts
-// Buy tokens
-buy({ user, mint, solAmount, slippageBps?, rpc, ... })
+// Buy tokens on the bonding curve
+curveBuy({ user, mint, solAmount, slippageBps?, rpc, ... })
 
-// Sell tokens
-sell({ user, mint, tokenAmount?, useWalletPercentage?, walletPercentage?, rpc, ... })
-
-// Quick helpers (return instructions only)
-quickBuy(wallet, mint, solAmount, { rpc, ...options })
-quickSell(wallet, mint, tokenAmount, { rpc, ...options })
-
-// Create token with initial buy
-mintWithFirstBuy({ user, mint, name, symbol, uri, firstBuyTokenAmount, firstBuySolBudget, rpc, ... })
+// Sell tokens on the bonding curve
+curveSell({ user, mint, tokenAmount?, useWalletPercentage?, walletPercentage?, rpc, ... })
 ```
 
-### Liquidity Management
+### AMM Swap Helpers
 
 ```ts
-// Add liquidity to pool
-addLiquidity({ user, baseMint, quoteMint?, maxBaseAmountIn, maxQuoteAmountIn, rpc, ... })
+// Buy tokens from the AMM pool using a SOL budget
+ammBuy({ user, mint, solAmount, rpc, quoteMint?, poolCreator?, poolAddress? })
 
-// Remove liquidity from pool
-removeLiquidity({ user, baseMint, quoteMint?, lpAmountIn, rpc, ... })
+// Sell tokens into the AMM pool (supports percentage-based selling)
+ammSell({
+  user,
+  mint,
+  tokenAmount?,
+  useWalletPercentage?,
+  walletPercentage?,
+  rpc,
+  quoteMint?,
+  poolCreator?,
+  poolAddress?,
+})
+```
+
+### Coming Soon
+
+```ts
+// Create token with initial buy
+mintWithFirstBuy({ ... })
+
+// Liquidity helpers
+addLiquidity({ ... })
+removeLiquidity({ ... })
 ```
 
 ### Transaction Utilities

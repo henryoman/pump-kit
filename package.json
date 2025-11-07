@@ -1,6 +1,6 @@
 {
   "name": "pump-kit",
-  "version": "0.0.8",
+  "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": {
@@ -29,8 +29,8 @@
     "build:types": "tsc -p tsconfig.build.json",
     "build": "rm -rf dist && bun run build:js && bun run build:types",
     "release:prepare": "bun run build && bun run test",
-    "release:publish": "npm publish --access public",
-    "release:dry-run": "npm publish --access public --dry-run",
+    "release:publish": "bun run npm publish --access public",
+    "release:dry-run": "bun run npm publish --access public --dry-run",
     "codegen": "bun run scripts/codama-generate.ts",
     "test": "bun test",
     "test:unit": "bun test tests/unit",

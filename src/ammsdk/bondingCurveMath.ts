@@ -11,7 +11,12 @@ const BPS_DENOMINATOR = 10_000n;
 
 export type BondingCurveState = Pick<
   BondingCurve,
-  "virtualTokenReserves" | "virtualSolReserves" | "realTokenReserves" | "realSolReserves" | "creator"
+  | "virtualTokenReserves"
+  | "virtualSolReserves"
+  | "realTokenReserves"
+  | "realSolReserves"
+  | "creator"
+  | "complete"
 >;
 
 export type FeeStructure = Pick<Fees, "lpFeeBps" | "protocolFeeBps" | "creatorFeeBps">;

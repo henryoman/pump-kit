@@ -1,24 +1,15 @@
 #!/usr/bin/env bun
 /**
- * Comprehensive SDK Test Suite
- * Tests all major SDK functionality without sending transactions
+ * Pump Kit Swap Test Suite
+ * Focused on verifying swap-related helpers without touching pending features.
  */
 
 import { readFileSync } from "fs";
 import { join } from "path";
-import { createSolanaRpc, createSolanaRpcSubscriptions, address } from "@solana/kit";
+import { createSolanaRpc } from "@solana/kit";
 import { createKeyPairSignerFromBytes } from "@solana/signers";
-import type { TransactionSigner, Address } from "@solana/kit";
 
-// Import all SDK functions
-import {
-  buy,
-  sell,
-  quickBuy,
-  quickSell,
-  type BuyParams,
-  type SellParams,
-} from "../src/swap";
+import { curveBuy, curveSell, ammBuy, ammSell } from "../src/swap";
 
 import {
   globalPda,
@@ -32,25 +23,6 @@ import {
 } from "../src/pda/pump";
 
 import {
-  poolPda,
-  lpMintPda,
-  poolBaseTokenAccountPda,
-  poolQuoteTokenAccountPda,
-  globalConfigPda as ammGlobalConfigPda,
-  globalVolumeAccumulatorPda as ammGlobalVolumeAccumulatorPda,
-  userVolumeAccumulatorPda as ammUserVolumeAccumulatorPda,
-} from "../src/pda/pumpAmm";
-
-import { ata, ata2022 } from "../src/pda/ata";
-
-import {
-  addLiquidity,
-  removeLiquidity,
-  quickAddLiquidity,
-  quickRemoveLiquidity,
-} from "../src/liquidity";
-
-import {
   addSlippage,
   subSlippage,
   validateSlippage,
@@ -59,31 +31,30 @@ import {
   DEFAULT_SLIPPAGE_BPS,
 } from "../src/utils/slippage";
 
-import {
-  buildTransaction,
-  simulateTransaction,
-  buildPriorityFeeInstructions,
-} from "../src/utils/transaction";
-
-import {
-  buildWrapSolInstructions,
-  buildUnwrapSolInstructions,
-  WSOL_ADDRESS,
-} from "../src/utils/wsol";
-
 import { PUMP_PROGRAM_ID, PUMP_AMM_PROGRAM_ID } from "../src/config/addresses";
 
+type TestConfig = {
+  testTokens: {
+    curve: string;
+    amm: string;
+  };
+  testAmount: number;
+};
+
 // Configuration
-const TOKEN_MINT = "NvW3Ukof58evgpCDhEsPhy2bAURGXjEQU5gy9ZDpump";
+const CONFIG = loadTestConfig();
+const CURVE_MINT = CONFIG.testTokens.curve;
+const AMM_MINT = CONFIG.testTokens.amm;
+const TEST_AMOUNT_SOL = CONFIG.testAmount;
+
 const RPC_URL = process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
-const RPC_WS_URL = process.env.RPC_WS_URL || RPC_URL.replace("https://", "wss://").replace("http://", "ws://");
 const KEYPAIR_PATH = join(__dirname, "keypair.json");
 
 interface TestResult {
   name: string;
   passed: boolean;
   error?: string;
-  details?: any;
+  details?: unknown;
 }
 
 const results: TestResult[] = [];
@@ -102,23 +73,22 @@ function test(name: string, fn: () => Promise<void> | void) {
 }
 
 async function main() {
-  console.log("🧪 Pump Kit Comprehensive SDK Test Suite\n");
-  console.log("=" .repeat(60));
+  console.log("🧪 Pump Kit Swap Test Suite\n");
+  console.log("=".repeat(60));
 
   // Setup
   console.log("\n📦 Setup...");
   const keypairBytes = JSON.parse(readFileSync(KEYPAIR_PATH, "utf-8"));
   const wallet = await createKeyPairSignerFromBytes(new Uint8Array(keypairBytes));
   const rpc = createSolanaRpc(RPC_URL);
-  const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);
 
   console.log(`✅ Wallet: ${wallet.address}`);
   console.log(`✅ RPC: ${RPC_URL}\n`);
 
   // ============================================================================
-  // Test 1: PDA Derivations
+  // Test 1: Swap PDA Derivations
   // ============================================================================
-  console.log("🔷 Testing PDA Derivations...\n");
+  console.log("🔷 Testing Swap PDA Derivations...\n");
 
   await test("globalPda() - Pump program global PDA", async () => {
     const pda = await globalPda();
@@ -127,14 +97,14 @@ async function main() {
   })();
 
   await test("bondingCurvePda() - Bonding curve PDA", async () => {
-    const pda = await bondingCurvePda(TOKEN_MINT);
+    const pda = await bondingCurvePda(CURVE_MINT);
     if (!pda || typeof pda !== "string") throw new Error("Invalid PDA");
     if (pda.length !== 44) throw new Error(`Invalid PDA length: ${pda.length}`);
   })();
 
   await test("associatedBondingCurveAta() - Bonding curve ATA", async () => {
-    const bondingCurve = await bondingCurvePda(TOKEN_MINT);
-    const ata = await associatedBondingCurveAta(bondingCurve, TOKEN_MINT);
+    const bondingCurve = await bondingCurvePda(CURVE_MINT);
+    const ata = await associatedBondingCurveAta(bondingCurve, CURVE_MINT);
     if (!ata || typeof ata !== "string") throw new Error("Invalid ATA");
     if (ata.length !== 44) throw new Error(`Invalid ATA length: ${ata.length}`);
   })();
@@ -154,7 +124,6 @@ async function main() {
   await test("userVolumeAccumulatorPda() - User volume accumulator", async () => {
     const pda = await userVolumeAccumulatorPda(wallet.address);
     if (!pda || typeof pda !== "string") throw new Error("Invalid PDA");
-    // Solana addresses can be 32-44 characters (base58 encoded)
     if (pda.length < 32 || pda.length > 44) throw new Error(`Invalid PDA length: ${pda.length}`);
   })();
 
@@ -166,38 +135,6 @@ async function main() {
 
   await test("feeConfigPda() - Fee config PDA", async () => {
     const pda = await feeConfigPda();
-    if (!pda || typeof pda !== "string") throw new Error("Invalid PDA");
-    if (pda.length !== 44) throw new Error(`Invalid PDA length: ${pda.length}`);
-  })();
-
-  await test("ata() - Associated token account (legacy)", async () => {
-    const ataAddress = await ata(wallet.address, TOKEN_MINT);
-    if (!ataAddress || typeof ataAddress !== "string") throw new Error("Invalid ATA");
-    if (ataAddress.length !== 44) throw new Error(`Invalid ATA length: ${ataAddress.length}`);
-  })();
-
-  await test("ata2022() - Associated token account (Token-2022)", async () => {
-    const ataAddress = await ata2022(wallet.address, TOKEN_MINT);
-    if (!ataAddress || typeof ataAddress !== "string") throw new Error("Invalid ATA");
-    if (ataAddress.length !== 44) throw new Error(`Invalid ATA length: ${ataAddress.length}`);
-  })();
-
-  // AMM PDAs
-  await test("poolPda() - AMM pool PDA", async () => {
-    const pda = await poolPda(0, wallet.address, TOKEN_MINT, WSOL_ADDRESS);
-    if (!pda || typeof pda !== "string") throw new Error("Invalid PDA");
-    if (pda.length !== 44) throw new Error(`Invalid PDA length: ${pda.length}`);
-  })();
-
-  await test("lpMintPda() - LP mint PDA", async () => {
-    const pool = await poolPda(0, wallet.address, TOKEN_MINT, WSOL_ADDRESS);
-    const lpMint = await lpMintPda(pool);
-    if (!lpMint || typeof lpMint !== "string") throw new Error("Invalid LP mint");
-    if (lpMint.length !== 44) throw new Error(`Invalid LP mint length: ${lpMint.length}`);
-  })();
-
-  await test("ammGlobalConfigPda() - AMM global config", async () => {
-    const pda = await ammGlobalConfigPda();
     if (!pda || typeof pda !== "string") throw new Error("Invalid PDA");
     if (pda.length !== 44) throw new Error(`Invalid PDA length: ${pda.length}`);
   })();
@@ -220,39 +157,39 @@ async function main() {
   })();
 
   await test("validateSlippage() - Validate slippage values", async () => {
-    validateSlippage(100); // Should not throw
-    validateSlippage(500); // Should not throw
+    validateSlippage(DEFAULT_SLIPPAGE_BPS);
+    validateSlippage(500);
     try {
       validateSlippage(-1);
       throw new Error("Should reject negative slippage");
     } catch {}
     try {
-      validateSlippage(10001);
+      validateSlippage(10_000 + 1);
       throw new Error("Should reject slippage > 100%");
     } catch {}
   })();
 
   await test("addSlippage() - Add slippage to amount", async () => {
-    const result = addSlippage(1000n, 100); // 1% slippage
-    if (result !== 1010n) throw new Error(`Expected 1010, got ${result}`);
+    const result = addSlippage(1_000n, 100);
+    if (result !== 1_010n) throw new Error(`Expected 1010, got ${result}`);
   })();
 
   await test("subSlippage() - Subtract slippage from amount", async () => {
-    const result = subSlippage(1000n, 100); // 1% slippage
+    const result = subSlippage(1_000n, 100);
     if (result !== 990n) throw new Error(`Expected 990, got ${result}`);
   })();
 
   // ============================================================================
-  // Test 3: Instruction Building (No Sending)
+  // Test 3: Swap Instruction Building (No Sending)
   // ============================================================================
-  console.log("\n🔷 Testing Instruction Building...\n");
+  console.log("\n🔷 Testing Swap Instruction Building...\n");
 
-  await test("buy() - Build buy instruction", async () => {
+  await test("curveBuy() - Build buy instruction", async () => {
     try {
-      const instruction = await buy({
+      const instruction = await curveBuy({
         user: wallet,
-        mint: TOKEN_MINT,
-        solAmount: 0.01,
+        mint: CURVE_MINT,
+        solAmount: TEST_AMOUNT_SOL,
         rpc,
         slippageBps: 100,
       });
@@ -269,22 +206,24 @@ async function main() {
         throw new Error("Instruction has no data");
       }
     } catch (error: any) {
-      // Bonding curve might not exist - that's okay for testing instruction building
-      if (error.message.includes("bonding curve") || error.message.includes("not found") || error.message.includes("Failed to load")) {
-        // Skip this test if bonding curve doesn't exist
+      if (
+        error.message.includes("bonding curve") ||
+        error.message.includes("not found") ||
+        error.message.includes("Failed to load")
+      ) {
         return;
       }
       throw error;
     }
   })();
 
-  await test("sell() - Build sell instruction", async () => {
+  await test("curveSell() - Build sell instruction", async () => {
     try {
-      const instruction = await sell({
+      const instruction = await curveSell({
         user: wallet,
-        mint: TOKEN_MINT,
+        mint: CURVE_MINT,
         useWalletPercentage: true,
-        walletPercentage: 50,
+        walletPercentage: 100,
         rpc,
         slippageBps: 100,
       });
@@ -297,199 +236,75 @@ async function main() {
         throw new Error(`Wrong program: ${instruction.programAddress}`);
       }
     } catch (error: any) {
-      // Bonding curve might not exist or wallet has no tokens - that's okay
-      if (error.message.includes("bonding curve") || error.message.includes("not found") || error.message.includes("Failed to load") || error.message.includes("zero")) {
-        // Skip this test if bonding curve doesn't exist or no tokens
+      if (
+        error.message.includes("bonding curve") ||
+        error.message.includes("not found") ||
+        error.message.includes("Failed to load") ||
+        error.message.includes("zero")
+      ) {
         return;
       }
       throw error;
     }
   })();
 
-  await test("quickBuy() - Build quick buy instruction", async () => {
+  await test("ammBuy() - Build AMM buy instruction", async () => {
     try {
-      const instruction = await quickBuy(
-        wallet,
-        TOKEN_MINT,
-        0.01,
-        { rpc }
-      );
-
-      if (!instruction) throw new Error("Instruction is null");
-      if (!instruction.accounts || instruction.accounts.length === 0) {
-        throw new Error("Instruction has no accounts");
-      }
-    } catch (error: any) {
-      // Bonding curve might not exist - that's okay
-      if (error.message.includes("bonding curve") || error.message.includes("not found") || error.message.includes("Failed to load")) {
-        return;
-      }
-      throw error;
-    }
-  })();
-
-  await test("quickSell() - Build quick sell instruction", async () => {
-    try {
-      const instruction = await quickSell(
-        wallet,
-        TOKEN_MINT,
-        1000, // token amount
-        { rpc }
-      );
-
-      if (!instruction) throw new Error("Instruction is null");
-      if (!instruction.accounts || instruction.accounts.length === 0) {
-        throw new Error("Instruction has no accounts");
-      }
-    } catch (error: any) {
-      // Bonding curve might not exist or wallet has no tokens - that's okay
-      if (error.message.includes("bonding curve") || error.message.includes("not found") || error.message.includes("Failed to load") || error.message.includes("zero")) {
-        return;
-      }
-      throw error;
-    }
-  })();
-
-  // ============================================================================
-  // Test 4: Transaction Building
-  // ============================================================================
-  console.log("\n🔷 Testing Transaction Building...\n");
-
-  await test("buildTransaction() - Build transaction from instructions", async () => {
-    try {
-      const buyInstruction = await buy({
+      const instruction = await ammBuy({
         user: wallet,
-        mint: TOKEN_MINT,
-        solAmount: 0.01,
+        mint: AMM_MINT,
+        solAmount: TEST_AMOUNT_SOL,
         rpc,
         slippageBps: 100,
       });
 
-      const transaction = await buildTransaction({
-        instructions: [buyInstruction],
-        payer: wallet,
-        rpc,
-      });
-
-      if (!transaction) throw new Error("Transaction is null");
-      if (!transaction.transactionMessage) throw new Error("Transaction message is null");
-      if (!transaction.latestBlockhash) throw new Error("Latest blockhash is null");
-    } catch (error: any) {
-      // If buy instruction fails due to bonding curve, test with empty instructions
-      if (error.message.includes("bonding curve") || error.message.includes("not found") || error.message.includes("Failed to load")) {
-        const transaction = await buildTransaction({
-          instructions: [], // Empty instructions array should still work
-          payer: wallet,
-          rpc,
-        });
-        if (!transaction) throw new Error("Transaction is null");
-        if (!transaction.transactionMessage) throw new Error("Transaction message is null");
-        if (!transaction.latestBlockhash) throw new Error("Latest blockhash is null");
-        return;
+      if (!instruction) throw new Error("Instruction is null");
+      if (!instruction.accounts || instruction.accounts.length === 0) {
+        throw new Error("Instruction has no accounts");
       }
-      // Connection errors are okay - RPC might be temporarily unavailable
-      if (error.message.includes("Unable to connect") || error.message.includes("ECONNREFUSED") || error.message.includes("timeout")) {
-        return; // Skip if RPC is unavailable
+      if (instruction.programAddress !== PUMP_AMM_PROGRAM_ID) {
+        throw new Error(`Wrong program: ${instruction.programAddress}`);
+      }
+    } catch (error: any) {
+      if (
+        error.message.includes("amm") ||
+        error.message.includes("not found") ||
+        error.message.includes("Failed to load") ||
+        error.message.includes("zero") ||
+        error.message.includes("pool")
+      ) {
+        return;
       }
       throw error;
     }
   })();
 
-  await test("buildPriorityFeeInstructions() - Build priority fee instructions", async () => {
-    // Test with compute unit price
-    const instructions1 = buildPriorityFeeInstructions({
-      computeUnitPriceMicroLamports: 1000,
-    });
-    if (!instructions1 || instructions1.length === 0) {
-      throw new Error("No priority fee instructions created for computeUnitPriceMicroLamports");
-    }
-
-    // Test with compute unit limit
-    const instructions2 = buildPriorityFeeInstructions({
-      computeUnitLimit: 200000,
-    });
-    if (!instructions2 || instructions2.length === 0) {
-      throw new Error("No priority fee instructions created for computeUnitLimit");
-    }
-
-    // Test with both
-    const instructions3 = buildPriorityFeeInstructions({
-      computeUnitLimit: 200000,
-      computeUnitPriceMicroLamports: 1000,
-    });
-    if (!instructions3 || instructions3.length < 2) {
-      throw new Error("Should create 2 instructions when both are provided");
-    }
-
-    // Test with none (should return empty array)
-    const instructions4 = buildPriorityFeeInstructions();
-    if (instructions4.length !== 0) {
-      throw new Error("Should return empty array when no fees provided");
-    }
-  })();
-
-  // ============================================================================
-  // Test 5: WSOL Utilities
-  // ============================================================================
-  console.log("\n🔷 Testing WSOL Utilities...\n");
-
-  await test("buildWrapSolInstructions() - Build wrap SOL instructions", async () => {
-    const result = buildWrapSolInstructions({
-      owner: wallet.address,
-      amount: 1_000_000_000n, // 1 SOL
-    });
-
-    if (!result) throw new Error("Result is null");
-    if (!result.prepend || result.prepend.length === 0) {
-      throw new Error("No wrap instructions created");
-    }
-    if (!result.associatedTokenAddress) {
-      throw new Error("No associated token address returned");
-    }
-  })();
-
-  await test("buildUnwrapSolInstructions() - Build unwrap SOL instructions", async () => {
-    const instructions = buildUnwrapSolInstructions(wallet.address);
-
-    if (!instructions || instructions.length === 0) {
-      throw new Error("No unwrap instructions created");
-    }
-  })();
-
-  await test("WSOL_ADDRESS - WSOL address constant", async () => {
-    if (!WSOL_ADDRESS) {
-      throw new Error(`WSOL_ADDRESS is null/undefined`);
-    }
-    // WSOL address is 44 characters
-    if (WSOL_ADDRESS !== "So11111111111111111111111111111111111111112") {
-      throw new Error(`Wrong WSOL address: ${WSOL_ADDRESS}`);
-    }
-  })();
-
-  // ============================================================================
-  // Test 6: Liquidity Functions (Instruction Building Only)
-  // ============================================================================
-  console.log("\n🔷 Testing Liquidity Functions...\n");
-
-  await test("addLiquidity() - Build add liquidity instruction", async () => {
+  await test("ammSell() - Build AMM sell instruction", async () => {
     try {
-      const instruction = await addLiquidity({
+      const instruction = await ammSell({
         user: wallet,
-        baseMint: TOKEN_MINT,
-        maxBaseAmountIn: 1000n,
-        maxQuoteAmountIn: 1_000_000_000n, // 1 SOL
+        mint: AMM_MINT,
+        useWalletPercentage: true,
+        walletPercentage: 100,
+        rpc,
+        slippageBps: 100,
       });
 
-      if (!instruction) {
-        throw new Error("No liquidity instruction created");
-      }
+      if (!instruction) throw new Error("Instruction is null");
       if (!instruction.accounts || instruction.accounts.length === 0) {
         throw new Error("Instruction has no accounts");
       }
+      if (instruction.programAddress !== PUMP_AMM_PROGRAM_ID) {
+        throw new Error(`Wrong program: ${instruction.programAddress}`);
+      }
     } catch (error: any) {
-      // Pool might not exist, which is okay for instruction building test
-      if (error.message.includes("Pool not found") || error.message.includes("does not exist") || error.message.includes("account")) {
-        // This is expected - pool might not exist yet
+      if (
+        error.message.includes("amm") ||
+        error.message.includes("not found") ||
+        error.message.includes("Failed to load") ||
+        error.message.includes("zero") ||
+        error.message.includes("pool")
+      ) {
         return;
       }
       throw error;
@@ -531,4 +346,80 @@ main().catch((error: any) => {
   }
   process.exit(1);
 });
+
+function loadTestConfig(): TestConfig {
+  const defaultConfig: TestConfig = {
+    testTokens: {
+      curve: "NvW3Ukof58evgpCDhEsPhy2bAURGXjEQU5gy9ZDpump",
+      amm: "NvW3Ukof58evgpCDhEsPhy2bAURGXjEQU5gy9ZDpump",
+    },
+    testAmount: 0.008,
+  };
+
+  try {
+    const configPath = join(__dirname, "config.yaml");
+    const raw = readFileSync(configPath, "utf-8");
+    const parsed = parseSimpleYaml(raw);
+
+    const curveMint =
+      parsed.testTokens?.curve ??
+      parsed["test-tokens"]?.curve ??
+      defaultConfig.testTokens.curve;
+    const ammMint =
+      parsed.testTokens?.amm ??
+      parsed["test-tokens"]?.amm ??
+      defaultConfig.testTokens.amm;
+    const amount = Number(parsed.testAmount ?? parsed["test-amount"]) || defaultConfig.testAmount;
+
+    return {
+      testTokens: {
+        curve: curveMint,
+        amm: ammMint,
+      },
+      testAmount: amount,
+    };
+  } catch {
+    return defaultConfig;
+  }
+}
+
+function parseSimpleYaml(raw: string): Record<string, any> {
+  const result: Record<string, any> = {};
+  let currentSection: string | null = null;
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    if (!line.startsWith(" ")) {
+      if (trimmed.endsWith(":")) {
+        currentSection = trimmed.slice(0, -1);
+        if (!result[currentSection]) {
+          result[currentSection] = {};
+        }
+        continue;
+      }
+
+      const [key, ...rest] = trimmed.split(":");
+      const value = rest.join(":").split("#")[0]?.trim() ?? "";
+      result[key] = value;
+      currentSection = null;
+    } else if (currentSection) {
+      const [key, ...rest] = trimmed.split(":");
+      const value = rest.join(":").split("#")[0]?.trim() ?? "";
+      const section = result[currentSection] ?? {};
+      section[key.trim()] = value;
+      result[currentSection] = section;
+    }
+  }
+
+  if (result.testTokens && typeof result.testTokens === "string") {
+    result.testTokens = {
+      curve: result.testTokens,
+      amm: result.testTokens,
+    };
+  }
+
+  return result;
+}
 

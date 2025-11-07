@@ -13,7 +13,7 @@ import { join } from "path";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { createKeyPairSignerFromBytes } from "@solana/signers";
 import type { TransactionSigner } from "@solana/kit";
-import { buy } from "../src/swap";
+import { curveBuy } from "../src/swap";
 import { buildTransaction, sendAndConfirmTransaction, simulateTransaction } from "../src/utils/transaction";
 
 // Configuration
@@ -113,7 +113,7 @@ async function main() {
   console.log("Buying tokens");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
   
-  const buyInstruction = await buy({
+  const buyInstruction = await curveBuy({
     user: wallet,
     mint: TOKEN_MINT,
     solAmount: BUY_AMOUNT_SOL,

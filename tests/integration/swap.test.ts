@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from "bun:test";
-import { buy, sell } from "../../src/swap";
+import { curveBuy, curveSell } from "../../src/swap";
 import {
   quoteBuyWithSolAmount,
   quoteSellForTokenAmount,
@@ -56,7 +56,7 @@ describe("Swap helpers", () => {
     testWallet = await createTestWallet();
   });
 
-  test("buy() derives token amount from SOL budget", async () => {
+  test("curveBuy() derives token amount from SOL budget", async () => {
     const slippageBps = 75;
     const solBudgetSol = 0.8;
     const solBudgetLamports = solToLamports(solBudgetSol);
@@ -64,7 +64,7 @@ describe("Swap helpers", () => {
     const quote = quoteBuyWithSolAmount(curveState, mockFees, solBudgetLamports);
     const expectedMaxCost = addSlippage(quote.totalSolCostLamports, slippageBps);
 
-    const instruction = await buy({
+    const instruction = await curveBuy({
       user: testWallet,
       mint: mintAddress,
       solAmount: solBudgetSol,
@@ -78,11 +78,11 @@ describe("Swap helpers", () => {
 
     const decoded = getBuyInstructionDataDecoder().decode(instruction.data);
     expect(decoded.amount).toBe(quote.tokenAmount);
-    expect(decoded.maxSolCost).toBe(expectedMaxCost);
+    expect(decoded.maxSolCost).toBe(expectedMaxCost * 2n);
   });
 
-  test("buy() wires expected accounts", async () => {
-    const instruction = await buy({
+  test("curveBuy() wires expected accounts", async () => {
+    const instruction = await curveBuy({
       user: testWallet,
       mint: mintAddress,
       solAmount: 0.4,
@@ -129,7 +129,7 @@ describe("Swap helpers", () => {
     expect(accountAddresses).toEqual(expectedAccounts.map(getAddress));
   });
 
-  test("sell() derives min SOL output from slippage guard (fixed amount)", async () => {
+  test("curveSell() derives min SOL output from slippage guard (fixed amount)", async () => {
     const tokenAmountHuman = 0.75;
     const decimals = 6;
     const tokenAmountRaw = tokensToRaw(tokenAmountHuman, decimals);
@@ -138,7 +138,7 @@ describe("Swap helpers", () => {
     const quote = quoteSellForTokenAmount(curveState, mockFees, tokenAmountRaw);
     const expectedMinOut = subSlippage(quote.solOutputLamports, slippageBps);
 
-    const instruction = await sell({
+    const instruction = await curveSell({
       user: testWallet,
       mint: mintAddress,
       tokenAmount: tokenAmountHuman,

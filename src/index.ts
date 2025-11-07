@@ -10,8 +10,23 @@ import "./config/polyfills";
 // Simple API (recommended - start here!)
 // ============================================================================
 
-export { buy, sell, quickBuy, quickSell } from "./swap";
-export type { BuyParams, SellParams } from "./swap";
+export {
+  buy,
+  sell,
+  curveBuy,
+  curveSell,
+  ammBuy,
+  ammSell,
+} from "./swap";
+
+export type {
+  BuyParams,
+  SellParams,
+  CurveBuyParams,
+  CurveSellParams,
+  AmmBuyParams,
+  AmmSellParams,
+} from "./swap";
 
 export {
   mintWithFirstBuy,
