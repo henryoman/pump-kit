@@ -16,7 +16,6 @@ import {
   getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
@@ -35,7 +34,6 @@ import {
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -66,7 +64,7 @@ export type UpdateFeeConfigInstruction<
             AccountSignerMeta<TAccountAdmin>
         : TAccountAdmin,
       TAccountGlobalConfig extends string
-        ? WritableAccount<TAccountGlobalConfig>
+        ? ReadonlyAccount<TAccountGlobalConfig>
         : TAccountGlobalConfig,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
@@ -83,16 +81,12 @@ export type UpdateFeeConfigInstructionData = {
   lpFeeBasisPoints: bigint;
   protocolFeeBasisPoints: bigint;
   protocolFeeRecipients: Array<Address>;
-  coinCreatorFeeBasisPoints: bigint;
-  adminSetCoinCreatorAuthority: Address;
 };
 
 export type UpdateFeeConfigInstructionDataArgs = {
   lpFeeBasisPoints: number | bigint;
   protocolFeeBasisPoints: number | bigint;
   protocolFeeRecipients: Array<Address>;
-  coinCreatorFeeBasisPoints: number | bigint;
-  adminSetCoinCreatorAuthority: Address;
 };
 
 export function getUpdateFeeConfigInstructionDataEncoder(): FixedSizeEncoder<UpdateFeeConfigInstructionDataArgs> {
@@ -105,8 +99,6 @@ export function getUpdateFeeConfigInstructionDataEncoder(): FixedSizeEncoder<Upd
         'protocolFeeRecipients',
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
-      ['coinCreatorFeeBasisPoints', getU64Encoder()],
-      ['adminSetCoinCreatorAuthority', getAddressEncoder()],
     ]),
     (value) => ({ ...value, discriminator: UPDATE_FEE_CONFIG_DISCRIMINATOR })
   );
@@ -121,8 +113,6 @@ export function getUpdateFeeConfigInstructionDataDecoder(): FixedSizeDecoder<Upd
       'protocolFeeRecipients',
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
     ],
-    ['coinCreatorFeeBasisPoints', getU64Decoder()],
-    ['adminSetCoinCreatorAuthority', getAddressDecoder()],
   ]);
 }
 
@@ -134,100 +124,6 @@ export function getUpdateFeeConfigInstructionDataCodec(): FixedSizeCodec<
     getUpdateFeeConfigInstructionDataEncoder(),
     getUpdateFeeConfigInstructionDataDecoder()
   );
-}
-
-export type UpdateFeeConfigAsyncInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-> = {
-  admin: TransactionSigner<TAccountAdmin>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  lpFeeBasisPoints: UpdateFeeConfigInstructionDataArgs['lpFeeBasisPoints'];
-  protocolFeeBasisPoints: UpdateFeeConfigInstructionDataArgs['protocolFeeBasisPoints'];
-  protocolFeeRecipients: UpdateFeeConfigInstructionDataArgs['protocolFeeRecipients'];
-  coinCreatorFeeBasisPoints: UpdateFeeConfigInstructionDataArgs['coinCreatorFeeBasisPoints'];
-  adminSetCoinCreatorAuthority: UpdateFeeConfigInstructionDataArgs['adminSetCoinCreatorAuthority'];
-};
-
-export async function getUpdateFeeConfigInstructionAsync<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
->(
-  input: UpdateFeeConfigAsyncInput<
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountEventAuthority,
-    TAccountProgram
-  >,
-  config?: { programAddress?: TProgramAddress }
-): Promise<
-  UpdateFeeConfigInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountEventAuthority,
-    TAccountProgram
-  >
-> {
-  // Program address.
-  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Original args.
-  const args = { ...input };
-
-  // Resolve default values.
-  if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
-    });
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-    ],
-    data: getUpdateFeeConfigInstructionDataEncoder().encode(
-      args as UpdateFeeConfigInstructionDataArgs
-    ),
-    programAddress,
-  } as UpdateFeeConfigInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountEventAuthority,
-    TAccountProgram
-  >);
 }
 
 export type UpdateFeeConfigInput<
@@ -243,8 +139,6 @@ export type UpdateFeeConfigInput<
   lpFeeBasisPoints: UpdateFeeConfigInstructionDataArgs['lpFeeBasisPoints'];
   protocolFeeBasisPoints: UpdateFeeConfigInstructionDataArgs['protocolFeeBasisPoints'];
   protocolFeeRecipients: UpdateFeeConfigInstructionDataArgs['protocolFeeRecipients'];
-  coinCreatorFeeBasisPoints: UpdateFeeConfigInstructionDataArgs['coinCreatorFeeBasisPoints'];
-  adminSetCoinCreatorAuthority: UpdateFeeConfigInstructionDataArgs['adminSetCoinCreatorAuthority'];
 };
 
 export function getUpdateFeeConfigInstruction<
@@ -274,7 +168,7 @@ export function getUpdateFeeConfigInstruction<
   // Original accounts.
   const originalAccounts = {
     admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
+    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
   };

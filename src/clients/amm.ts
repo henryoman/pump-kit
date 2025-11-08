@@ -5,6 +5,8 @@
 
 import type { Address, TransactionSigner } from "@solana/kit";
 import { address as getAddress } from "@solana/kit";
+import { AccountRole } from "@solana/instructions";
+import { bondingCurvePda } from "../pda/pump";
 import { findAssociatedTokenPda } from "../pda/ata";
 
 import {
@@ -26,8 +28,8 @@ import {
   poolTokenAta,
   userLpAta,
   userVolumeAccumulatorPda,
+  ammFeeConfigPda,
 } from "../pda/pumpAmm";
-import { ammFeeConfigPda } from "../pda/pumpAmm";
 import {
   getDepositInstruction,
   getWithdrawInstruction,
@@ -37,6 +39,7 @@ import {
 } from "../ammsdk/generated/instructions";
 import { fetchPool } from "../ammsdk/generated/accounts/pool";
 import { fetchGlobalConfig } from "../ammsdk/generated/accounts/globalConfig";
+import { fetchBondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
 import type { RpcClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
 
@@ -308,7 +311,7 @@ export async function ammBuy(params: AmmBuyParams) {
   const tokenProgramAddr = getAddress(TOKEN_PROGRAM_ID);
 
   const pool = await resolvePoolAddress(params, userAddr);
-  const { poolData, globalConfigData, globalConfigAddress } = await resolvePoolState(
+  const { poolData, globalConfigData, globalConfigAddress, coinCreator } = await resolvePoolState(
     rpc,
     pool,
     commitment
@@ -318,13 +321,6 @@ export async function ammBuy(params: AmmBuyParams) {
   if (!protocolFeeRecipient) {
     throw new Error("Global config does not define a protocol fee recipient");
   }
-
-  const coinCreatorVaultAuthority = await coinCreatorVaultAuthorityPda(poolData.coinCreator);
-  const coinCreatorVaultTokenAccount = await coinCreatorVaultAta(
-    coinCreatorVaultAuthority,
-    quote,
-    tokenProgramAddr
-  );
 
   const [userBaseAta] = await findAssociatedTokenPda({
     owner: userAddr,
@@ -344,12 +340,25 @@ export async function ammBuy(params: AmmBuyParams) {
     tokenProgram: tokenProgramAddr,
     mint: quote,
   });
-  const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
-  const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
   const eventAuthority = await eventAuthorityPda();
-  const feeConfig = await ammFeeConfigPda();
 
-  return getBuyInstruction(
+  const coinCreatorAddress = coinCreator ? getAddress(coinCreator) : poolData.creator;
+  const coinCreatorVaultAuthority = await coinCreatorVaultAuthorityPda(coinCreatorAddress);
+  const coinCreatorVaultTokenAccount = await coinCreatorVaultAta(
+    coinCreatorVaultAuthority,
+    quote,
+    tokenProgramAddr
+  );
+
+  const [globalVolumeAccumulator, userVolumeAccumulator] = allowTrackVolume
+    ? await Promise.all([
+        globalVolumeAccumulatorPda(),
+        userVolumeAccumulatorPda(userAddr),
+      ])
+    : [undefined, undefined];
+
+  const feeConfig = await ammFeeConfigPda();
+  const baseInstruction = getBuyInstruction(
     {
       pool,
       user,
@@ -368,18 +377,65 @@ export async function ammBuy(params: AmmBuyParams) {
       associatedTokenProgram: getAddress(ASSOCIATED_TOKEN_PROGRAM_ID),
       eventAuthority,
       program: getAddress(PUMP_AMM_PROGRAM_ID),
-      coinCreatorVaultAta: coinCreatorVaultTokenAccount,
-      coinCreatorVaultAuthority,
-      globalVolumeAccumulator,
-      userVolumeAccumulator,
-      feeConfig,
-      feeProgram: getAddress(FEE_PROGRAM_ID),
       baseAmountOut: tokenAmountOut,
       maxQuoteAmountIn: maxQuoteIn,
-      trackVolume: [allowTrackVolume] as const,
     },
     { programAddress: getAddress(PUMP_AMM_PROGRAM_ID) }
   );
+
+  const writableAccounts = new Set(
+    [
+      pool,
+      userBaseAta,
+      userQuoteAta,
+      poolBaseAta,
+      poolQuoteAta,
+      protocolFeeRecipientAta,
+    ].map((addr) => getAddress(addr))
+  );
+
+  const baseAccounts = baseInstruction.accounts.map((account) =>
+    writableAccounts.has(getAddress(account.address))
+      ? { ...account, role: AccountRole.WRITABLE }
+      : account
+  );
+
+  const extraAccounts = [
+    {
+      address: coinCreatorVaultTokenAccount,
+      role: AccountRole.WRITABLE,
+    },
+    {
+      address: coinCreatorVaultAuthority,
+      role: AccountRole.READONLY,
+    },
+    ...(allowTrackVolume && globalVolumeAccumulator && userVolumeAccumulator
+      ? [
+          {
+            address: globalVolumeAccumulator,
+            role: AccountRole.WRITABLE,
+          },
+          {
+            address: userVolumeAccumulator,
+            role: AccountRole.WRITABLE,
+          },
+        ]
+      : []),
+    {
+      address: feeConfig,
+      role: AccountRole.READONLY,
+    },
+    {
+      address: getAddress(FEE_PROGRAM_ID),
+      role: AccountRole.READONLY,
+    },
+  ];
+
+  return {
+    programAddress: baseInstruction.programAddress,
+    accounts: [...baseAccounts, ...extraAccounts],
+    data: baseInstruction.data,
+  };
 }
 
 export interface AmmSellParams {
@@ -409,7 +465,6 @@ export async function ammSell(params: AmmSellParams) {
     tokenAmountIn,
     minQuoteOut,
     rpc,
-    allowTrackVolume = true,
     commitment: commitmentOverride,
   } = params;
 
@@ -423,7 +478,7 @@ export async function ammSell(params: AmmSellParams) {
   const tokenProgramAddr = getAddress(TOKEN_PROGRAM_ID);
 
   const pool = await resolvePoolAddress(params, userAddr);
-  const { poolData, globalConfigData, globalConfigAddress } = await resolvePoolState(
+  const { poolData, globalConfigData, globalConfigAddress, coinCreator } = await resolvePoolState(
     rpc,
     pool,
     commitment
@@ -433,13 +488,6 @@ export async function ammSell(params: AmmSellParams) {
   if (!protocolFeeRecipient) {
     throw new Error("Global config does not define a protocol fee recipient");
   }
-
-  const coinCreatorVaultAuthority = await coinCreatorVaultAuthorityPda(poolData.coinCreator);
-  const coinCreatorVaultTokenAccount = await coinCreatorVaultAta(
-    coinCreatorVaultAuthority,
-    quote,
-    tokenProgramAddr
-  );
 
   const [userBaseAta] = await findAssociatedTokenPda({
     owner: userAddr,
@@ -459,12 +507,18 @@ export async function ammSell(params: AmmSellParams) {
     tokenProgram: tokenProgramAddr,
     mint: quote,
   });
-  const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
-  const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
   const eventAuthority = await eventAuthorityPda();
+
+  const coinCreatorAddress = coinCreator ? getAddress(coinCreator) : poolData.creator;
+  const coinCreatorVaultAuthority = await coinCreatorVaultAuthorityPda(coinCreatorAddress);
+  const coinCreatorVaultTokenAccount = await coinCreatorVaultAta(
+    coinCreatorVaultAuthority,
+    quote,
+    tokenProgramAddr
+  );
   const feeConfig = await ammFeeConfigPda();
 
-  return getSellInstruction(
+  const baseInstruction = getSellInstruction(
     {
       pool,
       user,
@@ -483,15 +537,53 @@ export async function ammSell(params: AmmSellParams) {
       associatedTokenProgram: getAddress(ASSOCIATED_TOKEN_PROGRAM_ID),
       eventAuthority,
       program: getAddress(PUMP_AMM_PROGRAM_ID),
-      coinCreatorVaultAta: coinCreatorVaultTokenAccount,
-      coinCreatorVaultAuthority,
-      feeConfig,
-      feeProgram: getAddress(FEE_PROGRAM_ID),
       baseAmountIn: tokenAmountIn,
       minQuoteAmountOut: minQuoteOut,
     },
     { programAddress: getAddress(PUMP_AMM_PROGRAM_ID) }
   );
+
+  const writableAccounts = new Set(
+    [
+      pool,
+      userBaseAta,
+      userQuoteAta,
+      poolBaseAta,
+      poolQuoteAta,
+      protocolFeeRecipientAta,
+    ].map((addr) => getAddress(addr))
+  );
+
+  const baseAccounts = baseInstruction.accounts.map((account) =>
+    writableAccounts.has(getAddress(account.address))
+      ? { ...account, role: AccountRole.WRITABLE }
+      : account
+  );
+
+  const extraAccounts = [
+    {
+      address: coinCreatorVaultTokenAccount,
+      role: AccountRole.WRITABLE,
+    },
+    {
+      address: coinCreatorVaultAuthority,
+      role: AccountRole.READONLY,
+    },
+    {
+      address: feeConfig,
+      role: AccountRole.READONLY,
+    },
+    {
+      address: getAddress(FEE_PROGRAM_ID),
+      role: AccountRole.READONLY,
+    },
+  ];
+
+  return {
+    programAddress: baseInstruction.programAddress,
+    accounts: [...baseAccounts, ...extraAccounts],
+    data: baseInstruction.data,
+  };
 }
 
 async function resolvePoolAddress(
@@ -524,10 +616,20 @@ async function resolvePoolState(
     fetchGlobalConfig(rpc, globalConfigAddress, { commitment }),
   ]);
 
+  let coinCreator: Address | undefined;
+  try {
+    const curveAddress = await bondingCurvePda(poolAccount.data.baseMint);
+    const curveAccount = await fetchBondingCurve(rpc, curveAddress, { commitment });
+    coinCreator = curveAccount.data.creator;
+  } catch {
+    coinCreator = undefined;
+  }
+
   return {
     poolData: poolAccount.data,
     globalConfigData: globalConfigAccount.data,
     globalConfigAddress,
+    coinCreator,
   };
 }
 

@@ -12,7 +12,6 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
@@ -31,7 +30,6 @@ import {
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -60,9 +58,7 @@ export type WithdrawInstruction<
   TAccountTokenProgram extends
     | string
     | AccountMeta<string> = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-  TAccountToken2022Program extends
-    | string
-    | AccountMeta<string> = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  TAccountToken2022Program extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -71,7 +67,7 @@ export type WithdrawInstruction<
   InstructionWithAccounts<
     [
       TAccountPool extends string
-        ? WritableAccount<TAccountPool>
+        ? ReadonlyAccount<TAccountPool>
         : TAccountPool,
       TAccountGlobalConfig extends string
         ? ReadonlyAccount<TAccountGlobalConfig>
@@ -86,22 +82,22 @@ export type WithdrawInstruction<
         ? ReadonlyAccount<TAccountQuoteMint>
         : TAccountQuoteMint,
       TAccountLpMint extends string
-        ? WritableAccount<TAccountLpMint>
+        ? ReadonlyAccount<TAccountLpMint>
         : TAccountLpMint,
       TAccountUserBaseTokenAccount extends string
-        ? WritableAccount<TAccountUserBaseTokenAccount>
+        ? ReadonlyAccount<TAccountUserBaseTokenAccount>
         : TAccountUserBaseTokenAccount,
       TAccountUserQuoteTokenAccount extends string
-        ? WritableAccount<TAccountUserQuoteTokenAccount>
+        ? ReadonlyAccount<TAccountUserQuoteTokenAccount>
         : TAccountUserQuoteTokenAccount,
       TAccountUserPoolTokenAccount extends string
-        ? WritableAccount<TAccountUserPoolTokenAccount>
+        ? ReadonlyAccount<TAccountUserPoolTokenAccount>
         : TAccountUserPoolTokenAccount,
       TAccountPoolBaseTokenAccount extends string
-        ? WritableAccount<TAccountPoolBaseTokenAccount>
+        ? ReadonlyAccount<TAccountPoolBaseTokenAccount>
         : TAccountPoolBaseTokenAccount,
       TAccountPoolQuoteTokenAccount extends string
-        ? WritableAccount<TAccountPoolQuoteTokenAccount>
+        ? ReadonlyAccount<TAccountPoolQuoteTokenAccount>
         : TAccountPoolQuoteTokenAccount,
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
@@ -163,212 +159,6 @@ export function getWithdrawInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type WithdrawAsyncInput<
-  TAccountPool extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountUser extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountLpMint extends string = string,
-  TAccountUserBaseTokenAccount extends string = string,
-  TAccountUserQuoteTokenAccount extends string = string,
-  TAccountUserPoolTokenAccount extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountToken2022Program extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-> = {
-  pool: Address<TAccountPool>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  user: TransactionSigner<TAccountUser>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  lpMint: Address<TAccountLpMint>;
-  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
-  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
-  userPoolTokenAccount: Address<TAccountUserPoolTokenAccount>;
-  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  token2022Program?: Address<TAccountToken2022Program>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  lpTokenAmountIn: WithdrawInstructionDataArgs['lpTokenAmountIn'];
-  minBaseAmountOut: WithdrawInstructionDataArgs['minBaseAmountOut'];
-  minQuoteAmountOut: WithdrawInstructionDataArgs['minQuoteAmountOut'];
-};
-
-export async function getWithdrawInstructionAsync<
-  TAccountPool extends string,
-  TAccountGlobalConfig extends string,
-  TAccountUser extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountLpMint extends string,
-  TAccountUserBaseTokenAccount extends string,
-  TAccountUserQuoteTokenAccount extends string,
-  TAccountUserPoolTokenAccount extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountTokenProgram extends string,
-  TAccountToken2022Program extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
->(
-  input: WithdrawAsyncInput<
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountUser,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountTokenProgram,
-    TAccountToken2022Program,
-    TAccountEventAuthority,
-    TAccountProgram
-  >,
-  config?: { programAddress?: TProgramAddress }
-): Promise<
-  WithdrawInstruction<
-    TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountUser,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountTokenProgram,
-    TAccountToken2022Program,
-    TAccountEventAuthority,
-    TAccountProgram
-  >
-> {
-  // Program address.
-  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    user: { value: input.user ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: true },
-    userBaseTokenAccount: {
-      value: input.userBaseTokenAccount ?? null,
-      isWritable: true,
-    },
-    userQuoteTokenAccount: {
-      value: input.userQuoteTokenAccount ?? null,
-      isWritable: true,
-    },
-    userPoolTokenAccount: {
-      value: input.userPoolTokenAccount ?? null,
-      isWritable: true,
-    },
-    poolBaseTokenAccount: {
-      value: input.poolBaseTokenAccount ?? null,
-      isWritable: true,
-    },
-    poolQuoteTokenAccount: {
-      value: input.poolQuoteTokenAccount ?? null,
-      isWritable: true,
-    },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    token2022Program: {
-      value: input.token2022Program ?? null,
-      isWritable: false,
-    },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Original args.
-  const args = { ...input };
-
-  // Resolve default values.
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
-  }
-  if (!accounts.token2022Program.value) {
-    accounts.token2022Program.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
-  }
-  if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
-    });
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.lpMint),
-      getAccountMeta(accounts.userBaseTokenAccount),
-      getAccountMeta(accounts.userQuoteTokenAccount),
-      getAccountMeta(accounts.userPoolTokenAccount),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.token2022Program),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-    ],
-    data: getWithdrawInstructionDataEncoder().encode(
-      args as WithdrawInstructionDataArgs
-    ),
-    programAddress,
-  } as WithdrawInstruction<
-    TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountUser,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountTokenProgram,
-    TAccountToken2022Program,
-    TAccountEventAuthority,
-    TAccountProgram
-  >);
-}
-
 export type WithdrawInput<
   TAccountPool extends string = string,
   TAccountGlobalConfig extends string = string,
@@ -398,7 +188,7 @@ export type WithdrawInput<
   poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
   poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
   tokenProgram?: Address<TAccountTokenProgram>;
-  token2022Program?: Address<TAccountToken2022Program>;
+  token2022Program: Address<TAccountToken2022Program>;
   eventAuthority: Address<TAccountEventAuthority>;
   program: Address<TAccountProgram>;
   lpTokenAmountIn: WithdrawInstructionDataArgs['lpTokenAmountIn'];
@@ -465,31 +255,31 @@ export function getWithdrawInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
+    pool: { value: input.pool ?? null, isWritable: false },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     user: { value: input.user ?? null, isWritable: false },
     baseMint: { value: input.baseMint ?? null, isWritable: false },
     quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: true },
+    lpMint: { value: input.lpMint ?? null, isWritable: false },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     userPoolTokenAccount: {
       value: input.userPoolTokenAccount ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
     token2022Program: {
@@ -511,10 +301,6 @@ export function getWithdrawInstruction<
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
       'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
-  }
-  if (!accounts.token2022Program.value) {
-    accounts.token2022Program.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
   }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');

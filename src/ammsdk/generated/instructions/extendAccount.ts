@@ -12,7 +12,6 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   transformEncoder,
@@ -29,7 +28,6 @@ import {
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -59,7 +57,7 @@ export type ExtendAccountInstruction<
   InstructionWithAccounts<
     [
       TAccountAccount extends string
-        ? WritableAccount<TAccountAccount>
+        ? ReadonlyAccount<TAccountAccount>
         : TAccountAccount,
       TAccountUser extends string
         ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
@@ -106,102 +104,6 @@ export function getExtendAccountInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type ExtendAccountAsyncInput<
-  TAccountAccount extends string = string,
-  TAccountUser extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-> = {
-  account: Address<TAccountAccount>;
-  user: TransactionSigner<TAccountUser>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-};
-
-export async function getExtendAccountInstructionAsync<
-  TAccountAccount extends string,
-  TAccountUser extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
->(
-  input: ExtendAccountAsyncInput<
-    TAccountAccount,
-    TAccountUser,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
-  >,
-  config?: { programAddress?: TProgramAddress }
-): Promise<
-  ExtendAccountInstruction<
-    TProgramAddress,
-    TAccountAccount,
-    TAccountUser,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
-  >
-> {
-  // Program address.
-  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    account: { value: input.account ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Resolve default values.
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-  }
-  if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
-    });
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.account),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-    ],
-    data: getExtendAccountInstructionDataEncoder().encode({}),
-    programAddress,
-  } as ExtendAccountInstruction<
-    TProgramAddress,
-    TAccountAccount,
-    TAccountUser,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
-  >);
-}
-
 export type ExtendAccountInput<
   TAccountAccount extends string = string,
   TAccountUser extends string = string,
@@ -245,7 +147,7 @@ export function getExtendAccountInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    account: { value: input.account ?? null, isWritable: true },
+    account: { value: input.account ?? null, isWritable: false },
     user: { value: input.user ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },

@@ -14,7 +14,6 @@ import {
   getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   transformEncoder,
@@ -31,7 +30,6 @@ import {
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -60,7 +58,7 @@ export type DisableInstruction<
             AccountSignerMeta<TAccountAdmin>
         : TAccountAdmin,
       TAccountGlobalConfig extends string
-        ? WritableAccount<TAccountGlobalConfig>
+        ? ReadonlyAccount<TAccountGlobalConfig>
         : TAccountGlobalConfig,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
@@ -124,100 +122,6 @@ export function getDisableInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type DisableAsyncInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-> = {
-  admin: TransactionSigner<TAccountAdmin>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  disableCreatePool: DisableInstructionDataArgs['disableCreatePool'];
-  disableDeposit: DisableInstructionDataArgs['disableDeposit'];
-  disableWithdraw: DisableInstructionDataArgs['disableWithdraw'];
-  disableBuy: DisableInstructionDataArgs['disableBuy'];
-  disableSell: DisableInstructionDataArgs['disableSell'];
-};
-
-export async function getDisableInstructionAsync<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
->(
-  input: DisableAsyncInput<
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountEventAuthority,
-    TAccountProgram
-  >,
-  config?: { programAddress?: TProgramAddress }
-): Promise<
-  DisableInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountEventAuthority,
-    TAccountProgram
-  >
-> {
-  // Program address.
-  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Original args.
-  const args = { ...input };
-
-  // Resolve default values.
-  if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
-    });
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-    ],
-    data: getDisableInstructionDataEncoder().encode(
-      args as DisableInstructionDataArgs
-    ),
-    programAddress,
-  } as DisableInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountEventAuthority,
-    TAccountProgram
-  >);
-}
-
 export type DisableInput<
   TAccountAdmin extends string = string,
   TAccountGlobalConfig extends string = string,
@@ -262,7 +166,7 @@ export function getDisableInstruction<
   // Original accounts.
   const originalAccounts = {
     admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
+    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
   };

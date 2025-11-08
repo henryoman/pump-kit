@@ -12,40 +12,64 @@ import {
   getAddressEncoder,
   getArrayDecoder,
   getArrayEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   type Address,
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
 } from '@solana/kit';
 
-export type UpdateFeeConfigEvent = {
-  timestamp: bigint;
+export type GlobalConfig = {
+  /** The admin pubkey */
   admin: Address;
+  /** The lp fee in basis points (0.01%) */
   lpFeeBasisPoints: bigint;
+  /** The protocol fee in basis points (0.01%) */
   protocolFeeBasisPoints: bigint;
+  /**
+   * Flags to disable certain functionality
+   * bit 0 - Disable create pool
+   * bit 1 - Disable deposit
+   * bit 2 - Disable withdraw
+   * bit 3 - Disable buy
+   * bit 4 - Disable sell
+   */
+  disableFlags: number;
+  /** Addresses of the protocol fee recipients */
   protocolFeeRecipients: Array<Address>;
 };
 
-export type UpdateFeeConfigEventArgs = {
-  timestamp: number | bigint;
+export type GlobalConfigArgs = {
+  /** The admin pubkey */
   admin: Address;
+  /** The lp fee in basis points (0.01%) */
   lpFeeBasisPoints: number | bigint;
+  /** The protocol fee in basis points (0.01%) */
   protocolFeeBasisPoints: number | bigint;
+  /**
+   * Flags to disable certain functionality
+   * bit 0 - Disable create pool
+   * bit 1 - Disable deposit
+   * bit 2 - Disable withdraw
+   * bit 3 - Disable buy
+   * bit 4 - Disable sell
+   */
+  disableFlags: number;
+  /** Addresses of the protocol fee recipients */
   protocolFeeRecipients: Array<Address>;
 };
 
-export function getUpdateFeeConfigEventEncoder(): FixedSizeEncoder<UpdateFeeConfigEventArgs> {
+export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
   return getStructEncoder([
-    ['timestamp', getI64Encoder()],
     ['admin', getAddressEncoder()],
     ['lpFeeBasisPoints', getU64Encoder()],
     ['protocolFeeBasisPoints', getU64Encoder()],
+    ['disableFlags', getU8Encoder()],
     [
       'protocolFeeRecipients',
       getArrayEncoder(getAddressEncoder(), { size: 8 }),
@@ -53,12 +77,12 @@ export function getUpdateFeeConfigEventEncoder(): FixedSizeEncoder<UpdateFeeConf
   ]);
 }
 
-export function getUpdateFeeConfigEventDecoder(): FixedSizeDecoder<UpdateFeeConfigEvent> {
+export function getGlobalConfigDecoder(): FixedSizeDecoder<GlobalConfig> {
   return getStructDecoder([
-    ['timestamp', getI64Decoder()],
     ['admin', getAddressDecoder()],
     ['lpFeeBasisPoints', getU64Decoder()],
     ['protocolFeeBasisPoints', getU64Decoder()],
+    ['disableFlags', getU8Decoder()],
     [
       'protocolFeeRecipients',
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
@@ -66,12 +90,9 @@ export function getUpdateFeeConfigEventDecoder(): FixedSizeDecoder<UpdateFeeConf
   ]);
 }
 
-export function getUpdateFeeConfigEventCodec(): FixedSizeCodec<
-  UpdateFeeConfigEventArgs,
-  UpdateFeeConfigEvent
+export function getGlobalConfigCodec(): FixedSizeCodec<
+  GlobalConfigArgs,
+  GlobalConfig
 > {
-  return combineCodec(
-    getUpdateFeeConfigEventEncoder(),
-    getUpdateFeeConfigEventDecoder()
-  );
+  return combineCodec(getGlobalConfigEncoder(), getGlobalConfigDecoder());
 }

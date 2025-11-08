@@ -14,65 +14,29 @@ import {
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
-  type ParsedAdminSetCoinCreatorInstruction,
-  type ParsedAdminUpdateTokenIncentivesInstruction,
-  type ParsedBuyExactQuoteInInstruction,
   type ParsedBuyInstruction,
-  type ParsedClaimTokenIncentivesInstruction,
-  type ParsedCloseUserVolumeAccumulatorInstruction,
-  type ParsedCollectCoinCreatorFeeInstruction,
   type ParsedCreateConfigInstruction,
   type ParsedCreatePoolInstruction,
   type ParsedDepositInstruction,
   type ParsedDisableInstruction,
   type ParsedExtendAccountInstruction,
-  type ParsedInitUserVolumeAccumulatorInstruction,
   type ParsedSellInstruction,
-  type ParsedSetCoinCreatorInstruction,
-  type ParsedSyncUserVolumeAccumulatorInstruction,
   type ParsedUpdateAdminInstruction,
   type ParsedUpdateFeeConfigInstruction,
   type ParsedWithdrawInstruction,
 } from '../instructions';
 
-export const PUMP_AMM_PROGRAM_ADDRESS =
-  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
+export const PUMP_AMM_PROGRAM_ADDRESS = '' as Address<''>;
 
 export enum PumpAmmAccount {
-  BondingCurve,
-  FeeConfig,
   GlobalConfig,
-  GlobalVolumeAccumulator,
   Pool,
-  UserVolumeAccumulator,
 }
 
 export function identifyPumpAmmAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array
 ): PumpAmmAccount {
   const data = 'data' in account ? account.data : account;
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([23, 183, 248, 55, 96, 216, 172, 96])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmAccount.BondingCurve;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([143, 52, 146, 187, 219, 123, 76, 155])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmAccount.FeeConfig;
-  }
   if (
     containsBytes(
       data,
@@ -88,17 +52,6 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmAccount.GlobalVolumeAccumulator;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188])
       ),
       0
@@ -106,39 +59,19 @@ export function identifyPumpAmmAccount(
   ) {
     return PumpAmmAccount.Pool;
   }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmAccount.UserVolumeAccumulator;
-  }
   throw new Error(
     'The provided account could not be identified as a pumpAmm account.'
   );
 }
 
 export enum PumpAmmInstruction {
-  AdminSetCoinCreator,
-  AdminUpdateTokenIncentives,
   Buy,
-  BuyExactQuoteIn,
-  ClaimTokenIncentives,
-  CloseUserVolumeAccumulator,
-  CollectCoinCreatorFee,
   CreateConfig,
   CreatePool,
   Deposit,
   Disable,
   ExtendAccount,
-  InitUserVolumeAccumulator,
   Sell,
-  SetCoinCreator,
-  SyncUserVolumeAccumulator,
   UpdateAdmin,
   UpdateFeeConfig,
   Withdraw,
@@ -152,78 +85,12 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([242, 40, 117, 145, 73, 96, 105, 104])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.AdminSetCoinCreator;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([209, 11, 115, 87, 213, 23, 124, 204])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.AdminUpdateTokenIncentives;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([102, 6, 61, 18, 1, 218, 235, 234])
       ),
       0
     )
   ) {
     return PumpAmmInstruction.Buy;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([198, 46, 21, 82, 180, 217, 232, 112])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.BuyExactQuoteIn;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.ClaimTokenIncentives;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.CloseUserVolumeAccumulator;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([160, 57, 89, 42, 181, 139, 43, 66])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.CollectCoinCreatorFee;
   }
   if (
     containsBytes(
@@ -284,45 +151,12 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.InitUserVolumeAccumulator;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173])
       ),
       0
     )
   ) {
     return PumpAmmInstruction.Sell;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([210, 149, 128, 45, 188, 58, 78, 175])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.SetCoinCreator;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238])
-      ),
-      0
-    )
-  ) {
-    return PumpAmmInstruction.SyncUserVolumeAccumulator;
   }
   if (
     containsBytes(
@@ -362,30 +196,10 @@ export function identifyPumpAmmInstruction(
   );
 }
 
-export type ParsedPumpAmmInstruction<
-  TProgram extends string = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
-> =
-  | ({
-      instructionType: PumpAmmInstruction.AdminSetCoinCreator;
-    } & ParsedAdminSetCoinCreatorInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.AdminUpdateTokenIncentives;
-    } & ParsedAdminUpdateTokenIncentivesInstruction<TProgram>)
+export type ParsedPumpAmmInstruction<TProgram extends string = ''> =
   | ({
       instructionType: PumpAmmInstruction.Buy;
     } & ParsedBuyInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.BuyExactQuoteIn;
-    } & ParsedBuyExactQuoteInInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.ClaimTokenIncentives;
-    } & ParsedClaimTokenIncentivesInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.CloseUserVolumeAccumulator;
-    } & ParsedCloseUserVolumeAccumulatorInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.CollectCoinCreatorFee;
-    } & ParsedCollectCoinCreatorFeeInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.CreateConfig;
     } & ParsedCreateConfigInstruction<TProgram>)
@@ -402,17 +216,8 @@ export type ParsedPumpAmmInstruction<
       instructionType: PumpAmmInstruction.ExtendAccount;
     } & ParsedExtendAccountInstruction<TProgram>)
   | ({
-      instructionType: PumpAmmInstruction.InitUserVolumeAccumulator;
-    } & ParsedInitUserVolumeAccumulatorInstruction<TProgram>)
-  | ({
       instructionType: PumpAmmInstruction.Sell;
     } & ParsedSellInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.SetCoinCreator;
-    } & ParsedSetCoinCreatorInstruction<TProgram>)
-  | ({
-      instructionType: PumpAmmInstruction.SyncUserVolumeAccumulator;
-    } & ParsedSyncUserVolumeAccumulatorInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.UpdateAdmin;
     } & ParsedUpdateAdminInstruction<TProgram>)

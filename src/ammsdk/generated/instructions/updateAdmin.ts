@@ -12,7 +12,6 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   transformEncoder,
@@ -29,7 +28,6 @@ import {
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -61,7 +59,7 @@ export type UpdateAdminInstruction<
             AccountSignerMeta<TAccountAdmin>
         : TAccountAdmin,
       TAccountGlobalConfig extends string
-        ? WritableAccount<TAccountGlobalConfig>
+        ? ReadonlyAccount<TAccountGlobalConfig>
         : TAccountGlobalConfig,
       TAccountNewAdmin extends string
         ? ReadonlyAccount<TAccountNewAdmin>
@@ -101,98 +99,6 @@ export function getUpdateAdminInstructionDataCodec(): FixedSizeCodec<
     getUpdateAdminInstructionDataEncoder(),
     getUpdateAdminInstructionDataDecoder()
   );
-}
-
-export type UpdateAdminAsyncInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountNewAdmin extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-> = {
-  admin: TransactionSigner<TAccountAdmin>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  newAdmin: Address<TAccountNewAdmin>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-};
-
-export async function getUpdateAdminInstructionAsync<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
-  TAccountNewAdmin extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
->(
-  input: UpdateAdminAsyncInput<
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountNewAdmin,
-    TAccountEventAuthority,
-    TAccountProgram
-  >,
-  config?: { programAddress?: TProgramAddress }
-): Promise<
-  UpdateAdminInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountNewAdmin,
-    TAccountEventAuthority,
-    TAccountProgram
-  >
-> {
-  // Program address.
-  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    newAdmin: { value: input.newAdmin ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Resolve default values.
-  if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
-    });
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.newAdmin),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-    ],
-    data: getUpdateAdminInstructionDataEncoder().encode({}),
-    programAddress,
-  } as UpdateAdminInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountNewAdmin,
-    TAccountEventAuthority,
-    TAccountProgram
-  >);
 }
 
 export type UpdateAdminInput<
@@ -239,7 +145,7 @@ export function getUpdateAdminInstruction<
   // Original accounts.
   const originalAccounts = {
     admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
+    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     newAdmin: { value: input.newAdmin ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },

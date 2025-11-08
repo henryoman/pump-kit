@@ -55,7 +55,9 @@ export type GlobalConfig = {
   discriminator: ReadonlyUint8Array;
   /** The admin pubkey */
   admin: Address;
+  /** The lp fee in basis points (0.01%) */
   lpFeeBasisPoints: bigint;
+  /** The protocol fee in basis points (0.01%) */
   protocolFeeBasisPoints: bigint;
   /**
    * Flags to disable certain functionality
@@ -68,15 +70,14 @@ export type GlobalConfig = {
   disableFlags: number;
   /** Addresses of the protocol fee recipients */
   protocolFeeRecipients: Array<Address>;
-  coinCreatorFeeBasisPoints: bigint;
-  /** The admin authority for setting coin creators */
-  adminSetCoinCreatorAuthority: Address;
 };
 
 export type GlobalConfigArgs = {
   /** The admin pubkey */
   admin: Address;
+  /** The lp fee in basis points (0.01%) */
   lpFeeBasisPoints: number | bigint;
+  /** The protocol fee in basis points (0.01%) */
   protocolFeeBasisPoints: number | bigint;
   /**
    * Flags to disable certain functionality
@@ -89,9 +90,6 @@ export type GlobalConfigArgs = {
   disableFlags: number;
   /** Addresses of the protocol fee recipients */
   protocolFeeRecipients: Array<Address>;
-  coinCreatorFeeBasisPoints: number | bigint;
-  /** The admin authority for setting coin creators */
-  adminSetCoinCreatorAuthority: Address;
 };
 
 export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
@@ -106,8 +104,6 @@ export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
         'protocolFeeRecipients',
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
-      ['coinCreatorFeeBasisPoints', getU64Encoder()],
-      ['adminSetCoinCreatorAuthority', getAddressEncoder()],
     ]),
     (value) => ({ ...value, discriminator: GLOBAL_CONFIG_DISCRIMINATOR })
   );
@@ -124,8 +120,6 @@ export function getGlobalConfigDecoder(): FixedSizeDecoder<GlobalConfig> {
       'protocolFeeRecipients',
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
     ],
-    ['coinCreatorFeeBasisPoints', getU64Decoder()],
-    ['adminSetCoinCreatorAuthority', getAddressDecoder()],
   ]);
 }
 
@@ -190,5 +184,5 @@ export async function fetchAllMaybeGlobalConfig(
 }
 
 export function getGlobalConfigSize(): number {
-  return 353;
+  return 313;
 }

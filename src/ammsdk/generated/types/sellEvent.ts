@@ -43,9 +43,6 @@ export type SellEvent = {
   userQuoteTokenAccount: Address;
   protocolFeeRecipient: Address;
   protocolFeeRecipientTokenAccount: Address;
-  coinCreator: Address;
-  coinCreatorFeeBasisPoints: bigint;
-  coinCreatorFee: bigint;
 };
 
 export type SellEventArgs = {
@@ -69,9 +66,6 @@ export type SellEventArgs = {
   userQuoteTokenAccount: Address;
   protocolFeeRecipient: Address;
   protocolFeeRecipientTokenAccount: Address;
-  coinCreator: Address;
-  coinCreatorFeeBasisPoints: number | bigint;
-  coinCreatorFee: number | bigint;
 };
 
 export function getSellEventEncoder(): FixedSizeEncoder<SellEventArgs> {
@@ -96,9 +90,6 @@ export function getSellEventEncoder(): FixedSizeEncoder<SellEventArgs> {
     ['userQuoteTokenAccount', getAddressEncoder()],
     ['protocolFeeRecipient', getAddressEncoder()],
     ['protocolFeeRecipientTokenAccount', getAddressEncoder()],
-    ['coinCreator', getAddressEncoder()],
-    ['coinCreatorFeeBasisPoints', getU64Encoder()],
-    ['coinCreatorFee', getU64Encoder()],
   ]);
 }
 
@@ -124,9 +115,6 @@ export function getSellEventDecoder(): FixedSizeDecoder<SellEvent> {
     ['userQuoteTokenAccount', getAddressDecoder()],
     ['protocolFeeRecipient', getAddressDecoder()],
     ['protocolFeeRecipientTokenAccount', getAddressDecoder()],
-    ['coinCreator', getAddressDecoder()],
-    ['coinCreatorFeeBasisPoints', getU64Decoder()],
-    ['coinCreatorFee', getU64Decoder()],
   ]);
 }
 

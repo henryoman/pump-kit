@@ -19,15 +19,20 @@ import type { TransactionSigner } from "@solana/kit";
 import { ammBuy, ammSell } from "../src/swap";
 import { buildTransaction, sendAndConfirmTransaction } from "../src/utils/transaction";
 
-const TOKEN_MINT = process.env.TOKEN_MINT;
+const CONFIG_PATH = join(import.meta.dir, "config.yaml");
+const CONFIG_DEFAULTS = loadSwapConfig();
+
+const TOKEN_MINT = process.env.TOKEN_MINT ?? CONFIG_DEFAULTS.ammMint;
 const RPC_URL = process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
 const RPC_WS_URL = process.env.RPC_WS_URL || RPC_URL.replace("https://", "wss://").replace("http://", "ws://");
 const KEYPAIR_PATH = join(import.meta.dir, "keypair.json");
-const BUY_AMOUNT_SOL = Number(process.env.BUY_AMOUNT_SOL ?? "0.01");
+const BUY_AMOUNT_SOL = Number(process.env.BUY_AMOUNT_SOL ?? CONFIG_DEFAULTS.testAmount ?? 0.01);
 const SLIPPAGE_BPS = Number(process.env.SLIPPAGE_BPS ?? "100");
 
 if (!TOKEN_MINT) {
-  console.error("❌ TOKEN_MINT environment variable is required for AMM swaps");
+  console.error(
+    "❌ TOKEN_MINT is required. Set TOKEN_MINT env var or update test-swap/config.yaml (test-tokens.amm)."
+  );
   process.exit(1);
 }
 
@@ -59,12 +64,51 @@ async function checkBalance(rpc: ReturnType<typeof createSolanaRpc>, address: st
   return lamports / 1_000_000_000;
 }
 
+function loadSwapConfig(): {
+  curveMint?: string;
+  ammMint?: string;
+  testAmount?: number;
+} {
+  try {
+    const raw = readFileSync(CONFIG_PATH, "utf-8");
+    const extract = (pattern: RegExp) => {
+      const match = raw.match(pattern);
+      return match?.[1];
+    };
+
+    const curveMint =
+      extract(/^\s*curve:\s*([A-Za-z0-9]+)/m) ??
+      extract(/^\s*test-tokens:\s*\n(?:\s+.+\n)*?\s*curve:\s*([A-Za-z0-9]+)/m);
+    const ammMint =
+      extract(/^\s*amm:\s*([A-Za-z0-9]+)/m) ??
+      extract(/^\s*test-tokens:\s*\n(?:\s+.+\n)*?\s*amm:\s*([A-Za-z0-9]+)/m);
+    const amountRaw =
+      extract(/^\s*test-amount:\s*([0-9.]+)/m) ??
+      extract(/^\s*testAmount:\s*([0-9.]+)/m);
+
+    return {
+      curveMint: curveMint ?? undefined,
+      ammMint: ammMint ?? undefined,
+      testAmount: amountRaw ? Number(amountRaw) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function main() {
   console.log("🚀 Pump Kit AMM Swap Test\n");
 
   const wallet = await loadKeypair();
   console.log(`📁 Loading keypair from: ${KEYPAIR_PATH}`);
   console.log(`✅ Wallet address: ${wallet.address}\n`);
+
+  if (!process.env.TOKEN_MINT && CONFIG_DEFAULTS.ammMint) {
+    console.log(`ℹ️ Loaded AMM mint from config.yaml: ${CONFIG_DEFAULTS.ammMint}`);
+  }
+  if (!process.env.BUY_AMOUNT_SOL && CONFIG_DEFAULTS.testAmount !== undefined) {
+    console.log(`ℹ️ Using test amount from config.yaml: ${CONFIG_DEFAULTS.testAmount} SOL`);
+  }
 
   const rpc = createSolanaRpc(RPC_URL);
   const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);

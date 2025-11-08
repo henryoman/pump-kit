@@ -46,7 +46,6 @@ export type CreatePoolEvent = {
   lpMint: Address;
   userBaseTokenAccount: Address;
   userQuoteTokenAccount: Address;
-  coinCreator: Address;
 };
 
 export type CreatePoolEventArgs = {
@@ -69,7 +68,6 @@ export type CreatePoolEventArgs = {
   lpMint: Address;
   userBaseTokenAccount: Address;
   userQuoteTokenAccount: Address;
-  coinCreator: Address;
 };
 
 export function getCreatePoolEventEncoder(): FixedSizeEncoder<CreatePoolEventArgs> {
@@ -93,7 +91,6 @@ export function getCreatePoolEventEncoder(): FixedSizeEncoder<CreatePoolEventArg
     ['lpMint', getAddressEncoder()],
     ['userBaseTokenAccount', getAddressEncoder()],
     ['userQuoteTokenAccount', getAddressEncoder()],
-    ['coinCreator', getAddressEncoder()],
   ]);
 }
 
@@ -118,7 +115,6 @@ export function getCreatePoolEventDecoder(): FixedSizeDecoder<CreatePoolEvent> {
     ['lpMint', getAddressDecoder()],
     ['userBaseTokenAccount', getAddressDecoder()],
     ['userQuoteTokenAccount', getAddressDecoder()],
-    ['coinCreator', getAddressDecoder()],
   ]);
 }
 

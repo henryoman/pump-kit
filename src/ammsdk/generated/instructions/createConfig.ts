@@ -16,7 +16,6 @@ import {
   getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
@@ -32,10 +31,9 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
+  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableAccount,
-  type WritableSignerAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -52,9 +50,7 @@ export function getCreateConfigDiscriminatorBytes() {
 
 export type CreateConfigInstruction<
   TProgram extends string = typeof PUMP_AMM_PROGRAM_ADDRESS,
-  TAccountAdmin extends
-    | string
-    | AccountMeta<string> = '8LWu7QM2dGR1G8nKDHthckea57bkCzXyBTAKPJUBDHo8',
+  TAccountAdmin extends string | AccountMeta<string> = string,
   TAccountGlobalConfig extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends
     | string
@@ -67,11 +63,11 @@ export type CreateConfigInstruction<
   InstructionWithAccounts<
     [
       TAccountAdmin extends string
-        ? WritableSignerAccount<TAccountAdmin> &
+        ? ReadonlySignerAccount<TAccountAdmin> &
             AccountSignerMeta<TAccountAdmin>
         : TAccountAdmin,
       TAccountGlobalConfig extends string
-        ? WritableAccount<TAccountGlobalConfig>
+        ? ReadonlyAccount<TAccountGlobalConfig>
         : TAccountGlobalConfig,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
@@ -91,16 +87,12 @@ export type CreateConfigInstructionData = {
   lpFeeBasisPoints: bigint;
   protocolFeeBasisPoints: bigint;
   protocolFeeRecipients: Array<Address>;
-  coinCreatorFeeBasisPoints: bigint;
-  adminSetCoinCreatorAuthority: Address;
 };
 
 export type CreateConfigInstructionDataArgs = {
   lpFeeBasisPoints: number | bigint;
   protocolFeeBasisPoints: number | bigint;
   protocolFeeRecipients: Array<Address>;
-  coinCreatorFeeBasisPoints: number | bigint;
-  adminSetCoinCreatorAuthority: Address;
 };
 
 export function getCreateConfigInstructionDataEncoder(): FixedSizeEncoder<CreateConfigInstructionDataArgs> {
@@ -113,8 +105,6 @@ export function getCreateConfigInstructionDataEncoder(): FixedSizeEncoder<Create
         'protocolFeeRecipients',
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
-      ['coinCreatorFeeBasisPoints', getU64Encoder()],
-      ['adminSetCoinCreatorAuthority', getAddressEncoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_CONFIG_DISCRIMINATOR })
   );
@@ -129,8 +119,6 @@ export function getCreateConfigInstructionDataDecoder(): FixedSizeDecoder<Create
       'protocolFeeRecipients',
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
     ],
-    ['coinCreatorFeeBasisPoints', getU64Decoder()],
-    ['adminSetCoinCreatorAuthority', getAddressDecoder()],
   ]);
 }
 
@@ -144,128 +132,6 @@ export function getCreateConfigInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type CreateConfigAsyncInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-> = {
-  admin?: TransactionSigner<TAccountAdmin>;
-  globalConfig?: Address<TAccountGlobalConfig>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  lpFeeBasisPoints: CreateConfigInstructionDataArgs['lpFeeBasisPoints'];
-  protocolFeeBasisPoints: CreateConfigInstructionDataArgs['protocolFeeBasisPoints'];
-  protocolFeeRecipients: CreateConfigInstructionDataArgs['protocolFeeRecipients'];
-  coinCreatorFeeBasisPoints: CreateConfigInstructionDataArgs['coinCreatorFeeBasisPoints'];
-  adminSetCoinCreatorAuthority: CreateConfigInstructionDataArgs['adminSetCoinCreatorAuthority'];
-};
-
-export async function getCreateConfigInstructionAsync<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
->(
-  input: CreateConfigAsyncInput<
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
-  >,
-  config?: { programAddress?: TProgramAddress }
-): Promise<
-  CreateConfigInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
-  >
-> {
-  // Program address.
-  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Original args.
-  const args = { ...input };
-
-  // Resolve default values.
-  if (!accounts.admin.value) {
-    accounts.admin.value =
-      '8LWu7QM2dGR1G8nKDHthckea57bkCzXyBTAKPJUBDHo8' as Address<'8LWu7QM2dGR1G8nKDHthckea57bkCzXyBTAKPJUBDHo8'>;
-  }
-  if (!accounts.globalConfig.value) {
-    accounts.globalConfig.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            103, 108, 111, 98, 97, 108, 95, 99, 111, 110, 102, 105, 103,
-          ])
-        ),
-      ],
-    });
-  }
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-  }
-  if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
-    });
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-    ],
-    data: getCreateConfigInstructionDataEncoder().encode(
-      args as CreateConfigInstructionDataArgs
-    ),
-    programAddress,
-  } as CreateConfigInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
-  >);
-}
-
 export type CreateConfigInput<
   TAccountAdmin extends string = string,
   TAccountGlobalConfig extends string = string,
@@ -273,7 +139,7 @@ export type CreateConfigInput<
   TAccountEventAuthority extends string = string,
   TAccountProgram extends string = string,
 > = {
-  admin?: TransactionSigner<TAccountAdmin>;
+  admin: TransactionSigner<TAccountAdmin>;
   globalConfig: Address<TAccountGlobalConfig>;
   systemProgram?: Address<TAccountSystemProgram>;
   eventAuthority: Address<TAccountEventAuthority>;
@@ -281,8 +147,6 @@ export type CreateConfigInput<
   lpFeeBasisPoints: CreateConfigInstructionDataArgs['lpFeeBasisPoints'];
   protocolFeeBasisPoints: CreateConfigInstructionDataArgs['protocolFeeBasisPoints'];
   protocolFeeRecipients: CreateConfigInstructionDataArgs['protocolFeeRecipients'];
-  coinCreatorFeeBasisPoints: CreateConfigInstructionDataArgs['coinCreatorFeeBasisPoints'];
-  adminSetCoinCreatorAuthority: CreateConfigInstructionDataArgs['adminSetCoinCreatorAuthority'];
 };
 
 export function getCreateConfigInstruction<
@@ -314,8 +178,8 @@ export function getCreateConfigInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
+    admin: { value: input.admin ?? null, isWritable: false },
+    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
@@ -329,10 +193,6 @@ export function getCreateConfigInstruction<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.admin.value) {
-    accounts.admin.value =
-      '8LWu7QM2dGR1G8nKDHthckea57bkCzXyBTAKPJUBDHo8' as Address<'8LWu7QM2dGR1G8nKDHthckea57bkCzXyBTAKPJUBDHo8'>;
-  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;

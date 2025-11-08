@@ -235,7 +235,8 @@ async function resolvePoolContext(params: {
   poolCreator?: Address | string;
   poolIndex?: number;
 }): Promise<PoolContext> {
-  const { poolAccount, globalConfigAccount, poolAddress, poolCreator } = await loadPoolAccounts(params);
+  const { poolAccount, globalConfigAccount, poolAddress, poolCreator, coinCreator } =
+    await loadPoolAccounts(params);
   const [baseAta, quoteAta] = await Promise.all([
     poolTokenAta(poolAddress, params.mint, TOKEN_PROGRAM_ADDRESS),
     poolTokenAta(poolAddress, params.quoteMint, TOKEN_PROGRAM_ADDRESS),
@@ -246,6 +247,7 @@ async function resolvePoolContext(params: {
   return {
     poolAddress,
     poolCreator,
+    coinCreator,
     poolData: poolAccount.data,
     globalConfigData: globalConfigAccount.data,
     baseReserve: reserves.baseReserve,
@@ -262,11 +264,13 @@ async function resolvePoolState(params: {
   poolCreator?: Address | string;
   poolIndex?: number;
 }) {
-  const { poolAccount, globalConfigAccount, poolAddress, poolCreator } = await loadPoolAccounts(params);
+  const { poolAccount, globalConfigAccount, poolAddress, poolCreator, coinCreator } =
+    await loadPoolAccounts(params);
 
   return {
     poolAddress,
     poolCreator,
+    coinCreator,
     poolData: poolAccount.data,
     globalConfigData: globalConfigAccount.data,
   } as const;
@@ -291,17 +295,14 @@ async function loadPoolAccounts(params: {
 
   let resolvedPoolAddress = poolAddress ? toAddress(poolAddress) : undefined;
   let resolvedPoolCreator = poolCreator ? toAddress(poolCreator) : undefined;
-  let curveCreator: Address | undefined;
+  let coinCreator: Address | undefined;
 
-  if (!resolvedPoolCreator) {
-    try {
-      const curveAddress = await bondingCurvePda(mint);
-      const curveAccount = await fetchBondingCurve(rpc, curveAddress, { commitment });
-      curveCreator = curveAccount.data.creator;
-      resolvedPoolCreator = curveCreator;
-    } catch {
-      curveCreator = undefined;
-    }
+  try {
+    const curveAddress = await bondingCurvePda(mint);
+    const curveAccount = await fetchBondingCurve(rpc, curveAddress, { commitment });
+    coinCreator = curveAccount.data.creator;
+  } catch {
+    coinCreator = undefined;
   }
 
   const globalConfigAddress = await globalConfigPda();
@@ -371,9 +372,6 @@ async function loadPoolAccounts(params: {
       const candidateAddress = toAddress(account.pubkey);
       const candidateAccount = await tryFetchPool(candidateAddress);
       if (!candidateAccount) continue;
-      if (curveCreator && candidateAccount.data.coinCreator !== curveCreator) {
-        continue;
-      }
 
       resolvedPoolAddress = candidateAddress;
       resolvedPoolCreator = candidateAccount.data.creator;
@@ -394,11 +392,16 @@ async function loadPoolAccounts(params: {
     resolvedPoolCreator = poolAccount.data.creator;
   }
 
+  if (!coinCreator) {
+    coinCreator = poolAccount.data.creator;
+  }
+
   return {
     poolAccount,
     globalConfigAccount,
     poolAddress: resolvedPoolAddress,
     poolCreator: resolvedPoolCreator,
+    coinCreator,
   } as const;
 }
 
@@ -428,9 +431,8 @@ async function fetchPoolReserves(rpc: RpcClient, baseAccount: Address, quoteAcco
 
 function computeTotalFeeBps(globalConfig: Awaited<ReturnType<typeof fetchGlobalConfig>>["data"]) {
   return (
-    BigInt(globalConfig.lpFeeBasisPoints) +
-    BigInt(globalConfig.protocolFeeBasisPoints) +
-    BigInt(globalConfig.coinCreatorFeeBasisPoints)
+    BigInt(globalConfig.lpFeeBasisPoints ?? 0n) +
+    BigInt(globalConfig.protocolFeeBasisPoints ?? 0n)
   );
 }
 
@@ -501,7 +503,9 @@ async function ensureUserAta({
 
   let createInstruction: Instruction | undefined;
   try {
-    const accountInfo = await rpc.getAccountInfo(userAta).send();
+    const accountInfo = await rpc
+      .getAccountInfo(userAta, { encoding: "base64" })
+      .send();
     if (!accountInfo.value) {
       createInstruction = buildCreateAtaInstruction({
         payer: owner,
