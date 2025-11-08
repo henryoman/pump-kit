@@ -13,7 +13,7 @@ import { createTestWallet, getTestRpc } from "../setup";
 import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
 import { getBuyInstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/buy";
 import { getSellInstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/sell";
-import { address as getAddress } from "@solana/kit";
+import { address as toAddress } from "@solana/kit";
 import {
   bondingCurvePda,
   associatedBondingCurveAta,
@@ -32,7 +32,7 @@ import {
   FEE_PROGRAM_ID,
 } from "../../src/config/addresses";
 
-describe("Swap helpers", () => {
+describe("Curve swap helpers", () => {
   let testWallet: TransactionSigner;
   let rpc: ReturnType<typeof getTestRpc>;
   const mintAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -42,7 +42,8 @@ describe("Swap helpers", () => {
     virtualSolReserves: 5_000_000_000n,
     realTokenReserves: 25_000_000_000n,
     realSolReserves: 1_000_000_000n,
-    creator: getAddress(creator),
+    creator: toAddress(creator),
+    complete: false,
   });
 
   const mockFees: FeeStructure = {
@@ -56,13 +57,13 @@ describe("Swap helpers", () => {
     testWallet = await createTestWallet();
   });
 
-  test("curveBuy() derives token amount from SOL budget", async () => {
+  test("curveBuy derives token amount and max SOL cost from SOL budget", async () => {
     const slippageBps = 75;
     const solBudgetSol = 0.8;
     const solBudgetLamports = solToLamports(solBudgetSol);
     const curveState = mockCurve(testWallet.address);
     const quote = quoteBuyWithSolAmount(curveState, mockFees, solBudgetLamports);
-    const expectedMaxCost = addSlippage(quote.totalSolCostLamports, slippageBps);
+    const expectedMaxCost = addSlippage(quote.totalSolCostLamports, slippageBps) * 2n;
 
     const instruction = await curveBuy({
       user: testWallet,
@@ -78,17 +79,18 @@ describe("Swap helpers", () => {
 
     const decoded = getBuyInstructionDataDecoder().decode(instruction.data);
     expect(decoded.amount).toBe(quote.tokenAmount);
-    expect(decoded.maxSolCost).toBe(expectedMaxCost * 2n);
+    expect(decoded.maxSolCost).toBe(expectedMaxCost);
   });
 
-  test("curveBuy() wires expected accounts", async () => {
+  test("curveBuy wires expected accounts", async () => {
+    const curveState = mockCurve(testWallet.address);
     const instruction = await curveBuy({
       user: testWallet,
       mint: mintAddress,
       solAmount: 0.4,
       bondingCurveCreator: testWallet.address,
       feeRecipient: DEFAULT_FEE_RECIPIENT,
-      curveStateOverride: mockCurve(testWallet.address),
+      curveStateOverride: curveState,
       feeStructureOverride: mockFees,
       rpc,
     });
@@ -97,8 +99,8 @@ describe("Swap helpers", () => {
     const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mintAddress);
     const [associatedUser] = await findAssociatedTokenPda({
       owner: testWallet.address,
-      mint: getAddress(mintAddress),
-      tokenProgram: getAddress(TOKEN_PROGRAM_ID),
+      mint: toAddress(mintAddress),
+      tokenProgram: toAddress(TOKEN_PROGRAM_ID),
     });
     const creatorVault = await creatorVaultPda(testWallet.address);
     const global = await globalPda();
@@ -109,27 +111,27 @@ describe("Swap helpers", () => {
     const expectedAccounts = [
       global,
       DEFAULT_FEE_RECIPIENT,
-      getAddress(mintAddress),
+      toAddress(mintAddress),
       bondingCurve,
       associatedBondingCurve,
       associatedUser,
       testWallet.address,
-      getAddress(SYSTEM_PROGRAM_ID),
-      getAddress(TOKEN_PROGRAM_ID),
+      toAddress(SYSTEM_PROGRAM_ID),
+      toAddress(TOKEN_PROGRAM_ID),
       creatorVault,
       await eventAuthorityPda(),
-      getAddress(PUMP_PROGRAM_ID),
+      toAddress(PUMP_PROGRAM_ID),
       globalVolumeAccumulator,
       userVolumeAccumulator,
       feeConfig,
-      getAddress(FEE_PROGRAM_ID),
+      toAddress(FEE_PROGRAM_ID),
     ];
 
     const accountAddresses = instruction.accounts.map((meta) => meta.address);
-    expect(accountAddresses).toEqual(expectedAccounts.map(getAddress));
+    expect(accountAddresses).toEqual(expectedAccounts.map(toAddress));
   });
 
-  test("curveSell() derives min SOL output from slippage guard (fixed amount)", async () => {
+  test("curveSell derives min SOL output from slippage guard for fixed token amount", async () => {
     const tokenAmountHuman = 0.75;
     const decimals = 6;
     const tokenAmountRaw = tokensToRaw(tokenAmountHuman, decimals);
@@ -155,6 +157,5 @@ describe("Swap helpers", () => {
     expect(decoded.minSolOutput).toBe(expectedMinOut);
     expect(decoded.amount).toBe(tokenAmountRaw);
   });
-
-  // TODO: add percentage-based sell tests once swap helpers expose balance injection hooks.
 });
+

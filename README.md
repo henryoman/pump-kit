@@ -1,7 +1,7 @@
 # Pump Kit
 
 <p align="center">
-  <img src="@pump-kit.png" alt="Pump Kit" width="600" />
+  <img src="https://amaranth-manual-buzzard-640.mypinata.cloud/ipfs/bafkreibp354xz2lzqxntalhdnq3gdvuyleilbxfw3u5pyjmigsaz6xidea" alt="Pump Kit" width="600" />
 </p>
 
 <p align="center">
@@ -16,9 +16,7 @@
   </a>
 </p>
 
-A TypeScript SDK for Pump.fun built on **Solana Kit 5.0**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices. 
-
-**Production-ready package coming soon.**
+A TypeScript SDK for Pump.fun built on **Solana Kit 5.0**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices.
 
 ## Features
 
@@ -30,10 +28,13 @@ A TypeScript SDK for Pump.fun built on **Solana Kit 5.0**. Designed for high-per
 - **Automatic slippage protection** – Built-in guards for buy/sell operations
 - **Full TypeScript support** – Strongly typed throughout with complete type coverage
 
-### Coming Soon
+## TODO
 
-- **Launch & mint helpers** – Create and seed new Pump.fun tokens once integration is ready
-- **Liquidity tooling** – Add/remove liquidity with tested helpers
+These are the next actions we need to make happen:
+
+- create pump fun curve launch helpers with dev buy
+- provide/remove liquidity in existing pool
+- create new liquidity pool
 
 ---
 
@@ -153,17 +154,6 @@ ammSell({
   poolCreator?,
   poolAddress?,
 })
-```
-
-### Coming Soon
-
-```ts
-// Create token with initial buy
-mintWithFirstBuy({ ... })
-
-// Liquidity helpers
-addLiquidity({ ... })
-removeLiquidity({ ... })
 ```
 
 ### Transaction Utilities
