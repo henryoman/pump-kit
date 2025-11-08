@@ -16,18 +16,18 @@ import {
   FEE_PROGRAM_ID,
 } from "../config/addresses";
 import {
-  poolPda,
-  lpMintPda,
-  userLpAta,
-  poolTokenAta,
+  coinCreatorVaultAta,
+  coinCreatorVaultAuthorityPda,
+  eventAuthorityPda,
   globalConfigPda,
   globalVolumeAccumulatorPda,
+  poolPda,
+  lpMintPda,
+  poolTokenAta,
+  userLpAta,
   userVolumeAccumulatorPda,
-  eventAuthorityPda,
-  coinCreatorVaultAuthorityPda,
-  coinCreatorVaultAta,
 } from "../pda/pumpAmm";
-import { feeConfigPda } from "../pda/pump";
+import { ammFeeConfigPda } from "../pda/pumpAmm";
 import {
   getDepositInstruction,
   getWithdrawInstruction,
@@ -347,7 +347,7 @@ export async function ammBuy(params: AmmBuyParams) {
   const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
   const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
   const eventAuthority = await eventAuthorityPda();
-  const feeConfig = await feeConfigPda();
+  const feeConfig = await ammFeeConfigPda();
 
   return getBuyInstruction(
     {
@@ -462,7 +462,7 @@ export async function ammSell(params: AmmSellParams) {
   const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
   const userVolumeAccumulator = await userVolumeAccumulatorPda(userAddr);
   const eventAuthority = await eventAuthorityPda();
-  const feeConfig = await feeConfigPda();
+  const feeConfig = await ammFeeConfigPda();
 
   return getSellInstruction(
     {

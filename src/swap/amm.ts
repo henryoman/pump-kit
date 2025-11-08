@@ -20,9 +20,10 @@ import { WSOL_ADDRESS } from "../utils/wsol";
 import { poolPda, poolTokenAta, globalConfigPda } from "../pda/pumpAmm";
 import { fetchPool } from "../ammsdk/generated/accounts/pool";
 import { fetchGlobalConfig } from "../ammsdk/generated/accounts/globalConfig";
-import { TOKEN_PROGRAM_ID } from "../config/addresses";
+import { PUMP_AMM_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
 import { findAssociatedTokenPda } from "../pda/ata";
 import { buildCreateAtaInstruction } from "../utils/ata";
+import type { Base58EncodedBytes } from "@solana/rpc-types";
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
@@ -271,6 +272,12 @@ async function resolvePoolState(params: {
   } as const;
 }
 
+const POOL_BASE_MINT_OFFSET = 8 + 1 + 2 + 32; // discriminator + bump + index + creator
+const POOL_QUOTE_MINT_OFFSET = POOL_BASE_MINT_OFFSET + 32;
+
+const toBase58Bytes = (value: Address | string): Base58EncodedBytes =>
+  toAddress(value) as unknown as Base58EncodedBytes;
+
 async function loadPoolAccounts(params: {
   rpc: RpcClient;
   mint: Address;
@@ -280,29 +287,28 @@ async function loadPoolAccounts(params: {
   poolCreator?: Address | string;
   poolIndex?: number;
 }) {
-  const { rpc, mint, quoteMint, commitment } = params;
-  let resolvedPoolCreator = params.poolCreator ? toAddress(params.poolCreator) : undefined;
-  let resolvedPoolAddress = params.poolAddress ? toAddress(params.poolAddress) : undefined;
+  const { rpc, mint, quoteMint, commitment, poolAddress, poolCreator, poolIndex } = params;
+
+  let resolvedPoolAddress = poolAddress ? toAddress(poolAddress) : undefined;
+  let resolvedPoolCreator = poolCreator ? toAddress(poolCreator) : undefined;
+  let curveCreator: Address | undefined;
 
   if (!resolvedPoolCreator) {
     try {
       const curveAddress = await bondingCurvePda(mint);
       const curveAccount = await fetchBondingCurve(rpc, curveAddress, { commitment });
-      resolvedPoolCreator = curveAccount.data.creator;
+      curveCreator = curveAccount.data.creator;
+      resolvedPoolCreator = curveCreator;
     } catch {
-      resolvedPoolCreator = undefined;
+      curveCreator = undefined;
     }
   }
 
   const globalConfigAddress = await globalConfigPda();
 
-  let poolAccount: Awaited<ReturnType<typeof fetchPool>> | null = null;
-  let poolAddrCandidate = resolvedPoolAddress;
-
   const tryFetchPool = async (address: Address) => {
     try {
-      const account = await fetchPool(rpc, address, { commitment });
-      return account;
+      return await fetchPool(rpc, address, { commitment });
     } catch (error) {
       if (isAccountNotFoundError(error)) {
         return null;
@@ -311,33 +317,72 @@ async function loadPoolAccounts(params: {
     }
   };
 
-  if (poolAddrCandidate) {
-    poolAccount = await tryFetchPool(poolAddrCandidate);
+  let poolAccount: Awaited<ReturnType<typeof fetchPool>> | null = null;
+
+  if (resolvedPoolAddress) {
+    poolAccount = await tryFetchPool(resolvedPoolAddress);
   }
 
-  if (!poolAccount) {
-    if (!resolvedPoolCreator) {
-      throw new Error(
-        "Unable to resolve AMM pool: provide poolCreator or poolAddress explicitly for this mint"
-      );
-    }
-
-    const indices = params.poolIndex !== undefined
-      ? [params.poolIndex]
+  if (!poolAccount && resolvedPoolCreator) {
+    const indices = poolIndex !== undefined
+      ? [poolIndex]
       : Array.from({ length: DEFAULT_POOL_SCAN_LIMIT }, (_, i) => i);
 
     for (const index of indices) {
       const candidateAddress = await poolPda(index, resolvedPoolCreator, mint, quoteMint);
       const candidateAccount = await tryFetchPool(candidateAddress);
       if (candidateAccount) {
-        poolAddrCandidate = candidateAddress;
+        resolvedPoolAddress = candidateAddress;
         poolAccount = candidateAccount;
         break;
       }
     }
   }
 
-  if (!poolAccount || !poolAddrCandidate) {
+  if (!poolAccount) {
+    const filters = [
+      {
+        memcmp: {
+          offset: BigInt(POOL_BASE_MINT_OFFSET),
+          bytes: toBase58Bytes(mint),
+          encoding: "base58" as const,
+        },
+      },
+      {
+        memcmp: {
+          offset: BigInt(POOL_QUOTE_MINT_OFFSET),
+          bytes: toBase58Bytes(quoteMint),
+          encoding: "base58" as const,
+        },
+      },
+    ];
+
+    const response = await rpc
+      .getProgramAccounts(toAddress(PUMP_AMM_PROGRAM_ID), {
+        commitment,
+        encoding: "base64",
+        filters,
+      })
+      .send();
+
+    const matches = response ?? [];
+
+    for (const account of matches) {
+      const candidateAddress = toAddress(account.pubkey);
+      const candidateAccount = await tryFetchPool(candidateAddress);
+      if (!candidateAccount) continue;
+      if (curveCreator && candidateAccount.data.coinCreator !== curveCreator) {
+        continue;
+      }
+
+      resolvedPoolAddress = candidateAddress;
+      resolvedPoolCreator = candidateAccount.data.creator;
+      poolAccount = candidateAccount;
+      break;
+    }
+  }
+
+  if (!poolAccount || !resolvedPoolAddress) {
     throw new Error(
       `Unable to locate AMM pool for mint ${mint}. Provide poolAddress or poolIndex explicitly.`
     );
@@ -352,7 +397,7 @@ async function loadPoolAccounts(params: {
   return {
     poolAccount,
     globalConfigAccount,
-    poolAddress: poolAddrCandidate,
+    poolAddress: resolvedPoolAddress,
     poolCreator: resolvedPoolCreator,
   } as const;
 }
@@ -366,7 +411,7 @@ function isAccountNotFoundError(error: unknown): boolean {
     return true;
   }
   const contextCode = (error as any)?.context?.__code;
-  return contextCode === 4100 /* custom code used by solana rpc for missing accounts */;
+  return contextCode === 4100;
 }
 
 async function fetchPoolReserves(rpc: RpcClient, baseAccount: Address, quoteAccount: Address) {
