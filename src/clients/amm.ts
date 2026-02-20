@@ -5,7 +5,6 @@
 
 import type { Address, TransactionSigner } from "@solana/kit";
 import { address as getAddress } from "@solana/kit";
-import { AccountRole } from "@solana/instructions";
 import { bondingCurvePda } from "../pda/pump";
 import { findAssociatedTokenPda } from "../pda/ata";
 
@@ -349,12 +348,10 @@ export async function ammBuy(params: AmmBuyParams) {
     tokenProgramAddr
   );
 
-  const [globalVolumeAccumulator, userVolumeAccumulator] = allowTrackVolume
-    ? await Promise.all([
-        globalVolumeAccumulatorPda(),
-        userVolumeAccumulatorPda(userAddr),
-      ])
-    : [undefined, undefined];
+  const [globalVolumeAccumulator, userVolumeAccumulator] = await Promise.all([
+    globalVolumeAccumulatorPda(),
+    userVolumeAccumulatorPda(userAddr),
+  ]);
 
   const feeConfig = await ammFeeConfigPda();
   const baseInstruction = getBuyInstruction(
@@ -376,65 +373,19 @@ export async function ammBuy(params: AmmBuyParams) {
       associatedTokenProgram: getAddress(ASSOCIATED_TOKEN_PROGRAM_ID),
       eventAuthority,
       program: getAddress(PUMP_AMM_PROGRAM_ID),
+      coinCreatorVaultAta: coinCreatorVaultTokenAccount,
+      coinCreatorVaultAuthority,
+      globalVolumeAccumulator,
+      userVolumeAccumulator,
+      feeConfig,
+      feeProgram: getAddress(FEE_PROGRAM_ID),
       baseAmountOut: tokenAmountOut,
       maxQuoteAmountIn: maxQuoteIn,
+      trackVolume: [allowTrackVolume],
     },
     { programAddress: getAddress(PUMP_AMM_PROGRAM_ID) }
   );
-
-  const writableAccounts = new Set(
-    [
-      pool,
-      userBaseAta,
-      userQuoteAta,
-      poolBaseAta,
-      poolQuoteAta,
-      protocolFeeRecipientAta,
-    ].map((addr) => getAddress(addr))
-  );
-
-  const baseAccounts = baseInstruction.accounts.map((account) =>
-    writableAccounts.has(getAddress(account.address))
-      ? { ...account, role: AccountRole.WRITABLE }
-      : account
-  );
-
-  const extraAccounts = [
-    {
-      address: coinCreatorVaultTokenAccount,
-      role: AccountRole.WRITABLE,
-    },
-    {
-      address: coinCreatorVaultAuthority,
-      role: AccountRole.READONLY,
-    },
-    ...(allowTrackVolume && globalVolumeAccumulator && userVolumeAccumulator
-      ? [
-          {
-            address: globalVolumeAccumulator,
-            role: AccountRole.WRITABLE,
-          },
-          {
-            address: userVolumeAccumulator,
-            role: AccountRole.WRITABLE,
-          },
-        ]
-      : []),
-    {
-      address: feeConfig,
-      role: AccountRole.READONLY,
-    },
-    {
-      address: getAddress(FEE_PROGRAM_ID),
-      role: AccountRole.READONLY,
-    },
-  ];
-
-  return {
-    programAddress: baseInstruction.programAddress,
-    accounts: [...baseAccounts, ...extraAccounts],
-    data: baseInstruction.data,
-  };
+  return baseInstruction;
 }
 
 export interface AmmSellParams {
@@ -536,53 +487,16 @@ export async function ammSell(params: AmmSellParams) {
       associatedTokenProgram: getAddress(ASSOCIATED_TOKEN_PROGRAM_ID),
       eventAuthority,
       program: getAddress(PUMP_AMM_PROGRAM_ID),
+      coinCreatorVaultAta: coinCreatorVaultTokenAccount,
+      coinCreatorVaultAuthority,
+      feeConfig,
+      feeProgram: getAddress(FEE_PROGRAM_ID),
       baseAmountIn: tokenAmountIn,
       minQuoteAmountOut: minQuoteOut,
     },
     { programAddress: getAddress(PUMP_AMM_PROGRAM_ID) }
   );
-
-  const writableAccounts = new Set(
-    [
-      pool,
-      userBaseAta,
-      userQuoteAta,
-      poolBaseAta,
-      poolQuoteAta,
-      protocolFeeRecipientAta,
-    ].map((addr) => getAddress(addr))
-  );
-
-  const baseAccounts = baseInstruction.accounts.map((account) =>
-    writableAccounts.has(getAddress(account.address))
-      ? { ...account, role: AccountRole.WRITABLE }
-      : account
-  );
-
-  const extraAccounts = [
-    {
-      address: coinCreatorVaultTokenAccount,
-      role: AccountRole.WRITABLE,
-    },
-    {
-      address: coinCreatorVaultAuthority,
-      role: AccountRole.READONLY,
-    },
-    {
-      address: feeConfig,
-      role: AccountRole.READONLY,
-    },
-    {
-      address: getAddress(FEE_PROGRAM_ID),
-      role: AccountRole.READONLY,
-    },
-  ];
-
-  return {
-    programAddress: baseInstruction.programAddress,
-    accounts: [...baseAccounts, ...extraAccounts],
-    data: baseInstruction.data,
-  };
+  return baseInstruction;
 }
 
 async function resolvePoolAddress(

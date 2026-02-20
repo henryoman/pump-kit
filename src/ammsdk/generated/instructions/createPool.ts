@@ -10,8 +10,13 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
+  getAddressDecoder,
+  getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU16Decoder,
@@ -29,12 +34,24 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
-  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
+  type WritableAccount,
+  type WritableSignerAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+import {
+  expectAddress,
+  expectSome,
+  getAccountMetaFactory,
+  type ResolvedAccount,
+} from '../shared';
+import {
+  getOptionBoolDecoder,
+  getOptionBoolEncoder,
+  type OptionBool,
+  type OptionBoolArgs,
+} from '../types';
 
 export const CREATE_POOL_DISCRIMINATOR = new Uint8Array([
   233, 146, 209, 142, 207, 104, 64, 188,
@@ -60,10 +77,14 @@ export type CreatePoolInstruction<
   TAccountSystemProgram extends
     | string
     | AccountMeta<string> = '11111111111111111111111111111111',
-  TAccountToken2022Program extends string | AccountMeta<string> = string,
+  TAccountToken2022Program extends
+    | string
+    | AccountMeta<string> = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
   TAccountBaseTokenProgram extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends string | AccountMeta<string> = string,
+  TAccountAssociatedTokenProgram extends
+    | string
+    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -72,13 +93,13 @@ export type CreatePoolInstruction<
   InstructionWithAccounts<
     [
       TAccountPool extends string
-        ? ReadonlyAccount<TAccountPool>
+        ? WritableAccount<TAccountPool>
         : TAccountPool,
       TAccountGlobalConfig extends string
         ? ReadonlyAccount<TAccountGlobalConfig>
         : TAccountGlobalConfig,
       TAccountCreator extends string
-        ? ReadonlySignerAccount<TAccountCreator> &
+        ? WritableSignerAccount<TAccountCreator> &
             AccountSignerMeta<TAccountCreator>
         : TAccountCreator,
       TAccountBaseMint extends string
@@ -88,22 +109,22 @@ export type CreatePoolInstruction<
         ? ReadonlyAccount<TAccountQuoteMint>
         : TAccountQuoteMint,
       TAccountLpMint extends string
-        ? ReadonlyAccount<TAccountLpMint>
+        ? WritableAccount<TAccountLpMint>
         : TAccountLpMint,
       TAccountUserBaseTokenAccount extends string
-        ? ReadonlyAccount<TAccountUserBaseTokenAccount>
+        ? WritableAccount<TAccountUserBaseTokenAccount>
         : TAccountUserBaseTokenAccount,
       TAccountUserQuoteTokenAccount extends string
-        ? ReadonlyAccount<TAccountUserQuoteTokenAccount>
+        ? WritableAccount<TAccountUserQuoteTokenAccount>
         : TAccountUserQuoteTokenAccount,
       TAccountUserPoolTokenAccount extends string
-        ? ReadonlyAccount<TAccountUserPoolTokenAccount>
+        ? WritableAccount<TAccountUserPoolTokenAccount>
         : TAccountUserPoolTokenAccount,
       TAccountPoolBaseTokenAccount extends string
-        ? ReadonlyAccount<TAccountPoolBaseTokenAccount>
+        ? WritableAccount<TAccountPoolBaseTokenAccount>
         : TAccountPoolBaseTokenAccount,
       TAccountPoolQuoteTokenAccount extends string
-        ? ReadonlyAccount<TAccountPoolQuoteTokenAccount>
+        ? WritableAccount<TAccountPoolQuoteTokenAccount>
         : TAccountPoolQuoteTokenAccount,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
@@ -135,12 +156,18 @@ export type CreatePoolInstructionData = {
   index: number;
   baseAmountIn: bigint;
   quoteAmountIn: bigint;
+  coinCreator: Address;
+  isMayhemMode: boolean;
+  isCashbackCoin: OptionBool;
 };
 
 export type CreatePoolInstructionDataArgs = {
   index: number;
   baseAmountIn: number | bigint;
   quoteAmountIn: number | bigint;
+  coinCreator: Address;
+  isMayhemMode: boolean;
+  isCashbackCoin: OptionBoolArgs;
 };
 
 export function getCreatePoolInstructionDataEncoder(): FixedSizeEncoder<CreatePoolInstructionDataArgs> {
@@ -150,6 +177,9 @@ export function getCreatePoolInstructionDataEncoder(): FixedSizeEncoder<CreatePo
       ['index', getU16Encoder()],
       ['baseAmountIn', getU64Encoder()],
       ['quoteAmountIn', getU64Encoder()],
+      ['coinCreator', getAddressEncoder()],
+      ['isMayhemMode', getBooleanEncoder()],
+      ['isCashbackCoin', getOptionBoolEncoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_POOL_DISCRIMINATOR })
   );
@@ -161,6 +191,9 @@ export function getCreatePoolInstructionDataDecoder(): FixedSizeDecoder<CreatePo
     ['index', getU16Decoder()],
     ['baseAmountIn', getU64Decoder()],
     ['quoteAmountIn', getU64Decoder()],
+    ['coinCreator', getAddressDecoder()],
+    ['isMayhemMode', getBooleanDecoder()],
+    ['isCashbackCoin', getOptionBoolDecoder()],
   ]);
 }
 
@@ -172,6 +205,316 @@ export function getCreatePoolInstructionDataCodec(): FixedSizeCodec<
     getCreatePoolInstructionDataEncoder(),
     getCreatePoolInstructionDataDecoder()
   );
+}
+
+export type CreatePoolAsyncInput<
+  TAccountPool extends string = string,
+  TAccountGlobalConfig extends string = string,
+  TAccountCreator extends string = string,
+  TAccountBaseMint extends string = string,
+  TAccountQuoteMint extends string = string,
+  TAccountLpMint extends string = string,
+  TAccountUserBaseTokenAccount extends string = string,
+  TAccountUserQuoteTokenAccount extends string = string,
+  TAccountUserPoolTokenAccount extends string = string,
+  TAccountPoolBaseTokenAccount extends string = string,
+  TAccountPoolQuoteTokenAccount extends string = string,
+  TAccountSystemProgram extends string = string,
+  TAccountToken2022Program extends string = string,
+  TAccountBaseTokenProgram extends string = string,
+  TAccountQuoteTokenProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
+  TAccountEventAuthority extends string = string,
+  TAccountProgram extends string = string,
+> = {
+  pool?: Address<TAccountPool>;
+  globalConfig: Address<TAccountGlobalConfig>;
+  creator: TransactionSigner<TAccountCreator>;
+  baseMint: Address<TAccountBaseMint>;
+  quoteMint: Address<TAccountQuoteMint>;
+  lpMint?: Address<TAccountLpMint>;
+  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
+  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
+  userPoolTokenAccount?: Address<TAccountUserPoolTokenAccount>;
+  poolBaseTokenAccount?: Address<TAccountPoolBaseTokenAccount>;
+  poolQuoteTokenAccount?: Address<TAccountPoolQuoteTokenAccount>;
+  systemProgram?: Address<TAccountSystemProgram>;
+  token2022Program?: Address<TAccountToken2022Program>;
+  baseTokenProgram: Address<TAccountBaseTokenProgram>;
+  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+  eventAuthority?: Address<TAccountEventAuthority>;
+  program: Address<TAccountProgram>;
+  index: CreatePoolInstructionDataArgs['index'];
+  baseAmountIn: CreatePoolInstructionDataArgs['baseAmountIn'];
+  quoteAmountIn: CreatePoolInstructionDataArgs['quoteAmountIn'];
+  coinCreator: CreatePoolInstructionDataArgs['coinCreator'];
+  isMayhemMode: CreatePoolInstructionDataArgs['isMayhemMode'];
+  isCashbackCoin: CreatePoolInstructionDataArgs['isCashbackCoin'];
+};
+
+export async function getCreatePoolInstructionAsync<
+  TAccountPool extends string,
+  TAccountGlobalConfig extends string,
+  TAccountCreator extends string,
+  TAccountBaseMint extends string,
+  TAccountQuoteMint extends string,
+  TAccountLpMint extends string,
+  TAccountUserBaseTokenAccount extends string,
+  TAccountUserQuoteTokenAccount extends string,
+  TAccountUserPoolTokenAccount extends string,
+  TAccountPoolBaseTokenAccount extends string,
+  TAccountPoolQuoteTokenAccount extends string,
+  TAccountSystemProgram extends string,
+  TAccountToken2022Program extends string,
+  TAccountBaseTokenProgram extends string,
+  TAccountQuoteTokenProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
+  TAccountEventAuthority extends string,
+  TAccountProgram extends string,
+  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
+>(
+  input: CreatePoolAsyncInput<
+    TAccountPool,
+    TAccountGlobalConfig,
+    TAccountCreator,
+    TAccountBaseMint,
+    TAccountQuoteMint,
+    TAccountLpMint,
+    TAccountUserBaseTokenAccount,
+    TAccountUserQuoteTokenAccount,
+    TAccountUserPoolTokenAccount,
+    TAccountPoolBaseTokenAccount,
+    TAccountPoolQuoteTokenAccount,
+    TAccountSystemProgram,
+    TAccountToken2022Program,
+    TAccountBaseTokenProgram,
+    TAccountQuoteTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountEventAuthority,
+    TAccountProgram
+  >,
+  config?: { programAddress?: TProgramAddress }
+): Promise<
+  CreatePoolInstruction<
+    TProgramAddress,
+    TAccountPool,
+    TAccountGlobalConfig,
+    TAccountCreator,
+    TAccountBaseMint,
+    TAccountQuoteMint,
+    TAccountLpMint,
+    TAccountUserBaseTokenAccount,
+    TAccountUserQuoteTokenAccount,
+    TAccountUserPoolTokenAccount,
+    TAccountPoolBaseTokenAccount,
+    TAccountPoolQuoteTokenAccount,
+    TAccountSystemProgram,
+    TAccountToken2022Program,
+    TAccountBaseTokenProgram,
+    TAccountQuoteTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountEventAuthority,
+    TAccountProgram
+  >
+> {
+  // Program address.
+  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
+
+  // Original accounts.
+  const originalAccounts = {
+    pool: { value: input.pool ?? null, isWritable: true },
+    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
+    creator: { value: input.creator ?? null, isWritable: true },
+    baseMint: { value: input.baseMint ?? null, isWritable: false },
+    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    lpMint: { value: input.lpMint ?? null, isWritable: true },
+    userBaseTokenAccount: {
+      value: input.userBaseTokenAccount ?? null,
+      isWritable: true,
+    },
+    userQuoteTokenAccount: {
+      value: input.userQuoteTokenAccount ?? null,
+      isWritable: true,
+    },
+    userPoolTokenAccount: {
+      value: input.userPoolTokenAccount ?? null,
+      isWritable: true,
+    },
+    poolBaseTokenAccount: {
+      value: input.poolBaseTokenAccount ?? null,
+      isWritable: true,
+    },
+    poolQuoteTokenAccount: {
+      value: input.poolQuoteTokenAccount ?? null,
+      isWritable: true,
+    },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    token2022Program: {
+      value: input.token2022Program ?? null,
+      isWritable: false,
+    },
+    baseTokenProgram: {
+      value: input.baseTokenProgram ?? null,
+      isWritable: false,
+    },
+    quoteTokenProgram: {
+      value: input.quoteTokenProgram ?? null,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isWritable: false,
+    },
+    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
+    program: { value: input.program ?? null, isWritable: false },
+  };
+  const accounts = originalAccounts as Record<
+    keyof typeof originalAccounts,
+    ResolvedAccount
+  >;
+
+  // Original args.
+  const args = { ...input };
+
+  // Resolve default values.
+  if (!accounts.pool.value) {
+    accounts.pool.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(new Uint8Array([112, 111, 111, 108])),
+        getU16Encoder().encode(expectSome(args.index)),
+        getAddressEncoder().encode(expectAddress(accounts.creator.value)),
+        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
+        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+      ],
+    });
+  }
+  if (!accounts.lpMint.value) {
+    accounts.lpMint.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([
+            112, 111, 111, 108, 95, 108, 112, 95, 109, 105, 110, 116,
+          ])
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
+      ],
+    });
+  }
+  if (!accounts.token2022Program.value) {
+    accounts.token2022Program.value =
+      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+  }
+  if (!accounts.userPoolTokenAccount.value) {
+    accounts.userPoolTokenAccount.value = await getProgramDerivedAddress({
+      programAddress:
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+      seeds: [
+        getAddressEncoder().encode(expectAddress(accounts.creator.value)),
+        getAddressEncoder().encode(
+          expectAddress(accounts.token2022Program.value)
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.lpMint.value)),
+      ],
+    });
+  }
+  if (!accounts.poolBaseTokenAccount.value) {
+    accounts.poolBaseTokenAccount.value = await getProgramDerivedAddress({
+      programAddress:
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+      seeds: [
+        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
+        getAddressEncoder().encode(
+          expectAddress(accounts.baseTokenProgram.value)
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
+      ],
+    });
+  }
+  if (!accounts.poolQuoteTokenAccount.value) {
+    accounts.poolQuoteTokenAccount.value = await getProgramDerivedAddress({
+      programAddress:
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+      seeds: [
+        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
+        getAddressEncoder().encode(
+          expectAddress(accounts.quoteTokenProgram.value)
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+      ],
+    });
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+  }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+  }
+  if (!accounts.eventAuthority.value) {
+    accounts.eventAuthority.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([
+            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
+            105, 116, 121,
+          ])
+        ),
+      ],
+    });
+  }
+
+  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+  return Object.freeze({
+    accounts: [
+      getAccountMeta(accounts.pool),
+      getAccountMeta(accounts.globalConfig),
+      getAccountMeta(accounts.creator),
+      getAccountMeta(accounts.baseMint),
+      getAccountMeta(accounts.quoteMint),
+      getAccountMeta(accounts.lpMint),
+      getAccountMeta(accounts.userBaseTokenAccount),
+      getAccountMeta(accounts.userQuoteTokenAccount),
+      getAccountMeta(accounts.userPoolTokenAccount),
+      getAccountMeta(accounts.poolBaseTokenAccount),
+      getAccountMeta(accounts.poolQuoteTokenAccount),
+      getAccountMeta(accounts.systemProgram),
+      getAccountMeta(accounts.token2022Program),
+      getAccountMeta(accounts.baseTokenProgram),
+      getAccountMeta(accounts.quoteTokenProgram),
+      getAccountMeta(accounts.associatedTokenProgram),
+      getAccountMeta(accounts.eventAuthority),
+      getAccountMeta(accounts.program),
+    ],
+    data: getCreatePoolInstructionDataEncoder().encode(
+      args as CreatePoolInstructionDataArgs
+    ),
+    programAddress,
+  } as CreatePoolInstruction<
+    TProgramAddress,
+    TAccountPool,
+    TAccountGlobalConfig,
+    TAccountCreator,
+    TAccountBaseMint,
+    TAccountQuoteMint,
+    TAccountLpMint,
+    TAccountUserBaseTokenAccount,
+    TAccountUserQuoteTokenAccount,
+    TAccountUserPoolTokenAccount,
+    TAccountPoolBaseTokenAccount,
+    TAccountPoolQuoteTokenAccount,
+    TAccountSystemProgram,
+    TAccountToken2022Program,
+    TAccountBaseTokenProgram,
+    TAccountQuoteTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountEventAuthority,
+    TAccountProgram
+  >);
 }
 
 export type CreatePoolInput<
@@ -206,15 +549,18 @@ export type CreatePoolInput<
   poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
   poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
   systemProgram?: Address<TAccountSystemProgram>;
-  token2022Program: Address<TAccountToken2022Program>;
+  token2022Program?: Address<TAccountToken2022Program>;
   baseTokenProgram: Address<TAccountBaseTokenProgram>;
   quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram: Address<TAccountAssociatedTokenProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   eventAuthority: Address<TAccountEventAuthority>;
   program: Address<TAccountProgram>;
   index: CreatePoolInstructionDataArgs['index'];
   baseAmountIn: CreatePoolInstructionDataArgs['baseAmountIn'];
   quoteAmountIn: CreatePoolInstructionDataArgs['quoteAmountIn'];
+  coinCreator: CreatePoolInstructionDataArgs['coinCreator'];
+  isMayhemMode: CreatePoolInstructionDataArgs['isMayhemMode'];
+  isCashbackCoin: CreatePoolInstructionDataArgs['isCashbackCoin'];
 };
 
 export function getCreatePoolInstruction<
@@ -285,31 +631,31 @@ export function getCreatePoolInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isWritable: true },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    creator: { value: input.creator ?? null, isWritable: false },
+    creator: { value: input.creator ?? null, isWritable: true },
     baseMint: { value: input.baseMint ?? null, isWritable: false },
     quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: false },
+    lpMint: { value: input.lpMint ?? null, isWritable: true },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     userPoolTokenAccount: {
       value: input.userPoolTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     token2022Program: {
@@ -340,9 +686,17 @@ export function getCreatePoolInstruction<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.token2022Program.value) {
+    accounts.token2022Program.value =
+      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+  }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
   }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');

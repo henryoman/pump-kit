@@ -10,8 +10,10 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
+  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
@@ -27,12 +29,23 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
-  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
+  type WritableAccount,
+  type WritableSignerAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+import {
+  expectAddress,
+  getAccountMetaFactory,
+  type ResolvedAccount,
+} from '../shared';
+import {
+  getOptionBoolDecoder,
+  getOptionBoolEncoder,
+  type OptionBool,
+  type OptionBoolArgs,
+} from '../types';
 
 export const BUY_DISCRIMINATOR = new Uint8Array([
   102, 6, 61, 18, 1, 218, 235, 234,
@@ -62,19 +75,33 @@ export type BuyInstruction<
   TAccountSystemProgram extends
     | string
     | AccountMeta<string> = '11111111111111111111111111111111',
-  TAccountAssociatedTokenProgram extends string | AccountMeta<string> = string,
+  TAccountAssociatedTokenProgram extends
+    | string
+    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
   TAccountEventAuthority extends string | AccountMeta<string> = string,
-  TAccountProgram extends string | AccountMeta<string> = string,
+  TAccountProgram extends
+    | string
+    | AccountMeta<string> = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
+  TAccountCoinCreatorVaultAta extends string | AccountMeta<string> = string,
+  TAccountCoinCreatorVaultAuthority extends
+    | string
+    | AccountMeta<string> = string,
+  TAccountGlobalVolumeAccumulator extends string | AccountMeta<string> = string,
+  TAccountUserVolumeAccumulator extends string | AccountMeta<string> = string,
+  TAccountFeeConfig extends string | AccountMeta<string> = string,
+  TAccountFeeProgram extends
+    | string
+    | AccountMeta<string> = 'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ',
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
       TAccountPool extends string
-        ? ReadonlyAccount<TAccountPool>
+        ? WritableAccount<TAccountPool>
         : TAccountPool,
       TAccountUser extends string
-        ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+        ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
         : TAccountUser,
       TAccountGlobalConfig extends string
         ? ReadonlyAccount<TAccountGlobalConfig>
@@ -86,22 +113,22 @@ export type BuyInstruction<
         ? ReadonlyAccount<TAccountQuoteMint>
         : TAccountQuoteMint,
       TAccountUserBaseTokenAccount extends string
-        ? ReadonlyAccount<TAccountUserBaseTokenAccount>
+        ? WritableAccount<TAccountUserBaseTokenAccount>
         : TAccountUserBaseTokenAccount,
       TAccountUserQuoteTokenAccount extends string
-        ? ReadonlyAccount<TAccountUserQuoteTokenAccount>
+        ? WritableAccount<TAccountUserQuoteTokenAccount>
         : TAccountUserQuoteTokenAccount,
       TAccountPoolBaseTokenAccount extends string
-        ? ReadonlyAccount<TAccountPoolBaseTokenAccount>
+        ? WritableAccount<TAccountPoolBaseTokenAccount>
         : TAccountPoolBaseTokenAccount,
       TAccountPoolQuoteTokenAccount extends string
-        ? ReadonlyAccount<TAccountPoolQuoteTokenAccount>
+        ? WritableAccount<TAccountPoolQuoteTokenAccount>
         : TAccountPoolQuoteTokenAccount,
       TAccountProtocolFeeRecipient extends string
         ? ReadonlyAccount<TAccountProtocolFeeRecipient>
         : TAccountProtocolFeeRecipient,
       TAccountProtocolFeeRecipientTokenAccount extends string
-        ? ReadonlyAccount<TAccountProtocolFeeRecipientTokenAccount>
+        ? WritableAccount<TAccountProtocolFeeRecipientTokenAccount>
         : TAccountProtocolFeeRecipientTokenAccount,
       TAccountBaseTokenProgram extends string
         ? ReadonlyAccount<TAccountBaseTokenProgram>
@@ -121,6 +148,24 @@ export type BuyInstruction<
       TAccountProgram extends string
         ? ReadonlyAccount<TAccountProgram>
         : TAccountProgram,
+      TAccountCoinCreatorVaultAta extends string
+        ? WritableAccount<TAccountCoinCreatorVaultAta>
+        : TAccountCoinCreatorVaultAta,
+      TAccountCoinCreatorVaultAuthority extends string
+        ? ReadonlyAccount<TAccountCoinCreatorVaultAuthority>
+        : TAccountCoinCreatorVaultAuthority,
+      TAccountGlobalVolumeAccumulator extends string
+        ? ReadonlyAccount<TAccountGlobalVolumeAccumulator>
+        : TAccountGlobalVolumeAccumulator,
+      TAccountUserVolumeAccumulator extends string
+        ? WritableAccount<TAccountUserVolumeAccumulator>
+        : TAccountUserVolumeAccumulator,
+      TAccountFeeConfig extends string
+        ? ReadonlyAccount<TAccountFeeConfig>
+        : TAccountFeeConfig,
+      TAccountFeeProgram extends string
+        ? ReadonlyAccount<TAccountFeeProgram>
+        : TAccountFeeProgram,
       ...TRemainingAccounts,
     ]
   >;
@@ -129,11 +174,13 @@ export type BuyInstructionData = {
   discriminator: ReadonlyUint8Array;
   baseAmountOut: bigint;
   maxQuoteAmountIn: bigint;
+  trackVolume: OptionBool;
 };
 
 export type BuyInstructionDataArgs = {
   baseAmountOut: number | bigint;
   maxQuoteAmountIn: number | bigint;
+  trackVolume: OptionBoolArgs;
 };
 
 export function getBuyInstructionDataEncoder(): FixedSizeEncoder<BuyInstructionDataArgs> {
@@ -142,6 +189,7 @@ export function getBuyInstructionDataEncoder(): FixedSizeEncoder<BuyInstructionD
       ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
       ['baseAmountOut', getU64Encoder()],
       ['maxQuoteAmountIn', getU64Encoder()],
+      ['trackVolume', getOptionBoolEncoder()],
     ]),
     (value) => ({ ...value, discriminator: BUY_DISCRIMINATOR })
   );
@@ -152,6 +200,7 @@ export function getBuyInstructionDataDecoder(): FixedSizeDecoder<BuyInstructionD
     ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
     ['baseAmountOut', getU64Decoder()],
     ['maxQuoteAmountIn', getU64Decoder()],
+    ['trackVolume', getOptionBoolDecoder()],
   ]);
 }
 
@@ -165,7 +214,7 @@ export function getBuyInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type BuyInput<
+export type BuyAsyncInput<
   TAccountPool extends string = string,
   TAccountUser extends string = string,
   TAccountGlobalConfig extends string = string,
@@ -183,6 +232,12 @@ export type BuyInput<
   TAccountAssociatedTokenProgram extends string = string,
   TAccountEventAuthority extends string = string,
   TAccountProgram extends string = string,
+  TAccountCoinCreatorVaultAta extends string = string,
+  TAccountCoinCreatorVaultAuthority extends string = string,
+  TAccountGlobalVolumeAccumulator extends string = string,
+  TAccountUserVolumeAccumulator extends string = string,
+  TAccountFeeConfig extends string = string,
+  TAccountFeeProgram extends string = string,
 > = {
   pool: Address<TAccountPool>;
   user: TransactionSigner<TAccountUser>;
@@ -194,18 +249,25 @@ export type BuyInput<
   poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
   poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
   protocolFeeRecipient: Address<TAccountProtocolFeeRecipient>;
-  protocolFeeRecipientTokenAccount: Address<TAccountProtocolFeeRecipientTokenAccount>;
+  protocolFeeRecipientTokenAccount?: Address<TAccountProtocolFeeRecipientTokenAccount>;
   baseTokenProgram: Address<TAccountBaseTokenProgram>;
   quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
-  associatedTokenProgram: Address<TAccountAssociatedTokenProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+  eventAuthority?: Address<TAccountEventAuthority>;
+  program?: Address<TAccountProgram>;
+  coinCreatorVaultAta?: Address<TAccountCoinCreatorVaultAta>;
+  coinCreatorVaultAuthority: Address<TAccountCoinCreatorVaultAuthority>;
+  globalVolumeAccumulator?: Address<TAccountGlobalVolumeAccumulator>;
+  userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
+  feeConfig?: Address<TAccountFeeConfig>;
+  feeProgram?: Address<TAccountFeeProgram>;
   baseAmountOut: BuyInstructionDataArgs['baseAmountOut'];
   maxQuoteAmountIn: BuyInstructionDataArgs['maxQuoteAmountIn'];
+  trackVolume: BuyInstructionDataArgs['trackVolume'];
 };
 
-export function getBuyInstruction<
+export async function getBuyInstructionAsync<
   TAccountPool extends string,
   TAccountUser extends string,
   TAccountGlobalConfig extends string,
@@ -223,9 +285,15 @@ export function getBuyInstruction<
   TAccountAssociatedTokenProgram extends string,
   TAccountEventAuthority extends string,
   TAccountProgram extends string,
+  TAccountCoinCreatorVaultAta extends string,
+  TAccountCoinCreatorVaultAuthority extends string,
+  TAccountGlobalVolumeAccumulator extends string,
+  TAccountUserVolumeAccumulator extends string,
+  TAccountFeeConfig extends string,
+  TAccountFeeProgram extends string,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
-  input: BuyInput<
+  input: BuyAsyncInput<
     TAccountPool,
     TAccountUser,
     TAccountGlobalConfig,
@@ -242,54 +310,68 @@ export function getBuyInstruction<
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountCoinCreatorVaultAta,
+    TAccountCoinCreatorVaultAuthority,
+    TAccountGlobalVolumeAccumulator,
+    TAccountUserVolumeAccumulator,
+    TAccountFeeConfig,
+    TAccountFeeProgram
   >,
   config?: { programAddress?: TProgramAddress }
-): BuyInstruction<
-  TProgramAddress,
-  TAccountPool,
-  TAccountUser,
-  TAccountGlobalConfig,
-  TAccountBaseMint,
-  TAccountQuoteMint,
-  TAccountUserBaseTokenAccount,
-  TAccountUserQuoteTokenAccount,
-  TAccountPoolBaseTokenAccount,
-  TAccountPoolQuoteTokenAccount,
-  TAccountProtocolFeeRecipient,
-  TAccountProtocolFeeRecipientTokenAccount,
-  TAccountBaseTokenProgram,
-  TAccountQuoteTokenProgram,
-  TAccountSystemProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+): Promise<
+  BuyInstruction<
+    TProgramAddress,
+    TAccountPool,
+    TAccountUser,
+    TAccountGlobalConfig,
+    TAccountBaseMint,
+    TAccountQuoteMint,
+    TAccountUserBaseTokenAccount,
+    TAccountUserQuoteTokenAccount,
+    TAccountPoolBaseTokenAccount,
+    TAccountPoolQuoteTokenAccount,
+    TAccountProtocolFeeRecipient,
+    TAccountProtocolFeeRecipientTokenAccount,
+    TAccountBaseTokenProgram,
+    TAccountQuoteTokenProgram,
+    TAccountSystemProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountEventAuthority,
+    TAccountProgram,
+    TAccountCoinCreatorVaultAta,
+    TAccountCoinCreatorVaultAuthority,
+    TAccountGlobalVolumeAccumulator,
+    TAccountUserVolumeAccumulator,
+    TAccountFeeConfig,
+    TAccountFeeProgram
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
-    user: { value: input.user ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isWritable: true },
+    user: { value: input.user ?? null, isWritable: true },
     globalConfig: { value: input.globalConfig ?? null, isWritable: false },
     baseMint: { value: input.baseMint ?? null, isWritable: false },
     quoteMint: { value: input.quoteMint ?? null, isWritable: false },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     protocolFeeRecipient: {
       value: input.protocolFeeRecipient ?? null,
@@ -297,7 +379,7 @@ export function getBuyInstruction<
     },
     protocolFeeRecipientTokenAccount: {
       value: input.protocolFeeRecipientTokenAccount ?? null,
-      isWritable: false,
+      isWritable: true,
     },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
@@ -314,6 +396,24 @@ export function getBuyInstruction<
     },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
+    coinCreatorVaultAta: {
+      value: input.coinCreatorVaultAta ?? null,
+      isWritable: true,
+    },
+    coinCreatorVaultAuthority: {
+      value: input.coinCreatorVaultAuthority ?? null,
+      isWritable: false,
+    },
+    globalVolumeAccumulator: {
+      value: input.globalVolumeAccumulator ?? null,
+      isWritable: false,
+    },
+    userVolumeAccumulator: {
+      value: input.userVolumeAccumulator ?? null,
+      isWritable: true,
+    },
+    feeConfig: { value: input.feeConfig ?? null, isWritable: false },
+    feeProgram: { value: input.feeProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -324,9 +424,110 @@ export function getBuyInstruction<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.protocolFeeRecipientTokenAccount.value) {
+    accounts.protocolFeeRecipientTokenAccount.value =
+      await getProgramDerivedAddress({
+        programAddress:
+          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        seeds: [
+          getAddressEncoder().encode(
+            expectAddress(accounts.protocolFeeRecipient.value)
+          ),
+          getAddressEncoder().encode(
+            expectAddress(accounts.quoteTokenProgram.value)
+          ),
+          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+        ],
+      });
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+  }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+  }
+  if (!accounts.eventAuthority.value) {
+    accounts.eventAuthority.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([
+            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
+            105, 116, 121,
+          ])
+        ),
+      ],
+    });
+  }
+  if (!accounts.program.value) {
+    accounts.program.value =
+      'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
+  }
+  if (!accounts.coinCreatorVaultAta.value) {
+    accounts.coinCreatorVaultAta.value = await getProgramDerivedAddress({
+      programAddress:
+        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+      seeds: [
+        getAddressEncoder().encode(
+          expectAddress(accounts.coinCreatorVaultAuthority.value)
+        ),
+        getAddressEncoder().encode(
+          expectAddress(accounts.quoteTokenProgram.value)
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+      ],
+    });
+  }
+  if (!accounts.globalVolumeAccumulator.value) {
+    accounts.globalVolumeAccumulator.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([
+            103, 108, 111, 98, 97, 108, 95, 118, 111, 108, 117, 109, 101, 95,
+            97, 99, 99, 117, 109, 117, 108, 97, 116, 111, 114,
+          ])
+        ),
+      ],
+    });
+  }
+  if (!accounts.userVolumeAccumulator.value) {
+    accounts.userVolumeAccumulator.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([
+            117, 115, 101, 114, 95, 118, 111, 108, 117, 109, 101, 95, 97, 99,
+            99, 117, 109, 117, 108, 97, 116, 111, 114,
+          ])
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.user.value)),
+      ],
+    });
+  }
+  if (!accounts.feeConfig.value) {
+    accounts.feeConfig.value = await getProgramDerivedAddress({
+      programAddress:
+        'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([102, 101, 101, 95, 99, 111, 110, 102, 105, 103])
+        ),
+        getBytesEncoder().encode(
+          new Uint8Array([
+            12, 20, 222, 252, 130, 94, 198, 118, 148, 37, 8, 24, 187, 101, 64,
+            101, 244, 41, 141, 49, 86, 213, 113, 180, 212, 248, 9, 12, 24, 233,
+            168, 99,
+          ])
+        ),
+      ],
+    });
+  }
+  if (!accounts.feeProgram.value) {
+    accounts.feeProgram.value =
+      'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>;
   }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
@@ -349,6 +550,12 @@ export function getBuyInstruction<
       getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.eventAuthority),
       getAccountMeta(accounts.program),
+      getAccountMeta(accounts.coinCreatorVaultAta),
+      getAccountMeta(accounts.coinCreatorVaultAuthority),
+      getAccountMeta(accounts.globalVolumeAccumulator),
+      getAccountMeta(accounts.userVolumeAccumulator),
+      getAccountMeta(accounts.feeConfig),
+      getAccountMeta(accounts.feeProgram),
     ],
     data: getBuyInstructionDataEncoder().encode(args as BuyInstructionDataArgs),
     programAddress,
@@ -370,7 +577,295 @@ export function getBuyInstruction<
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountCoinCreatorVaultAta,
+    TAccountCoinCreatorVaultAuthority,
+    TAccountGlobalVolumeAccumulator,
+    TAccountUserVolumeAccumulator,
+    TAccountFeeConfig,
+    TAccountFeeProgram
+  >);
+}
+
+export type BuyInput<
+  TAccountPool extends string = string,
+  TAccountUser extends string = string,
+  TAccountGlobalConfig extends string = string,
+  TAccountBaseMint extends string = string,
+  TAccountQuoteMint extends string = string,
+  TAccountUserBaseTokenAccount extends string = string,
+  TAccountUserQuoteTokenAccount extends string = string,
+  TAccountPoolBaseTokenAccount extends string = string,
+  TAccountPoolQuoteTokenAccount extends string = string,
+  TAccountProtocolFeeRecipient extends string = string,
+  TAccountProtocolFeeRecipientTokenAccount extends string = string,
+  TAccountBaseTokenProgram extends string = string,
+  TAccountQuoteTokenProgram extends string = string,
+  TAccountSystemProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
+  TAccountEventAuthority extends string = string,
+  TAccountProgram extends string = string,
+  TAccountCoinCreatorVaultAta extends string = string,
+  TAccountCoinCreatorVaultAuthority extends string = string,
+  TAccountGlobalVolumeAccumulator extends string = string,
+  TAccountUserVolumeAccumulator extends string = string,
+  TAccountFeeConfig extends string = string,
+  TAccountFeeProgram extends string = string,
+> = {
+  pool: Address<TAccountPool>;
+  user: TransactionSigner<TAccountUser>;
+  globalConfig: Address<TAccountGlobalConfig>;
+  baseMint: Address<TAccountBaseMint>;
+  quoteMint: Address<TAccountQuoteMint>;
+  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
+  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
+  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
+  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
+  protocolFeeRecipient: Address<TAccountProtocolFeeRecipient>;
+  protocolFeeRecipientTokenAccount: Address<TAccountProtocolFeeRecipientTokenAccount>;
+  baseTokenProgram: Address<TAccountBaseTokenProgram>;
+  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
+  systemProgram?: Address<TAccountSystemProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+  eventAuthority: Address<TAccountEventAuthority>;
+  program?: Address<TAccountProgram>;
+  coinCreatorVaultAta: Address<TAccountCoinCreatorVaultAta>;
+  coinCreatorVaultAuthority: Address<TAccountCoinCreatorVaultAuthority>;
+  globalVolumeAccumulator: Address<TAccountGlobalVolumeAccumulator>;
+  userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
+  feeConfig: Address<TAccountFeeConfig>;
+  feeProgram?: Address<TAccountFeeProgram>;
+  baseAmountOut: BuyInstructionDataArgs['baseAmountOut'];
+  maxQuoteAmountIn: BuyInstructionDataArgs['maxQuoteAmountIn'];
+  trackVolume: BuyInstructionDataArgs['trackVolume'];
+};
+
+export function getBuyInstruction<
+  TAccountPool extends string,
+  TAccountUser extends string,
+  TAccountGlobalConfig extends string,
+  TAccountBaseMint extends string,
+  TAccountQuoteMint extends string,
+  TAccountUserBaseTokenAccount extends string,
+  TAccountUserQuoteTokenAccount extends string,
+  TAccountPoolBaseTokenAccount extends string,
+  TAccountPoolQuoteTokenAccount extends string,
+  TAccountProtocolFeeRecipient extends string,
+  TAccountProtocolFeeRecipientTokenAccount extends string,
+  TAccountBaseTokenProgram extends string,
+  TAccountQuoteTokenProgram extends string,
+  TAccountSystemProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
+  TAccountEventAuthority extends string,
+  TAccountProgram extends string,
+  TAccountCoinCreatorVaultAta extends string,
+  TAccountCoinCreatorVaultAuthority extends string,
+  TAccountGlobalVolumeAccumulator extends string,
+  TAccountUserVolumeAccumulator extends string,
+  TAccountFeeConfig extends string,
+  TAccountFeeProgram extends string,
+  TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
+>(
+  input: BuyInput<
+    TAccountPool,
+    TAccountUser,
+    TAccountGlobalConfig,
+    TAccountBaseMint,
+    TAccountQuoteMint,
+    TAccountUserBaseTokenAccount,
+    TAccountUserQuoteTokenAccount,
+    TAccountPoolBaseTokenAccount,
+    TAccountPoolQuoteTokenAccount,
+    TAccountProtocolFeeRecipient,
+    TAccountProtocolFeeRecipientTokenAccount,
+    TAccountBaseTokenProgram,
+    TAccountQuoteTokenProgram,
+    TAccountSystemProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountEventAuthority,
+    TAccountProgram,
+    TAccountCoinCreatorVaultAta,
+    TAccountCoinCreatorVaultAuthority,
+    TAccountGlobalVolumeAccumulator,
+    TAccountUserVolumeAccumulator,
+    TAccountFeeConfig,
+    TAccountFeeProgram
+  >,
+  config?: { programAddress?: TProgramAddress }
+): BuyInstruction<
+  TProgramAddress,
+  TAccountPool,
+  TAccountUser,
+  TAccountGlobalConfig,
+  TAccountBaseMint,
+  TAccountQuoteMint,
+  TAccountUserBaseTokenAccount,
+  TAccountUserQuoteTokenAccount,
+  TAccountPoolBaseTokenAccount,
+  TAccountPoolQuoteTokenAccount,
+  TAccountProtocolFeeRecipient,
+  TAccountProtocolFeeRecipientTokenAccount,
+  TAccountBaseTokenProgram,
+  TAccountQuoteTokenProgram,
+  TAccountSystemProgram,
+  TAccountAssociatedTokenProgram,
+  TAccountEventAuthority,
+  TAccountProgram,
+  TAccountCoinCreatorVaultAta,
+  TAccountCoinCreatorVaultAuthority,
+  TAccountGlobalVolumeAccumulator,
+  TAccountUserVolumeAccumulator,
+  TAccountFeeConfig,
+  TAccountFeeProgram
+> {
+  // Program address.
+  const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
+
+  // Original accounts.
+  const originalAccounts = {
+    pool: { value: input.pool ?? null, isWritable: true },
+    user: { value: input.user ?? null, isWritable: true },
+    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
+    baseMint: { value: input.baseMint ?? null, isWritable: false },
+    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    userBaseTokenAccount: {
+      value: input.userBaseTokenAccount ?? null,
+      isWritable: true,
+    },
+    userQuoteTokenAccount: {
+      value: input.userQuoteTokenAccount ?? null,
+      isWritable: true,
+    },
+    poolBaseTokenAccount: {
+      value: input.poolBaseTokenAccount ?? null,
+      isWritable: true,
+    },
+    poolQuoteTokenAccount: {
+      value: input.poolQuoteTokenAccount ?? null,
+      isWritable: true,
+    },
+    protocolFeeRecipient: {
+      value: input.protocolFeeRecipient ?? null,
+      isWritable: false,
+    },
+    protocolFeeRecipientTokenAccount: {
+      value: input.protocolFeeRecipientTokenAccount ?? null,
+      isWritable: true,
+    },
+    baseTokenProgram: {
+      value: input.baseTokenProgram ?? null,
+      isWritable: false,
+    },
+    quoteTokenProgram: {
+      value: input.quoteTokenProgram ?? null,
+      isWritable: false,
+    },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isWritable: false,
+    },
+    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
+    program: { value: input.program ?? null, isWritable: false },
+    coinCreatorVaultAta: {
+      value: input.coinCreatorVaultAta ?? null,
+      isWritable: true,
+    },
+    coinCreatorVaultAuthority: {
+      value: input.coinCreatorVaultAuthority ?? null,
+      isWritable: false,
+    },
+    globalVolumeAccumulator: {
+      value: input.globalVolumeAccumulator ?? null,
+      isWritable: false,
+    },
+    userVolumeAccumulator: {
+      value: input.userVolumeAccumulator ?? null,
+      isWritable: true,
+    },
+    feeConfig: { value: input.feeConfig ?? null, isWritable: false },
+    feeProgram: { value: input.feeProgram ?? null, isWritable: false },
+  };
+  const accounts = originalAccounts as Record<
+    keyof typeof originalAccounts,
+    ResolvedAccount
+  >;
+
+  // Original args.
+  const args = { ...input };
+
+  // Resolve default values.
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+  }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+  }
+  if (!accounts.program.value) {
+    accounts.program.value =
+      'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
+  }
+  if (!accounts.feeProgram.value) {
+    accounts.feeProgram.value =
+      'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>;
+  }
+
+  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+  return Object.freeze({
+    accounts: [
+      getAccountMeta(accounts.pool),
+      getAccountMeta(accounts.user),
+      getAccountMeta(accounts.globalConfig),
+      getAccountMeta(accounts.baseMint),
+      getAccountMeta(accounts.quoteMint),
+      getAccountMeta(accounts.userBaseTokenAccount),
+      getAccountMeta(accounts.userQuoteTokenAccount),
+      getAccountMeta(accounts.poolBaseTokenAccount),
+      getAccountMeta(accounts.poolQuoteTokenAccount),
+      getAccountMeta(accounts.protocolFeeRecipient),
+      getAccountMeta(accounts.protocolFeeRecipientTokenAccount),
+      getAccountMeta(accounts.baseTokenProgram),
+      getAccountMeta(accounts.quoteTokenProgram),
+      getAccountMeta(accounts.systemProgram),
+      getAccountMeta(accounts.associatedTokenProgram),
+      getAccountMeta(accounts.eventAuthority),
+      getAccountMeta(accounts.program),
+      getAccountMeta(accounts.coinCreatorVaultAta),
+      getAccountMeta(accounts.coinCreatorVaultAuthority),
+      getAccountMeta(accounts.globalVolumeAccumulator),
+      getAccountMeta(accounts.userVolumeAccumulator),
+      getAccountMeta(accounts.feeConfig),
+      getAccountMeta(accounts.feeProgram),
+    ],
+    data: getBuyInstructionDataEncoder().encode(args as BuyInstructionDataArgs),
+    programAddress,
+  } as BuyInstruction<
+    TProgramAddress,
+    TAccountPool,
+    TAccountUser,
+    TAccountGlobalConfig,
+    TAccountBaseMint,
+    TAccountQuoteMint,
+    TAccountUserBaseTokenAccount,
+    TAccountUserQuoteTokenAccount,
+    TAccountPoolBaseTokenAccount,
+    TAccountPoolQuoteTokenAccount,
+    TAccountProtocolFeeRecipient,
+    TAccountProtocolFeeRecipientTokenAccount,
+    TAccountBaseTokenProgram,
+    TAccountQuoteTokenProgram,
+    TAccountSystemProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountEventAuthority,
+    TAccountProgram,
+    TAccountCoinCreatorVaultAta,
+    TAccountCoinCreatorVaultAuthority,
+    TAccountGlobalVolumeAccumulator,
+    TAccountUserVolumeAccumulator,
+    TAccountFeeConfig,
+    TAccountFeeProgram
   >);
 }
 
@@ -397,6 +892,12 @@ export type ParsedBuyInstruction<
     associatedTokenProgram: TAccountMetas[14];
     eventAuthority: TAccountMetas[15];
     program: TAccountMetas[16];
+    coinCreatorVaultAta: TAccountMetas[17];
+    coinCreatorVaultAuthority: TAccountMetas[18];
+    globalVolumeAccumulator: TAccountMetas[19];
+    userVolumeAccumulator: TAccountMetas[20];
+    feeConfig: TAccountMetas[21];
+    feeProgram: TAccountMetas[22];
   };
   data: BuyInstructionData;
 };
@@ -409,7 +910,7 @@ export function parseBuyInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedBuyInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 17) {
+  if (instruction.accounts.length < 23) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -439,6 +940,12 @@ export function parseBuyInstruction<
       associatedTokenProgram: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
+      coinCreatorVaultAta: getNextAccount(),
+      coinCreatorVaultAuthority: getNextAccount(),
+      globalVolumeAccumulator: getNextAccount(),
+      userVolumeAccumulator: getNextAccount(),
+      feeConfig: getNextAccount(),
+      feeProgram: getNextAccount(),
     },
     data: getBuyInstructionDataDecoder().decode(instruction.data),
   };

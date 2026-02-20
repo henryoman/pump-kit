@@ -68,6 +68,12 @@ export type Global = {
   feeRecipients: Array<Address>;
   setCreatorAuthority: Address;
   adminSetCreatorAuthority: Address;
+  createV2Enabled: boolean;
+  whitelistPda: Address;
+  reservedFeeRecipient: Address;
+  mayhemModeEnabled: boolean;
+  reservedFeeRecipients: Array<Address>;
+  isCashbackEnabled: boolean;
 };
 
 export type GlobalArgs = {
@@ -88,6 +94,12 @@ export type GlobalArgs = {
   feeRecipients: Array<Address>;
   setCreatorAuthority: Address;
   adminSetCreatorAuthority: Address;
+  createV2Enabled: boolean;
+  whitelistPda: Address;
+  reservedFeeRecipient: Address;
+  mayhemModeEnabled: boolean;
+  reservedFeeRecipients: Array<Address>;
+  isCashbackEnabled: boolean;
 };
 
 export function getGlobalEncoder(): FixedSizeEncoder<GlobalArgs> {
@@ -109,6 +121,15 @@ export function getGlobalEncoder(): FixedSizeEncoder<GlobalArgs> {
       ['feeRecipients', getArrayEncoder(getAddressEncoder(), { size: 7 })],
       ['setCreatorAuthority', getAddressEncoder()],
       ['adminSetCreatorAuthority', getAddressEncoder()],
+      ['createV2Enabled', getBooleanEncoder()],
+      ['whitelistPda', getAddressEncoder()],
+      ['reservedFeeRecipient', getAddressEncoder()],
+      ['mayhemModeEnabled', getBooleanEncoder()],
+      [
+        'reservedFeeRecipients',
+        getArrayEncoder(getAddressEncoder(), { size: 7 }),
+      ],
+      ['isCashbackEnabled', getBooleanEncoder()],
     ]),
     (value) => ({ ...value, discriminator: GLOBAL_DISCRIMINATOR })
   );
@@ -132,6 +153,15 @@ export function getGlobalDecoder(): FixedSizeDecoder<Global> {
     ['feeRecipients', getArrayDecoder(getAddressDecoder(), { size: 7 })],
     ['setCreatorAuthority', getAddressDecoder()],
     ['adminSetCreatorAuthority', getAddressDecoder()],
+    ['createV2Enabled', getBooleanDecoder()],
+    ['whitelistPda', getAddressDecoder()],
+    ['reservedFeeRecipient', getAddressDecoder()],
+    ['mayhemModeEnabled', getBooleanDecoder()],
+    [
+      'reservedFeeRecipients',
+      getArrayDecoder(getAddressDecoder(), { size: 7 }),
+    ],
+    ['isCashbackEnabled', getBooleanDecoder()],
   ]);
 }
 
@@ -193,5 +223,5 @@ export async function fetchAllMaybeGlobal(
 }
 
 export function getGlobalSize(): number {
-  return 450;
+  return 741;
 }

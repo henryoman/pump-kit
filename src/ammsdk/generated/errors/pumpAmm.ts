@@ -14,85 +14,160 @@ import {
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 
-/** FeeBasisPointsExceedsMaximum */
+/** FeeBasisPointsExceedsMaximum:  */
 export const PUMP_AMM_ERROR__FEE_BASIS_POINTS_EXCEEDS_MAXIMUM = 0x1770; // 6000
-/** ZeroBaseAmount */
+/** ZeroBaseAmount:  */
 export const PUMP_AMM_ERROR__ZERO_BASE_AMOUNT = 0x1771; // 6001
-/** ZeroQuoteAmount */
+/** ZeroQuoteAmount:  */
 export const PUMP_AMM_ERROR__ZERO_QUOTE_AMOUNT = 0x1772; // 6002
-/** TooLittlePoolTokenLiquidity */
+/** TooLittlePoolTokenLiquidity:  */
 export const PUMP_AMM_ERROR__TOO_LITTLE_POOL_TOKEN_LIQUIDITY = 0x1773; // 6003
-/** ExceededSlippage */
+/** ExceededSlippage:  */
 export const PUMP_AMM_ERROR__EXCEEDED_SLIPPAGE = 0x1774; // 6004
-/** InvalidAdmin */
+/** InvalidAdmin:  */
 export const PUMP_AMM_ERROR__INVALID_ADMIN = 0x1775; // 6005
-/** UnsupportedBaseMint */
+/** UnsupportedBaseMint:  */
 export const PUMP_AMM_ERROR__UNSUPPORTED_BASE_MINT = 0x1776; // 6006
-/** UnsupportedQuoteMint */
+/** UnsupportedQuoteMint:  */
 export const PUMP_AMM_ERROR__UNSUPPORTED_QUOTE_MINT = 0x1777; // 6007
-/** InvalidBaseMint */
+/** InvalidBaseMint:  */
 export const PUMP_AMM_ERROR__INVALID_BASE_MINT = 0x1778; // 6008
-/** InvalidQuoteMint */
+/** InvalidQuoteMint:  */
 export const PUMP_AMM_ERROR__INVALID_QUOTE_MINT = 0x1779; // 6009
-/** InvalidLpMint */
+/** InvalidLpMint:  */
 export const PUMP_AMM_ERROR__INVALID_LP_MINT = 0x177a; // 6010
-/** AllProtocolFeeRecipientsShouldBeNonZero */
+/** AllProtocolFeeRecipientsShouldBeNonZero:  */
 export const PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO = 0x177b; // 6011
-/** UnsortedNotUniqueProtocolFeeRecipients */
+/** UnsortedNotUniqueProtocolFeeRecipients:  */
 export const PUMP_AMM_ERROR__UNSORTED_NOT_UNIQUE_PROTOCOL_FEE_RECIPIENTS = 0x177c; // 6012
-/** InvalidProtocolFeeRecipient */
+/** InvalidProtocolFeeRecipient:  */
 export const PUMP_AMM_ERROR__INVALID_PROTOCOL_FEE_RECIPIENT = 0x177d; // 6013
-/** InvalidPoolBaseTokenAccount */
+/** InvalidPoolBaseTokenAccount:  */
 export const PUMP_AMM_ERROR__INVALID_POOL_BASE_TOKEN_ACCOUNT = 0x177e; // 6014
-/** InvalidPoolQuoteTokenAccount */
+/** InvalidPoolQuoteTokenAccount:  */
 export const PUMP_AMM_ERROR__INVALID_POOL_QUOTE_TOKEN_ACCOUNT = 0x177f; // 6015
-/** BuyMoreBaseAmountThanPoolReserves */
+/** BuyMoreBaseAmountThanPoolReserves:  */
 export const PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES = 0x1780; // 6016
-/** DisabledCreatePool */
+/** DisabledCreatePool:  */
 export const PUMP_AMM_ERROR__DISABLED_CREATE_POOL = 0x1781; // 6017
-/** DisabledDeposit */
+/** DisabledDeposit:  */
 export const PUMP_AMM_ERROR__DISABLED_DEPOSIT = 0x1782; // 6018
-/** DisabledWithdraw */
+/** DisabledWithdraw:  */
 export const PUMP_AMM_ERROR__DISABLED_WITHDRAW = 0x1783; // 6019
-/** DisabledBuy */
+/** DisabledBuy:  */
 export const PUMP_AMM_ERROR__DISABLED_BUY = 0x1784; // 6020
-/** DisabledSell */
+/** DisabledSell:  */
 export const PUMP_AMM_ERROR__DISABLED_SELL = 0x1785; // 6021
-/** SameMint */
+/** SameMint:  */
 export const PUMP_AMM_ERROR__SAME_MINT = 0x1786; // 6022
-/** Overflow */
+/** Overflow:  */
 export const PUMP_AMM_ERROR__OVERFLOW = 0x1787; // 6023
-/** Truncation */
+/** Truncation:  */
 export const PUMP_AMM_ERROR__TRUNCATION = 0x1788; // 6024
-/** DivisionByZero */
+/** DivisionByZero:  */
 export const PUMP_AMM_ERROR__DIVISION_BY_ZERO = 0x1789; // 6025
-/** NewSizeLessThanCurrentSize */
+/** NewSizeLessThanCurrentSize:  */
 export const PUMP_AMM_ERROR__NEW_SIZE_LESS_THAN_CURRENT_SIZE = 0x178a; // 6026
-/** AccountTypeNotSupported */
+/** AccountTypeNotSupported:  */
 export const PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED = 0x178b; // 6027
+/** OnlyCanonicalPumpPoolsCanHaveCoinCreator:  */
+export const PUMP_AMM_ERROR__ONLY_CANONICAL_PUMP_POOLS_CAN_HAVE_COIN_CREATOR = 0x178c; // 6028
+/** InvalidAdminSetCoinCreatorAuthority:  */
+export const PUMP_AMM_ERROR__INVALID_ADMIN_SET_COIN_CREATOR_AUTHORITY = 0x178d; // 6029
+/** StartTimeInThePast:  */
+export const PUMP_AMM_ERROR__START_TIME_IN_THE_PAST = 0x178e; // 6030
+/** EndTimeInThePast:  */
+export const PUMP_AMM_ERROR__END_TIME_IN_THE_PAST = 0x178f; // 6031
+/** EndTimeBeforeStartTime:  */
+export const PUMP_AMM_ERROR__END_TIME_BEFORE_START_TIME = 0x1790; // 6032
+/** TimeRangeTooLarge:  */
+export const PUMP_AMM_ERROR__TIME_RANGE_TOO_LARGE = 0x1791; // 6033
+/** EndTimeBeforeCurrentDay:  */
+export const PUMP_AMM_ERROR__END_TIME_BEFORE_CURRENT_DAY = 0x1792; // 6034
+/** SupplyUpdateForFinishedRange:  */
+export const PUMP_AMM_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE = 0x1793; // 6035
+/** DayIndexAfterEndIndex:  */
+export const PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX = 0x1794; // 6036
+/** DayInActiveRange:  */
+export const PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE = 0x1795; // 6037
+/** InvalidIncentiveMint:  */
+export const PUMP_AMM_ERROR__INVALID_INCENTIVE_MINT = 0x1796; // 6038
+/** BuyNotEnoughQuoteTokensToCoverFees: buy: Not enough quote tokens to cover for fees. */
+export const PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES = 0x1797; // 6039
+/** BuySlippageBelowMinBaseAmountOut: buy: slippage - would buy less tokens than expected min_base_amount_out */
+export const PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT = 0x1798; // 6040
+/** MayhemModeDisabled:  */
+export const PUMP_AMM_ERROR__MAYHEM_MODE_DISABLED = 0x1799; // 6041
+/** OnlyPumpPoolsMayhemMode:  */
+export const PUMP_AMM_ERROR__ONLY_PUMP_POOLS_MAYHEM_MODE = 0x179a; // 6042
+/** MayhemModeInDesiredState:  */
+export const PUMP_AMM_ERROR__MAYHEM_MODE_IN_DESIRED_STATE = 0x179b; // 6043
+/** NotEnoughRemainingAccounts:  */
+export const PUMP_AMM_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS = 0x179c; // 6044
+/** InvalidSharingConfigBaseMint:  */
+export const PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_BASE_MINT = 0x179d; // 6045
+/** InvalidSharingConfigCoinCreator:  */
+export const PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_COIN_CREATOR = 0x179e; // 6046
+/** CoinCreatorMigratedToSharingConfig: coin creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead */
+export const PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG = 0x179f; // 6047
+/** CreatorVaultMigratedToSharingConfig: creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead */
+export const PUMP_AMM_ERROR__CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG = 0x17a0; // 6048
+/** CashbackNotEnabled: Cashback is disabled */
+export const PUMP_AMM_ERROR__CASHBACK_NOT_ENABLED = 0x17a1; // 6049
+/** OnlyPumpPoolsCashback:  */
+export const PUMP_AMM_ERROR__ONLY_PUMP_POOLS_CASHBACK = 0x17a2; // 6050
+/** CashbackNotInDesiredState:  */
+export const PUMP_AMM_ERROR__CASHBACK_NOT_IN_DESIRED_STATE = 0x17a3; // 6051
+/** CashbackEarnedDoesNotMatchTokenInVault:  */
+export const PUMP_AMM_ERROR__CASHBACK_EARNED_DOES_NOT_MATCH_TOKEN_IN_VAULT = 0x17a4; // 6052
 
 export type PumpAmmError =
   | typeof PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED
   | typeof PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
   | typeof PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES
+  | typeof PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES
+  | typeof PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT
+  | typeof PUMP_AMM_ERROR__CASHBACK_EARNED_DOES_NOT_MATCH_TOKEN_IN_VAULT
+  | typeof PUMP_AMM_ERROR__CASHBACK_NOT_ENABLED
+  | typeof PUMP_AMM_ERROR__CASHBACK_NOT_IN_DESIRED_STATE
+  | typeof PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG
+  | typeof PUMP_AMM_ERROR__CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG
+  | typeof PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE
+  | typeof PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX
   | typeof PUMP_AMM_ERROR__DISABLED_BUY
   | typeof PUMP_AMM_ERROR__DISABLED_CREATE_POOL
   | typeof PUMP_AMM_ERROR__DISABLED_DEPOSIT
   | typeof PUMP_AMM_ERROR__DISABLED_SELL
   | typeof PUMP_AMM_ERROR__DISABLED_WITHDRAW
   | typeof PUMP_AMM_ERROR__DIVISION_BY_ZERO
+  | typeof PUMP_AMM_ERROR__END_TIME_BEFORE_CURRENT_DAY
+  | typeof PUMP_AMM_ERROR__END_TIME_BEFORE_START_TIME
+  | typeof PUMP_AMM_ERROR__END_TIME_IN_THE_PAST
   | typeof PUMP_AMM_ERROR__EXCEEDED_SLIPPAGE
   | typeof PUMP_AMM_ERROR__FEE_BASIS_POINTS_EXCEEDS_MAXIMUM
   | typeof PUMP_AMM_ERROR__INVALID_ADMIN
+  | typeof PUMP_AMM_ERROR__INVALID_ADMIN_SET_COIN_CREATOR_AUTHORITY
   | typeof PUMP_AMM_ERROR__INVALID_BASE_MINT
+  | typeof PUMP_AMM_ERROR__INVALID_INCENTIVE_MINT
   | typeof PUMP_AMM_ERROR__INVALID_LP_MINT
   | typeof PUMP_AMM_ERROR__INVALID_POOL_BASE_TOKEN_ACCOUNT
   | typeof PUMP_AMM_ERROR__INVALID_POOL_QUOTE_TOKEN_ACCOUNT
   | typeof PUMP_AMM_ERROR__INVALID_PROTOCOL_FEE_RECIPIENT
   | typeof PUMP_AMM_ERROR__INVALID_QUOTE_MINT
+  | typeof PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_BASE_MINT
+  | typeof PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_COIN_CREATOR
+  | typeof PUMP_AMM_ERROR__MAYHEM_MODE_DISABLED
+  | typeof PUMP_AMM_ERROR__MAYHEM_MODE_IN_DESIRED_STATE
   | typeof PUMP_AMM_ERROR__NEW_SIZE_LESS_THAN_CURRENT_SIZE
+  | typeof PUMP_AMM_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS
+  | typeof PUMP_AMM_ERROR__ONLY_CANONICAL_PUMP_POOLS_CAN_HAVE_COIN_CREATOR
+  | typeof PUMP_AMM_ERROR__ONLY_PUMP_POOLS_CASHBACK
+  | typeof PUMP_AMM_ERROR__ONLY_PUMP_POOLS_MAYHEM_MODE
   | typeof PUMP_AMM_ERROR__OVERFLOW
   | typeof PUMP_AMM_ERROR__SAME_MINT
+  | typeof PUMP_AMM_ERROR__START_TIME_IN_THE_PAST
+  | typeof PUMP_AMM_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE
+  | typeof PUMP_AMM_ERROR__TIME_RANGE_TOO_LARGE
   | typeof PUMP_AMM_ERROR__TOO_LITTLE_POOL_TOKEN_LIQUIDITY
   | typeof PUMP_AMM_ERROR__TRUNCATION
   | typeof PUMP_AMM_ERROR__UNSORTED_NOT_UNIQUE_PROTOCOL_FEE_RECIPIENTS
@@ -107,24 +182,49 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED]: ``,
     [PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
     [PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES]: ``,
+    [PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES]: `buy: Not enough quote tokens to cover for fees.`,
+    [PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT]: `buy: slippage - would buy less tokens than expected min_base_amount_out`,
+    [PUMP_AMM_ERROR__CASHBACK_EARNED_DOES_NOT_MATCH_TOKEN_IN_VAULT]: ``,
+    [PUMP_AMM_ERROR__CASHBACK_NOT_ENABLED]: `Cashback is disabled`,
+    [PUMP_AMM_ERROR__CASHBACK_NOT_IN_DESIRED_STATE]: ``,
+    [PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG]: `coin creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead`,
+    [PUMP_AMM_ERROR__CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG]: `creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead`,
+    [PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE]: ``,
+    [PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX]: ``,
     [PUMP_AMM_ERROR__DISABLED_BUY]: ``,
     [PUMP_AMM_ERROR__DISABLED_CREATE_POOL]: ``,
     [PUMP_AMM_ERROR__DISABLED_DEPOSIT]: ``,
     [PUMP_AMM_ERROR__DISABLED_SELL]: ``,
     [PUMP_AMM_ERROR__DISABLED_WITHDRAW]: ``,
     [PUMP_AMM_ERROR__DIVISION_BY_ZERO]: ``,
+    [PUMP_AMM_ERROR__END_TIME_BEFORE_CURRENT_DAY]: ``,
+    [PUMP_AMM_ERROR__END_TIME_BEFORE_START_TIME]: ``,
+    [PUMP_AMM_ERROR__END_TIME_IN_THE_PAST]: ``,
     [PUMP_AMM_ERROR__EXCEEDED_SLIPPAGE]: ``,
     [PUMP_AMM_ERROR__FEE_BASIS_POINTS_EXCEEDS_MAXIMUM]: ``,
     [PUMP_AMM_ERROR__INVALID_ADMIN]: ``,
+    [PUMP_AMM_ERROR__INVALID_ADMIN_SET_COIN_CREATOR_AUTHORITY]: ``,
     [PUMP_AMM_ERROR__INVALID_BASE_MINT]: ``,
+    [PUMP_AMM_ERROR__INVALID_INCENTIVE_MINT]: ``,
     [PUMP_AMM_ERROR__INVALID_LP_MINT]: ``,
     [PUMP_AMM_ERROR__INVALID_POOL_BASE_TOKEN_ACCOUNT]: ``,
     [PUMP_AMM_ERROR__INVALID_POOL_QUOTE_TOKEN_ACCOUNT]: ``,
     [PUMP_AMM_ERROR__INVALID_PROTOCOL_FEE_RECIPIENT]: ``,
     [PUMP_AMM_ERROR__INVALID_QUOTE_MINT]: ``,
+    [PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_BASE_MINT]: ``,
+    [PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_COIN_CREATOR]: ``,
+    [PUMP_AMM_ERROR__MAYHEM_MODE_DISABLED]: ``,
+    [PUMP_AMM_ERROR__MAYHEM_MODE_IN_DESIRED_STATE]: ``,
     [PUMP_AMM_ERROR__NEW_SIZE_LESS_THAN_CURRENT_SIZE]: ``,
+    [PUMP_AMM_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS]: ``,
+    [PUMP_AMM_ERROR__ONLY_CANONICAL_PUMP_POOLS_CAN_HAVE_COIN_CREATOR]: ``,
+    [PUMP_AMM_ERROR__ONLY_PUMP_POOLS_CASHBACK]: ``,
+    [PUMP_AMM_ERROR__ONLY_PUMP_POOLS_MAYHEM_MODE]: ``,
     [PUMP_AMM_ERROR__OVERFLOW]: ``,
     [PUMP_AMM_ERROR__SAME_MINT]: ``,
+    [PUMP_AMM_ERROR__START_TIME_IN_THE_PAST]: ``,
+    [PUMP_AMM_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE]: ``,
+    [PUMP_AMM_ERROR__TIME_RANGE_TOO_LARGE]: ``,
     [PUMP_AMM_ERROR__TOO_LITTLE_POOL_TOKEN_LIQUIDITY]: ``,
     [PUMP_AMM_ERROR__TRUNCATION]: ``,
     [PUMP_AMM_ERROR__UNSORTED_NOT_UNIQUE_PROTOCOL_FEE_RECIPIENTS]: ``,

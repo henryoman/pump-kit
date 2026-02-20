@@ -100,18 +100,51 @@ export const PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT = 0x1798; // 6040
 export const PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES = 0x1799; // 6041
 /** BuySlippageBelowMinTokensOut: Slippage: Would buy less tokens than expected min_tokens_out */
 export const PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT = 0x179a; // 6042
+/** NameTooLong:  */
+export const PUMP_ERROR__NAME_TOO_LONG = 0x179b; // 6043
+/** SymbolTooLong:  */
+export const PUMP_ERROR__SYMBOL_TOO_LONG = 0x179c; // 6044
+/** UriTooLong:  */
+export const PUMP_ERROR__URI_TOO_LONG = 0x179d; // 6045
+/** CreateV2Disabled:  */
+export const PUMP_ERROR__CREATE_V2_DISABLED = 0x179e; // 6046
+/** CpitializeMayhemFailed:  */
+export const PUMP_ERROR__CPITIALIZE_MAYHEM_FAILED = 0x179f; // 6047
+/** MayhemModeDisabled:  */
+export const PUMP_ERROR__MAYHEM_MODE_DISABLED = 0x17a0; // 6048
+/** CreatorMigratedToSharingConfig: creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead */
+export const PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG = 0x17a1; // 6049
+/** UnableToDistributeCreatorVaultMigratedToSharingConfig: creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead */
+export const PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG = 0x17a2; // 6050
+/** SharingConfigNotActive: Sharing config is not active */
+export const PUMP_ERROR__SHARING_CONFIG_NOT_ACTIVE = 0x17a3; // 6051
+/** UnableToDistributeCreatorFeesToExecutableRecipient: The recipient account is executable, so it cannot receive lamports, remove it from the team first */
+export const PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_EXECUTABLE_RECIPIENT = 0x17a4; // 6052
+/** BondingCurveAndSharingConfigCreatorMismatch: Bonding curve creator does not match sharing config */
+export const PUMP_ERROR__BONDING_CURVE_AND_SHARING_CONFIG_CREATOR_MISMATCH = 0x17a5; // 6053
+/** ShareholdersAndRemainingAccountsMismatch: Remaining accounts do not match shareholders, make sure to pass exactly the same pubkeys in the same order */
+export const PUMP_ERROR__SHAREHOLDERS_AND_REMAINING_ACCOUNTS_MISMATCH = 0x17a6; // 6054
+/** InvalidShareBps: Share bps must be greater than 0 */
+export const PUMP_ERROR__INVALID_SHARE_BPS = 0x17a7; // 6055
+/** CashbackNotEnabled: Cashback is not enabled */
+export const PUMP_ERROR__CASHBACK_NOT_ENABLED = 0x17a8; // 6056
 
 export type PumpError =
   | typeof PUMP_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED
   | typeof PUMP_ERROR__ALL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
   | typeof PUMP_ERROR__ALL_ZEROS_WITHDRAW_AUTHORITY
   | typeof PUMP_ERROR__ALREADY_INITIALIZED
+  | typeof PUMP_ERROR__BONDING_CURVE_AND_SHARING_CONFIG_CREATOR_MISMATCH
   | typeof PUMP_ERROR__BONDING_CURVE_COMPLETE
   | typeof PUMP_ERROR__BONDING_CURVE_NOT_COMPLETE
   | typeof PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES
   | typeof PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT
   | typeof PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT
   | typeof PUMP_ERROR__BUY_ZERO_AMOUNT
+  | typeof PUMP_ERROR__CASHBACK_NOT_ENABLED
+  | typeof PUMP_ERROR__CPITIALIZE_MAYHEM_FAILED
+  | typeof PUMP_ERROR__CREATE_V2_DISABLED
+  | typeof PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG
   | typeof PUMP_ERROR__CREATOR_SHOULD_NOT_BE_ZERO
   | typeof PUMP_ERROR__DAY_IN_ACTIVE_RANGE
   | typeof PUMP_ERROR__DAY_INDEX_AFTER_END_INDEX
@@ -126,7 +159,10 @@ export type PumpError =
   | typeof PUMP_ERROR__INITIAL_VIRTUAL_TOKEN_RESERVES_SHOULD_BE_GREATER_THAN_INITIAL_REAL_TOKEN_RESERVES
   | typeof PUMP_ERROR__INVALID_CREATOR
   | typeof PUMP_ERROR__INVALID_INCENTIVE_MINT
+  | typeof PUMP_ERROR__INVALID_SHARE_BPS
+  | typeof PUMP_ERROR__MAYHEM_MODE_DISABLED
   | typeof PUMP_ERROR__MINT_DOES_NOT_MATCH_BONDING_CURVE
+  | typeof PUMP_ERROR__NAME_TOO_LONG
   | typeof PUMP_ERROR__NEW_SIZE_SHOULD_BE_GREATER_THAN_CURRENT_SIZE
   | typeof PUMP_ERROR__NOT_AUTHORIZED
   | typeof PUMP_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS
@@ -137,13 +173,19 @@ export type PumpError =
   | typeof PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_GREATER_THAN_CREATOR_FEE_PLUS_MAX_MIGRATE_FEES
   | typeof PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_LESS_THAN_FINAL_REAL_SOL_RESERVES
   | typeof PUMP_ERROR__SELL_ZERO_AMOUNT
+  | typeof PUMP_ERROR__SHAREHOLDERS_AND_REMAINING_ACCOUNTS_MISMATCH
+  | typeof PUMP_ERROR__SHARING_CONFIG_NOT_ACTIVE
   | typeof PUMP_ERROR__START_TIME_IN_THE_PAST
   | typeof PUMP_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE
+  | typeof PUMP_ERROR__SYMBOL_TOO_LONG
   | typeof PUMP_ERROR__TIME_RANGE_TOO_LARGE
   | typeof PUMP_ERROR__TOO_LITTLE_SOL_RECEIVED
   | typeof PUMP_ERROR__TOO_MUCH_SOL_REQUIRED
   | typeof PUMP_ERROR__TRUNCATION
+  | typeof PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_EXECUTABLE_RECIPIENT
+  | typeof PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG
   | typeof PUMP_ERROR__UNSORTED_NOT_UNIQUE_FEE_RECIPIENTS
+  | typeof PUMP_ERROR__URI_TOO_LONG
   | typeof PUMP_ERROR__WITHDRAW_TOO_FREQUENT;
 
 let pumpErrorMessages: Record<PumpError, string> | undefined;
@@ -153,12 +195,17 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__ALL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: `All fee recipients should be non-zero`,
     [PUMP_ERROR__ALL_ZEROS_WITHDRAW_AUTHORITY]: `Withdraw authority cannot be set to System Program ID`,
     [PUMP_ERROR__ALREADY_INITIALIZED]: `The program is already initialized.`,
+    [PUMP_ERROR__BONDING_CURVE_AND_SHARING_CONFIG_CREATOR_MISMATCH]: `Bonding curve creator does not match sharing config`,
     [PUMP_ERROR__BONDING_CURVE_COMPLETE]: `The bonding curve has completed and liquidity migrated to raydium.`,
     [PUMP_ERROR__BONDING_CURVE_NOT_COMPLETE]: `The bonding curve has not completed.`,
     [PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES]: `Buy: Not enough SOL to cover for fees.`,
     [PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT]: `Buy: Not enough SOL to cover for rent exemption.`,
     [PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT]: `Slippage: Would buy less tokens than expected min_tokens_out`,
     [PUMP_ERROR__BUY_ZERO_AMOUNT]: `Buy zero amount`,
+    [PUMP_ERROR__CASHBACK_NOT_ENABLED]: `Cashback is not enabled`,
+    [PUMP_ERROR__CPITIALIZE_MAYHEM_FAILED]: ``,
+    [PUMP_ERROR__CREATE_V2_DISABLED]: ``,
+    [PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG]: `creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead`,
     [PUMP_ERROR__CREATOR_SHOULD_NOT_BE_ZERO]: `Creator should not be zero`,
     [PUMP_ERROR__DAY_IN_ACTIVE_RANGE]: ``,
     [PUMP_ERROR__DAY_INDEX_AFTER_END_INDEX]: ``,
@@ -173,7 +220,10 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__INITIAL_VIRTUAL_TOKEN_RESERVES_SHOULD_BE_GREATER_THAN_INITIAL_REAL_TOKEN_RESERVES]: `initial_virtual_token_reserves should be greater than initial_real_token_reserves`,
     [PUMP_ERROR__INVALID_CREATOR]: `Invalid creator pubkey`,
     [PUMP_ERROR__INVALID_INCENTIVE_MINT]: ``,
+    [PUMP_ERROR__INVALID_SHARE_BPS]: `Share bps must be greater than 0`,
+    [PUMP_ERROR__MAYHEM_MODE_DISABLED]: ``,
     [PUMP_ERROR__MINT_DOES_NOT_MATCH_BONDING_CURVE]: `The mint does not match the bonding curve.`,
+    [PUMP_ERROR__NAME_TOO_LONG]: ``,
     [PUMP_ERROR__NEW_SIZE_SHOULD_BE_GREATER_THAN_CURRENT_SIZE]: `new_size should be > current_size`,
     [PUMP_ERROR__NOT_AUTHORIZED]: `The given account is not authorized to execute this instruction.`,
     [PUMP_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS]: `Not enough remaining accounts`,
@@ -184,13 +234,19 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_GREATER_THAN_CREATOR_FEE_PLUS_MAX_MIGRATE_FEES]: `pool_migration_fee should be greater than creator_fee + MAX_MIGRATE_FEES`,
     [PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_LESS_THAN_FINAL_REAL_SOL_RESERVES]: `pool_migration_fee should be less than final_real_sol_reserves`,
     [PUMP_ERROR__SELL_ZERO_AMOUNT]: `Sell zero amount`,
+    [PUMP_ERROR__SHAREHOLDERS_AND_REMAINING_ACCOUNTS_MISMATCH]: `Remaining accounts do not match shareholders, make sure to pass exactly the same pubkeys in the same order`,
+    [PUMP_ERROR__SHARING_CONFIG_NOT_ACTIVE]: `Sharing config is not active`,
     [PUMP_ERROR__START_TIME_IN_THE_PAST]: ``,
     [PUMP_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE]: ``,
+    [PUMP_ERROR__SYMBOL_TOO_LONG]: ``,
     [PUMP_ERROR__TIME_RANGE_TOO_LARGE]: ``,
     [PUMP_ERROR__TOO_LITTLE_SOL_RECEIVED]: `slippage: Too little SOL received to sell the given amount of tokens.`,
     [PUMP_ERROR__TOO_MUCH_SOL_REQUIRED]: `slippage: Too much SOL required to buy the given amount of tokens.`,
     [PUMP_ERROR__TRUNCATION]: `Truncation`,
+    [PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_EXECUTABLE_RECIPIENT]: `The recipient account is executable, so it cannot receive lamports, remove it from the team first`,
+    [PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG]: `creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead`,
     [PUMP_ERROR__UNSORTED_NOT_UNIQUE_FEE_RECIPIENTS]: `Unsorted or not unique fee recipients`,
+    [PUMP_ERROR__URI_TOO_LONG]: ``,
     [PUMP_ERROR__WITHDRAW_TOO_FREQUENT]: `Withdraw too frequent`,
   };
 }

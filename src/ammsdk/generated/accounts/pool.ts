@@ -17,6 +17,8 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -61,6 +63,9 @@ export type Pool = {
   poolQuoteTokenAccount: Address;
   /** True circulating supply without burns and lock-ups */
   lpSupply: bigint;
+  coinCreator: Address;
+  isMayhemMode: boolean;
+  isCashbackCoin: boolean;
 };
 
 export type PoolArgs = {
@@ -74,6 +79,9 @@ export type PoolArgs = {
   poolQuoteTokenAccount: Address;
   /** True circulating supply without burns and lock-ups */
   lpSupply: number | bigint;
+  coinCreator: Address;
+  isMayhemMode: boolean;
+  isCashbackCoin: boolean;
 };
 
 export function getPoolEncoder(): FixedSizeEncoder<PoolArgs> {
@@ -89,6 +97,9 @@ export function getPoolEncoder(): FixedSizeEncoder<PoolArgs> {
       ['poolBaseTokenAccount', getAddressEncoder()],
       ['poolQuoteTokenAccount', getAddressEncoder()],
       ['lpSupply', getU64Encoder()],
+      ['coinCreator', getAddressEncoder()],
+      ['isMayhemMode', getBooleanEncoder()],
+      ['isCashbackCoin', getBooleanEncoder()],
     ]),
     (value) => ({ ...value, discriminator: POOL_DISCRIMINATOR })
   );
@@ -106,6 +117,9 @@ export function getPoolDecoder(): FixedSizeDecoder<Pool> {
     ['poolBaseTokenAccount', getAddressDecoder()],
     ['poolQuoteTokenAccount', getAddressDecoder()],
     ['lpSupply', getU64Decoder()],
+    ['coinCreator', getAddressDecoder()],
+    ['isMayhemMode', getBooleanDecoder()],
+    ['isCashbackCoin', getBooleanDecoder()],
   ]);
 }
 
@@ -167,5 +181,5 @@ export async function fetchAllMaybePool(
 }
 
 export function getPoolSize(): number {
-  return 211;
+  return 245;
 }

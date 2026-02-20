@@ -428,13 +428,7 @@ export async function getMigrateInstructionAsync<
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
       seeds: [
         getAddressEncoder().encode(expectAddress(accounts.bondingCurve.value)),
-        getBytesEncoder().encode(
-          new Uint8Array([
-            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
-            126, 255, 0, 169,
-          ])
-        ),
+        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
         getAddressEncoder().encode(expectAddress(accounts.mint.value)),
       ],
     });
@@ -487,7 +481,7 @@ export async function getMigrateInstructionAsync<
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
       seeds: [
         getAddressEncoder().encode(expectAddress(accounts.poolAuthority.value)),
-        getAddressEncoder().encode(expectAddress(accounts.tokenProgram.value)),
+        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
         getAddressEncoder().encode(expectAddress(accounts.mint.value)),
       ],
     });
@@ -553,7 +547,7 @@ export async function getMigrateInstructionAsync<
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
       seeds: [
         getAddressEncoder().encode(expectAddress(accounts.pool.value)),
-        getAddressEncoder().encode(expectAddress(accounts.tokenProgram.value)),
+        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
         getAddressEncoder().encode(expectAddress(accounts.mint.value)),
       ],
     });

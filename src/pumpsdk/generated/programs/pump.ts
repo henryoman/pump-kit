@@ -19,19 +19,29 @@ import {
   type ParsedAdminUpdateTokenIncentivesInstruction,
   type ParsedBuyExactSolInInstruction,
   type ParsedBuyInstruction,
+  type ParsedClaimCashbackInstruction,
   type ParsedClaimTokenIncentivesInstruction,
   type ParsedCloseUserVolumeAccumulatorInstruction,
   type ParsedCollectCreatorFeeInstruction,
   type ParsedCreateInstruction,
+  type ParsedCreateV2Instruction,
+  type ParsedDistributeCreatorFeesInstruction,
   type ParsedExtendAccountInstruction,
+  type ParsedGetMinimumDistributableFeeInstruction,
   type ParsedInitializeInstruction,
   type ParsedInitUserVolumeAccumulatorInstruction,
+  type ParsedMigrateBondingCurveCreatorInstruction,
   type ParsedMigrateInstruction,
   type ParsedSellInstruction,
   type ParsedSetCreatorInstruction,
+  type ParsedSetMayhemVirtualParamsInstruction,
   type ParsedSetMetaplexCreatorInstruction,
   type ParsedSetParamsInstruction,
+  type ParsedSetReservedFeeRecipientsInstruction,
   type ParsedSyncUserVolumeAccumulatorInstruction,
+  type ParsedToggleCashbackEnabledInstruction,
+  type ParsedToggleCreateV2Instruction,
+  type ParsedToggleMayhemModeInstruction,
   type ParsedUpdateGlobalAuthorityInstruction,
 } from '../instructions';
 
@@ -43,6 +53,7 @@ export enum PumpAccount {
   FeeConfig,
   Global,
   GlobalVolumeAccumulator,
+  SharingConfig,
   UserVolumeAccumulator,
 }
 
@@ -98,6 +109,17 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75])
+      ),
+      0
+    )
+  ) {
+    return PumpAccount.SharingConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250])
       ),
       0
@@ -116,19 +138,29 @@ export enum PumpInstruction {
   AdminUpdateTokenIncentives,
   Buy,
   BuyExactSolIn,
+  ClaimCashback,
   ClaimTokenIncentives,
   CloseUserVolumeAccumulator,
   CollectCreatorFee,
   Create,
+  CreateV2,
+  DistributeCreatorFees,
   ExtendAccount,
+  GetMinimumDistributableFee,
   InitUserVolumeAccumulator,
   Initialize,
   Migrate,
+  MigrateBondingCurveCreator,
   Sell,
   SetCreator,
+  SetMayhemVirtualParams,
   SetMetaplexCreator,
   SetParams,
+  SetReservedFeeRecipients,
   SyncUserVolumeAccumulator,
+  ToggleCashbackEnabled,
+  ToggleCreateV2,
+  ToggleMayhemMode,
   UpdateGlobalAuthority,
 }
 
@@ -195,6 +227,17 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.ClaimCashback;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27])
       ),
       0
@@ -239,12 +282,45 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([214, 144, 76, 236, 95, 139, 49, 180])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.CreateV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([165, 114, 103, 0, 121, 206, 247, 81])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.DistributeCreatorFees;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([234, 102, 194, 203, 150, 72, 62, 229])
       ),
       0
     )
   ) {
     return PumpInstruction.ExtendAccount;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([117, 225, 127, 202, 134, 95, 68, 35])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.GetMinimumDistributableFee;
   }
   if (
     containsBytes(
@@ -283,6 +359,17 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([87, 124, 52, 191, 52, 38, 214, 232])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.MigrateBondingCurveCreator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173])
       ),
       0
@@ -300,6 +387,17 @@ export function identifyPumpInstruction(
     )
   ) {
     return PumpInstruction.SetCreator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([61, 169, 188, 191, 153, 149, 42, 97])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.SetMayhemVirtualParams;
   }
   if (
     containsBytes(
@@ -327,12 +425,56 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.SetReservedFeeRecipients;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238])
       ),
       0
     )
   ) {
     return PumpInstruction.SyncUserVolumeAccumulator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.ToggleCashbackEnabled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([28, 255, 230, 240, 172, 107, 203, 171])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.ToggleCreateV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 9, 111, 208, 100, 31, 255, 163])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.ToggleMayhemMode;
   }
   if (
     containsBytes(
@@ -367,6 +509,9 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.BuyExactSolIn;
     } & ParsedBuyExactSolInInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.ClaimCashback;
+    } & ParsedClaimCashbackInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.ClaimTokenIncentives;
     } & ParsedClaimTokenIncentivesInstruction<TProgram>)
   | ({
@@ -379,8 +524,17 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.Create;
     } & ParsedCreateInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.CreateV2;
+    } & ParsedCreateV2Instruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.DistributeCreatorFees;
+    } & ParsedDistributeCreatorFeesInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.ExtendAccount;
     } & ParsedExtendAccountInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.GetMinimumDistributableFee;
+    } & ParsedGetMinimumDistributableFeeInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.InitUserVolumeAccumulator;
     } & ParsedInitUserVolumeAccumulatorInstruction<TProgram>)
@@ -391,11 +545,17 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.Migrate;
     } & ParsedMigrateInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.MigrateBondingCurveCreator;
+    } & ParsedMigrateBondingCurveCreatorInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.Sell;
     } & ParsedSellInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.SetCreator;
     } & ParsedSetCreatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.SetMayhemVirtualParams;
+    } & ParsedSetMayhemVirtualParamsInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.SetMetaplexCreator;
     } & ParsedSetMetaplexCreatorInstruction<TProgram>)
@@ -403,8 +563,20 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.SetParams;
     } & ParsedSetParamsInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.SetReservedFeeRecipients;
+    } & ParsedSetReservedFeeRecipientsInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.SyncUserVolumeAccumulator;
     } & ParsedSyncUserVolumeAccumulatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.ToggleCashbackEnabled;
+    } & ParsedToggleCashbackEnabledInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.ToggleCreateV2;
+    } & ParsedToggleCreateV2Instruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.ToggleMayhemMode;
+    } & ParsedToggleMayhemModeInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.UpdateGlobalAuthority;
     } & ParsedUpdateGlobalAuthorityInstruction<TProgram>);

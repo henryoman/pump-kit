@@ -12,6 +12,8 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getI64Decoder,
   getI64Encoder,
   getStructDecoder,
@@ -41,6 +43,9 @@ export type CreateEvent = {
   virtualSolReserves: bigint;
   realTokenReserves: bigint;
   tokenTotalSupply: bigint;
+  tokenProgram: Address;
+  isMayhemMode: boolean;
+  isCashbackEnabled: boolean;
 };
 
 export type CreateEventArgs = {
@@ -56,6 +61,9 @@ export type CreateEventArgs = {
   virtualSolReserves: number | bigint;
   realTokenReserves: number | bigint;
   tokenTotalSupply: number | bigint;
+  tokenProgram: Address;
+  isMayhemMode: boolean;
+  isCashbackEnabled: boolean;
 };
 
 export function getCreateEventEncoder(): Encoder<CreateEventArgs> {
@@ -72,6 +80,9 @@ export function getCreateEventEncoder(): Encoder<CreateEventArgs> {
     ['virtualSolReserves', getU64Encoder()],
     ['realTokenReserves', getU64Encoder()],
     ['tokenTotalSupply', getU64Encoder()],
+    ['tokenProgram', getAddressEncoder()],
+    ['isMayhemMode', getBooleanEncoder()],
+    ['isCashbackEnabled', getBooleanEncoder()],
   ]);
 }
 
@@ -89,6 +100,9 @@ export function getCreateEventDecoder(): Decoder<CreateEvent> {
     ['virtualSolReserves', getU64Decoder()],
     ['realTokenReserves', getU64Decoder()],
     ['tokenTotalSupply', getU64Decoder()],
+    ['tokenProgram', getAddressDecoder()],
+    ['isMayhemMode', getBooleanDecoder()],
+    ['isCashbackEnabled', getBooleanDecoder()],
   ]);
 }
 

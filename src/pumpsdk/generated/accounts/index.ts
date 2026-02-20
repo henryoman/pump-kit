@@ -10,4 +10,5 @@ export * from './bondingCurve';
 export * from './feeConfig';
 export * from './global';
 export * from './globalVolumeAccumulator';
+export * from './sharingConfig';
 export * from './userVolumeAccumulator';

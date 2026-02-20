@@ -6,15 +6,30 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './adminSetCoinCreatorEvent';
+export * from './adminUpdateTokenIncentivesEvent';
 export * from './buyEvent';
+export * from './claimCashbackEvent';
+export * from './claimTokenIncentivesEvent';
+export * from './closeUserVolumeAccumulatorEvent';
+export * from './collectCoinCreatorFeeEvent';
+export * from './configStatus';
 export * from './createConfigEvent';
 export * from './createPoolEvent';
 export * from './depositEvent';
 export * from './disableEvent';
 export * from './extendAccountEvent';
-export * from './globalConfig';
-export * from './pool';
+export * from './fees';
+export * from './feeTier';
+export * from './initUserVolumeAccumulatorEvent';
+export * from './migratePoolCoinCreatorEvent';
+export * from './optionBool';
+export * from './reservedFeeRecipientsEvent';
 export * from './sellEvent';
+export * from './setBondingCurveCoinCreatorEvent';
+export * from './setMetaplexCoinCreatorEvent';
+export * from './shareholder';
+export * from './syncUserVolumeAccumulatorEvent';
 export * from './updateAdminEvent';
 export * from './updateFeeConfigEvent';
 export * from './withdrawEvent';

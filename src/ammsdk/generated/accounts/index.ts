@@ -6,5 +6,10 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './bondingCurve';
+export * from './feeConfig';
 export * from './globalConfig';
+export * from './globalVolumeAccumulator';
 export * from './pool';
+export * from './sharingConfig';
+export * from './userVolumeAccumulator';

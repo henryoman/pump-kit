@@ -54,6 +54,9 @@ export type TradeEvent = {
   currentSolVolume: bigint;
   lastUpdateTimestamp: bigint;
   ixName: string;
+  mayhemMode: boolean;
+  cashbackFeeBasisPoints: bigint;
+  cashback: bigint;
 };
 
 export type TradeEventArgs = {
@@ -79,6 +82,9 @@ export type TradeEventArgs = {
   currentSolVolume: number | bigint;
   lastUpdateTimestamp: number | bigint;
   ixName: string;
+  mayhemMode: boolean;
+  cashbackFeeBasisPoints: number | bigint;
+  cashback: number | bigint;
 };
 
 export function getTradeEventEncoder(): Encoder<TradeEventArgs> {
@@ -105,6 +111,9 @@ export function getTradeEventEncoder(): Encoder<TradeEventArgs> {
     ['currentSolVolume', getU64Encoder()],
     ['lastUpdateTimestamp', getI64Encoder()],
     ['ixName', addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
+    ['mayhemMode', getBooleanEncoder()],
+    ['cashbackFeeBasisPoints', getU64Encoder()],
+    ['cashback', getU64Encoder()],
   ]);
 }
 
@@ -132,6 +141,9 @@ export function getTradeEventDecoder(): Decoder<TradeEvent> {
     ['currentSolVolume', getU64Decoder()],
     ['lastUpdateTimestamp', getI64Decoder()],
     ['ixName', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
+    ['mayhemMode', getBooleanDecoder()],
+    ['cashbackFeeBasisPoints', getU64Decoder()],
+    ['cashback', getU64Decoder()],
   ]);
 }
 

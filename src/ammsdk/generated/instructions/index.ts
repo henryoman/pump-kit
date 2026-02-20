@@ -6,13 +6,28 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './adminSetCoinCreator';
+export * from './adminUpdateTokenIncentives';
 export * from './buy';
+export * from './buyExactQuoteIn';
+export * from './claimCashback';
+export * from './claimTokenIncentives';
+export * from './closeUserVolumeAccumulator';
+export * from './collectCoinCreatorFee';
 export * from './createConfig';
 export * from './createPool';
 export * from './deposit';
 export * from './disable';
 export * from './extendAccount';
+export * from './initUserVolumeAccumulator';
+export * from './migratePoolCoinCreator';
 export * from './sell';
+export * from './setCoinCreator';
+export * from './setReservedFeeRecipients';
+export * from './syncUserVolumeAccumulator';
+export * from './toggleCashbackEnabled';
+export * from './toggleMayhemMode';
+export * from './transferCreatorFeesToPump';
 export * from './updateAdmin';
 export * from './updateFeeConfig';
 export * from './withdraw';

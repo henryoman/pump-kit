@@ -10,6 +10,8 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getI64Decoder,
   getI64Encoder,
   getStructDecoder,
@@ -46,6 +48,8 @@ export type CreatePoolEvent = {
   lpMint: Address;
   userBaseTokenAccount: Address;
   userQuoteTokenAccount: Address;
+  coinCreator: Address;
+  isMayhemMode: boolean;
 };
 
 export type CreatePoolEventArgs = {
@@ -68,6 +72,8 @@ export type CreatePoolEventArgs = {
   lpMint: Address;
   userBaseTokenAccount: Address;
   userQuoteTokenAccount: Address;
+  coinCreator: Address;
+  isMayhemMode: boolean;
 };
 
 export function getCreatePoolEventEncoder(): FixedSizeEncoder<CreatePoolEventArgs> {
@@ -91,6 +97,8 @@ export function getCreatePoolEventEncoder(): FixedSizeEncoder<CreatePoolEventArg
     ['lpMint', getAddressEncoder()],
     ['userBaseTokenAccount', getAddressEncoder()],
     ['userQuoteTokenAccount', getAddressEncoder()],
+    ['coinCreator', getAddressEncoder()],
+    ['isMayhemMode', getBooleanEncoder()],
   ]);
 }
 
@@ -115,6 +123,8 @@ export function getCreatePoolEventDecoder(): FixedSizeDecoder<CreatePoolEvent> {
     ['lpMint', getAddressDecoder()],
     ['userBaseTokenAccount', getAddressDecoder()],
     ['userQuoteTokenAccount', getAddressDecoder()],
+    ['coinCreator', getAddressDecoder()],
+    ['isMayhemMode', getBooleanDecoder()],
   ]);
 }
 

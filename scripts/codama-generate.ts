@@ -75,9 +75,7 @@ async function main() {
   console.log("");
   
   // Generate pump AMM client (pumpswap)
-  await render("idl/pumpswap.idl.json", "src/ammsdk/generated", {
-    normalizePubkey: true,
-  });
+  await render("idl/pumpswap.idl.json", "src/ammsdk/generated");
   
   console.log("\n🎉 Codama code generation complete!");
 }

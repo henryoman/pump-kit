@@ -19,6 +19,8 @@ import {
   getAddressEncoder,
   getArrayDecoder,
   getArrayEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -55,9 +57,7 @@ export type GlobalConfig = {
   discriminator: ReadonlyUint8Array;
   /** The admin pubkey */
   admin: Address;
-  /** The lp fee in basis points (0.01%) */
   lpFeeBasisPoints: bigint;
-  /** The protocol fee in basis points (0.01%) */
   protocolFeeBasisPoints: bigint;
   /**
    * Flags to disable certain functionality
@@ -70,14 +70,20 @@ export type GlobalConfig = {
   disableFlags: number;
   /** Addresses of the protocol fee recipients */
   protocolFeeRecipients: Array<Address>;
+  coinCreatorFeeBasisPoints: bigint;
+  /** The admin authority for setting coin creators */
+  adminSetCoinCreatorAuthority: Address;
+  whitelistPda: Address;
+  reservedFeeRecipient: Address;
+  mayhemModeEnabled: boolean;
+  reservedFeeRecipients: Array<Address>;
+  isCashbackEnabled: boolean;
 };
 
 export type GlobalConfigArgs = {
   /** The admin pubkey */
   admin: Address;
-  /** The lp fee in basis points (0.01%) */
   lpFeeBasisPoints: number | bigint;
-  /** The protocol fee in basis points (0.01%) */
   protocolFeeBasisPoints: number | bigint;
   /**
    * Flags to disable certain functionality
@@ -90,6 +96,14 @@ export type GlobalConfigArgs = {
   disableFlags: number;
   /** Addresses of the protocol fee recipients */
   protocolFeeRecipients: Array<Address>;
+  coinCreatorFeeBasisPoints: number | bigint;
+  /** The admin authority for setting coin creators */
+  adminSetCoinCreatorAuthority: Address;
+  whitelistPda: Address;
+  reservedFeeRecipient: Address;
+  mayhemModeEnabled: boolean;
+  reservedFeeRecipients: Array<Address>;
+  isCashbackEnabled: boolean;
 };
 
 export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
@@ -104,6 +118,16 @@ export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
         'protocolFeeRecipients',
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
+      ['coinCreatorFeeBasisPoints', getU64Encoder()],
+      ['adminSetCoinCreatorAuthority', getAddressEncoder()],
+      ['whitelistPda', getAddressEncoder()],
+      ['reservedFeeRecipient', getAddressEncoder()],
+      ['mayhemModeEnabled', getBooleanEncoder()],
+      [
+        'reservedFeeRecipients',
+        getArrayEncoder(getAddressEncoder(), { size: 7 }),
+      ],
+      ['isCashbackEnabled', getBooleanEncoder()],
     ]),
     (value) => ({ ...value, discriminator: GLOBAL_CONFIG_DISCRIMINATOR })
   );
@@ -120,6 +144,16 @@ export function getGlobalConfigDecoder(): FixedSizeDecoder<GlobalConfig> {
       'protocolFeeRecipients',
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
     ],
+    ['coinCreatorFeeBasisPoints', getU64Decoder()],
+    ['adminSetCoinCreatorAuthority', getAddressDecoder()],
+    ['whitelistPda', getAddressDecoder()],
+    ['reservedFeeRecipient', getAddressDecoder()],
+    ['mayhemModeEnabled', getBooleanDecoder()],
+    [
+      'reservedFeeRecipients',
+      getArrayDecoder(getAddressDecoder(), { size: 7 }),
+    ],
+    ['isCashbackEnabled', getBooleanDecoder()],
   ]);
 }
 
@@ -184,5 +218,5 @@ export async function fetchAllMaybeGlobalConfig(
 }
 
 export function getGlobalConfigSize(): number {
-  return 313;
+  return 643;
 }

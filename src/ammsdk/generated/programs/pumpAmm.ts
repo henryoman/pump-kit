@@ -14,29 +14,72 @@ import {
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
+  type ParsedAdminSetCoinCreatorInstruction,
+  type ParsedAdminUpdateTokenIncentivesInstruction,
+  type ParsedBuyExactQuoteInInstruction,
   type ParsedBuyInstruction,
+  type ParsedClaimCashbackInstruction,
+  type ParsedClaimTokenIncentivesInstruction,
+  type ParsedCloseUserVolumeAccumulatorInstruction,
+  type ParsedCollectCoinCreatorFeeInstruction,
   type ParsedCreateConfigInstruction,
   type ParsedCreatePoolInstruction,
   type ParsedDepositInstruction,
   type ParsedDisableInstruction,
   type ParsedExtendAccountInstruction,
+  type ParsedInitUserVolumeAccumulatorInstruction,
+  type ParsedMigratePoolCoinCreatorInstruction,
   type ParsedSellInstruction,
+  type ParsedSetCoinCreatorInstruction,
+  type ParsedSetReservedFeeRecipientsInstruction,
+  type ParsedSyncUserVolumeAccumulatorInstruction,
+  type ParsedToggleCashbackEnabledInstruction,
+  type ParsedToggleMayhemModeInstruction,
+  type ParsedTransferCreatorFeesToPumpInstruction,
   type ParsedUpdateAdminInstruction,
   type ParsedUpdateFeeConfigInstruction,
   type ParsedWithdrawInstruction,
 } from '../instructions';
 
-export const PUMP_AMM_PROGRAM_ADDRESS = '' as Address<''>;
+export const PUMP_AMM_PROGRAM_ADDRESS =
+  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
 
 export enum PumpAmmAccount {
+  BondingCurve,
+  FeeConfig,
   GlobalConfig,
+  GlobalVolumeAccumulator,
   Pool,
+  SharingConfig,
+  UserVolumeAccumulator,
 }
 
 export function identifyPumpAmmAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array
 ): PumpAmmAccount {
   const data = 'data' in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([23, 183, 248, 55, 96, 216, 172, 96])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmAccount.BondingCurve;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([143, 52, 146, 187, 219, 123, 76, 155])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmAccount.FeeConfig;
+  }
   if (
     containsBytes(
       data,
@@ -52,6 +95,17 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmAccount.GlobalVolumeAccumulator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188])
       ),
       0
@@ -59,19 +113,56 @@ export function identifyPumpAmmAccount(
   ) {
     return PumpAmmAccount.Pool;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmAccount.SharingConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmAccount.UserVolumeAccumulator;
+  }
   throw new Error(
     'The provided account could not be identified as a pumpAmm account.'
   );
 }
 
 export enum PumpAmmInstruction {
+  AdminSetCoinCreator,
+  AdminUpdateTokenIncentives,
   Buy,
+  BuyExactQuoteIn,
+  ClaimCashback,
+  ClaimTokenIncentives,
+  CloseUserVolumeAccumulator,
+  CollectCoinCreatorFee,
   CreateConfig,
   CreatePool,
   Deposit,
   Disable,
   ExtendAccount,
+  InitUserVolumeAccumulator,
+  MigratePoolCoinCreator,
   Sell,
+  SetCoinCreator,
+  SetReservedFeeRecipients,
+  SyncUserVolumeAccumulator,
+  ToggleCashbackEnabled,
+  ToggleMayhemMode,
+  TransferCreatorFeesToPump,
   UpdateAdmin,
   UpdateFeeConfig,
   Withdraw,
@@ -85,12 +176,89 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([242, 40, 117, 145, 73, 96, 105, 104])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.AdminSetCoinCreator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([209, 11, 115, 87, 213, 23, 124, 204])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.AdminUpdateTokenIncentives;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([102, 6, 61, 18, 1, 218, 235, 234])
       ),
       0
     )
   ) {
     return PumpAmmInstruction.Buy;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([198, 46, 21, 82, 180, 217, 232, 112])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.BuyExactQuoteIn;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.ClaimCashback;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.ClaimTokenIncentives;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.CloseUserVolumeAccumulator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([160, 57, 89, 42, 181, 139, 43, 66])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.CollectCoinCreatorFee;
   }
   if (
     containsBytes(
@@ -151,12 +319,100 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.InitUserVolumeAccumulator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([208, 8, 159, 4, 74, 175, 16, 58])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.MigratePoolCoinCreator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173])
       ),
       0
     )
   ) {
     return PumpAmmInstruction.Sell;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([210, 149, 128, 45, 188, 58, 78, 175])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.SetCoinCreator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.SetReservedFeeRecipients;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.SyncUserVolumeAccumulator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.ToggleCashbackEnabled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 9, 111, 208, 100, 31, 255, 163])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.ToggleMayhemMode;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([139, 52, 134, 85, 228, 229, 108, 241])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.TransferCreatorFeesToPump;
   }
   if (
     containsBytes(
@@ -196,10 +452,33 @@ export function identifyPumpAmmInstruction(
   );
 }
 
-export type ParsedPumpAmmInstruction<TProgram extends string = ''> =
+export type ParsedPumpAmmInstruction<
+  TProgram extends string = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
+> =
+  | ({
+      instructionType: PumpAmmInstruction.AdminSetCoinCreator;
+    } & ParsedAdminSetCoinCreatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.AdminUpdateTokenIncentives;
+    } & ParsedAdminUpdateTokenIncentivesInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.Buy;
     } & ParsedBuyInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.BuyExactQuoteIn;
+    } & ParsedBuyExactQuoteInInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.ClaimCashback;
+    } & ParsedClaimCashbackInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.ClaimTokenIncentives;
+    } & ParsedClaimTokenIncentivesInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.CloseUserVolumeAccumulator;
+    } & ParsedCloseUserVolumeAccumulatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.CollectCoinCreatorFee;
+    } & ParsedCollectCoinCreatorFeeInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.CreateConfig;
     } & ParsedCreateConfigInstruction<TProgram>)
@@ -216,8 +495,32 @@ export type ParsedPumpAmmInstruction<TProgram extends string = ''> =
       instructionType: PumpAmmInstruction.ExtendAccount;
     } & ParsedExtendAccountInstruction<TProgram>)
   | ({
+      instructionType: PumpAmmInstruction.InitUserVolumeAccumulator;
+    } & ParsedInitUserVolumeAccumulatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.MigratePoolCoinCreator;
+    } & ParsedMigratePoolCoinCreatorInstruction<TProgram>)
+  | ({
       instructionType: PumpAmmInstruction.Sell;
     } & ParsedSellInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.SetCoinCreator;
+    } & ParsedSetCoinCreatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.SetReservedFeeRecipients;
+    } & ParsedSetReservedFeeRecipientsInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.SyncUserVolumeAccumulator;
+    } & ParsedSyncUserVolumeAccumulatorInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.ToggleCashbackEnabled;
+    } & ParsedToggleCashbackEnabledInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.ToggleMayhemMode;
+    } & ParsedToggleMayhemModeInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.TransferCreatorFeesToPump;
+    } & ParsedTransferCreatorFeesToPumpInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.UpdateAdmin;
     } & ParsedUpdateAdminInstruction<TProgram>)

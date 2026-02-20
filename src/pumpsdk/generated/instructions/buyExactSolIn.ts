@@ -125,7 +125,7 @@ export type BuyExactSolInInstruction<
         ? ReadonlyAccount<TAccountProgram>
         : TAccountProgram,
       TAccountGlobalVolumeAccumulator extends string
-        ? WritableAccount<TAccountGlobalVolumeAccumulator>
+        ? ReadonlyAccount<TAccountGlobalVolumeAccumulator>
         : TAccountGlobalVolumeAccumulator,
       TAccountUserVolumeAccumulator extends string
         ? WritableAccount<TAccountUserVolumeAccumulator>
@@ -304,7 +304,7 @@ export async function getBuyExactSolInInstructionAsync<
     program: { value: input.program ?? null, isWritable: false },
     globalVolumeAccumulator: {
       value: input.globalVolumeAccumulator ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
@@ -343,19 +343,17 @@ export async function getBuyExactSolInInstructionAsync<
       ],
     });
   }
+  if (!accounts.tokenProgram.value) {
+    accounts.tokenProgram.value =
+      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+  }
   if (!accounts.associatedBondingCurve.value) {
     accounts.associatedBondingCurve.value = await getProgramDerivedAddress({
       programAddress:
         'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
       seeds: [
         getAddressEncoder().encode(expectAddress(accounts.bondingCurve.value)),
-        getBytesEncoder().encode(
-          new Uint8Array([
-            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
-            126, 255, 0, 169,
-          ])
-        ),
+        getAddressEncoder().encode(expectAddress(accounts.tokenProgram.value)),
         getAddressEncoder().encode(expectAddress(accounts.mint.value)),
       ],
     });
@@ -363,10 +361,6 @@ export async function getBuyExactSolInInstructionAsync<
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-  }
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
   }
   if (!accounts.eventAuthority.value) {
     accounts.eventAuthority.value = await getProgramDerivedAddress({
@@ -598,7 +592,7 @@ export function getBuyExactSolInInstruction<
     program: { value: input.program ?? null, isWritable: false },
     globalVolumeAccumulator: {
       value: input.globalVolumeAccumulator ?? null,
-      isWritable: true,
+      isWritable: false,
     },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
@@ -616,13 +610,13 @@ export function getBuyExactSolInInstruction<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-  }
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
       'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
   }
   if (!accounts.program.value) {
     accounts.program.value =

@@ -7,21 +7,30 @@
  */
 
 import {
+  addDecoderSizePrefix,
+  addEncoderSizePrefix,
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getI64Decoder,
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
+  getUtf8Decoder,
+  getUtf8Encoder,
   type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+  type Codec,
+  type Decoder,
+  type Encoder,
 } from '@solana/kit';
 
+/** ix_name: "buy" | "buy_exact_quote_in" */
 export type BuyEvent = {
   timestamp: bigint;
   baseAmountOut: bigint;
@@ -43,6 +52,18 @@ export type BuyEvent = {
   userQuoteTokenAccount: Address;
   protocolFeeRecipient: Address;
   protocolFeeRecipientTokenAccount: Address;
+  coinCreator: Address;
+  coinCreatorFeeBasisPoints: bigint;
+  coinCreatorFee: bigint;
+  trackVolume: boolean;
+  totalUnclaimedTokens: bigint;
+  totalClaimedTokens: bigint;
+  currentSolVolume: bigint;
+  lastUpdateTimestamp: bigint;
+  minBaseAmountOut: bigint;
+  ixName: string;
+  cashbackFeeBasisPoints: bigint;
+  cashback: bigint;
 };
 
 export type BuyEventArgs = {
@@ -66,9 +87,21 @@ export type BuyEventArgs = {
   userQuoteTokenAccount: Address;
   protocolFeeRecipient: Address;
   protocolFeeRecipientTokenAccount: Address;
+  coinCreator: Address;
+  coinCreatorFeeBasisPoints: number | bigint;
+  coinCreatorFee: number | bigint;
+  trackVolume: boolean;
+  totalUnclaimedTokens: number | bigint;
+  totalClaimedTokens: number | bigint;
+  currentSolVolume: number | bigint;
+  lastUpdateTimestamp: number | bigint;
+  minBaseAmountOut: number | bigint;
+  ixName: string;
+  cashbackFeeBasisPoints: number | bigint;
+  cashback: number | bigint;
 };
 
-export function getBuyEventEncoder(): FixedSizeEncoder<BuyEventArgs> {
+export function getBuyEventEncoder(): Encoder<BuyEventArgs> {
   return getStructEncoder([
     ['timestamp', getI64Encoder()],
     ['baseAmountOut', getU64Encoder()],
@@ -90,10 +123,22 @@ export function getBuyEventEncoder(): FixedSizeEncoder<BuyEventArgs> {
     ['userQuoteTokenAccount', getAddressEncoder()],
     ['protocolFeeRecipient', getAddressEncoder()],
     ['protocolFeeRecipientTokenAccount', getAddressEncoder()],
+    ['coinCreator', getAddressEncoder()],
+    ['coinCreatorFeeBasisPoints', getU64Encoder()],
+    ['coinCreatorFee', getU64Encoder()],
+    ['trackVolume', getBooleanEncoder()],
+    ['totalUnclaimedTokens', getU64Encoder()],
+    ['totalClaimedTokens', getU64Encoder()],
+    ['currentSolVolume', getU64Encoder()],
+    ['lastUpdateTimestamp', getI64Encoder()],
+    ['minBaseAmountOut', getU64Encoder()],
+    ['ixName', addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
+    ['cashbackFeeBasisPoints', getU64Encoder()],
+    ['cashback', getU64Encoder()],
   ]);
 }
 
-export function getBuyEventDecoder(): FixedSizeDecoder<BuyEvent> {
+export function getBuyEventDecoder(): Decoder<BuyEvent> {
   return getStructDecoder([
     ['timestamp', getI64Decoder()],
     ['baseAmountOut', getU64Decoder()],
@@ -115,9 +160,21 @@ export function getBuyEventDecoder(): FixedSizeDecoder<BuyEvent> {
     ['userQuoteTokenAccount', getAddressDecoder()],
     ['protocolFeeRecipient', getAddressDecoder()],
     ['protocolFeeRecipientTokenAccount', getAddressDecoder()],
+    ['coinCreator', getAddressDecoder()],
+    ['coinCreatorFeeBasisPoints', getU64Decoder()],
+    ['coinCreatorFee', getU64Decoder()],
+    ['trackVolume', getBooleanDecoder()],
+    ['totalUnclaimedTokens', getU64Decoder()],
+    ['totalClaimedTokens', getU64Decoder()],
+    ['currentSolVolume', getU64Decoder()],
+    ['lastUpdateTimestamp', getI64Decoder()],
+    ['minBaseAmountOut', getU64Decoder()],
+    ['ixName', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
+    ['cashbackFeeBasisPoints', getU64Decoder()],
+    ['cashback', getU64Decoder()],
   ]);
 }
 
-export function getBuyEventCodec(): FixedSizeCodec<BuyEventArgs, BuyEvent> {
+export function getBuyEventCodec(): Codec<BuyEventArgs, BuyEvent> {
   return combineCodec(getBuyEventEncoder(), getBuyEventDecoder());
 }

@@ -30,6 +30,8 @@ export type UpdateFeeConfigEvent = {
   lpFeeBasisPoints: bigint;
   protocolFeeBasisPoints: bigint;
   protocolFeeRecipients: Array<Address>;
+  coinCreatorFeeBasisPoints: bigint;
+  adminSetCoinCreatorAuthority: Address;
 };
 
 export type UpdateFeeConfigEventArgs = {
@@ -38,6 +40,8 @@ export type UpdateFeeConfigEventArgs = {
   lpFeeBasisPoints: number | bigint;
   protocolFeeBasisPoints: number | bigint;
   protocolFeeRecipients: Array<Address>;
+  coinCreatorFeeBasisPoints: number | bigint;
+  adminSetCoinCreatorAuthority: Address;
 };
 
 export function getUpdateFeeConfigEventEncoder(): FixedSizeEncoder<UpdateFeeConfigEventArgs> {
@@ -50,6 +54,8 @@ export function getUpdateFeeConfigEventEncoder(): FixedSizeEncoder<UpdateFeeConf
       'protocolFeeRecipients',
       getArrayEncoder(getAddressEncoder(), { size: 8 }),
     ],
+    ['coinCreatorFeeBasisPoints', getU64Encoder()],
+    ['adminSetCoinCreatorAuthority', getAddressEncoder()],
   ]);
 }
 
@@ -63,6 +69,8 @@ export function getUpdateFeeConfigEventDecoder(): FixedSizeDecoder<UpdateFeeConf
       'protocolFeeRecipients',
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
     ],
+    ['coinCreatorFeeBasisPoints', getU64Decoder()],
+    ['adminSetCoinCreatorAuthority', getAddressDecoder()],
   ]);
 }
 
