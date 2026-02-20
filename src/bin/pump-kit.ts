@@ -3,6 +3,11 @@
 import { readFileSync } from "node:fs";
 
 function readVersion(): string {
+  const fromEnv = process.env.PUMP_KIT_VERSION;
+  if (fromEnv && fromEnv.length > 0) {
+    return fromEnv;
+  }
+
   try {
     const pkgUrl = new URL("../../package.json", import.meta.url);
     const pkg = JSON.parse(readFileSync(pkgUrl, "utf8")) as { version?: string };

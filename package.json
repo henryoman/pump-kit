@@ -27,7 +27,7 @@
     "lint": "oxlint --deny-warnings src tests scripts examples",
     "lint:fix": "oxlint --fix --deny-warnings src tests scripts examples",
     "build:js": "bun build ./src/index.ts --outdir dist --format esm --minify",
-    "build:binary": "mkdir -p dist/bin && bun build --compile --outfile dist/bin/pump-kit ./src/bin/pump-kit.ts",
+    "build:binary": "mkdir -p dist/bin && PUMP_KIT_VERSION=$(node -p \"require('./package.json').version\") bun build --compile --env='PUMP_KIT_*' --outfile dist/bin/pump-kit ./src/bin/pump-kit.ts",
     "build:types": "tsc -p tsconfig.build.json",
     "build": "rm -rf dist && bun run build:js && bun run build:types",
     "ci": "bun run dev:typecheck && bun run lint && bun run test:unit && bun run test:integration && bun run build",
