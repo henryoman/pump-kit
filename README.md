@@ -1,7 +1,7 @@
 # Pump Kit
 
 <p align="center">
-  <img src="https://amaranth-manual-buzzard-640.mypinata.cloud/ipfs/bafkreibp354xz2lzqxntalhdnq3gdvuyleilbxfw3u5pyjmigsaz6xidea" alt="Pump Kit" width="600" />
+  <img src="https://amaranth-manual-buzzard-640.mypinata.cloud/ipfs/bafkreif6akiu636nsc53bkexhuxoy3ddscyjepsbjdzldf3wxyl6rl4tqm" alt="Pump Kit - Solana Kit 6" width="600" />
 </p>
 
 <p align="center">
@@ -188,4 +188,11 @@ MIT
    - runs CI
    - builds a Bun Linux binary (`dist/bin/pump-kit`)
    - uploads release assets (`pump-kit-linux-x64`, `.sha256`, `.tar.gz`)
-   - publishes npm package.
+   - publishes npm package
+   - creates GitHub release notes from commits since the previous tag.
+
+One-command ship flow (cut + wait for GitHub release job):
+
+- `bun run release:ship:patch`
+- `bun run release:ship:minor`
+- `bun run release:ship:major`

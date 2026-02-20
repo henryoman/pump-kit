@@ -51,6 +51,27 @@ jobs:
           sha256sum artifacts/pump-kit-linux-x64 > artifacts/pump-kit-linux-x64.sha256
           tar -czf artifacts/pump-kit-linux-x64.tar.gz -C artifacts pump-kit-linux-x64
 
+      - name: Build release notes from commits
+        id: release_notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "${CURRENT_TAG}^" 2>/dev/null || true)
+          if [ -n "$PREV_TAG" ]; then
+            NOTES=$(git log --pretty=format:'- %s (%h)' "${PREV_TAG}..${CURRENT_TAG}")
+          else
+            NOTES=$(git log --pretty=format:'- %s (%h)' "${CURRENT_TAG}")
+          fi
+          if [ -z "$NOTES" ]; then
+            NOTES="- Initial release"
+          fi
+          {
+            echo "body<<EOF"
+            echo "## Changes"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish to npm
         if: startsWith(github.ref, 'refs/tags/') && secrets.NPM_TOKEN != ''
         env:
@@ -61,8 +82,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          body: ${{ steps.release_notes.outputs.body }}
           files: |
             artifacts/pump-kit-linux-x64
             artifacts/pump-kit-linux-x64.sha256
             artifacts/pump-kit-linux-x64.tar.gz
-          generate_release_notes: true
