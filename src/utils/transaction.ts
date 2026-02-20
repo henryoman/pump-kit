@@ -149,7 +149,7 @@ export async function buildTransaction({
     if ('prepend' in instruction && Array.isArray(instruction.prepend)) {
       instructionPrepend.push(...instruction.prepend);
       // Remove prepend property for clean instruction
-      const { prepend, ...cleanInstruction } = instruction as any;
+      const { prepend: _prepend, ...cleanInstruction } = instruction as any;
       cleanedInstructions.push(cleanInstruction);
     } else {
       cleanedInstructions.push(instruction);
@@ -344,7 +344,7 @@ export async function sendAndConfirmTransaction({
       }
       
       throw new Error(errorMessage);
-    } catch (error: any) {
+    } catch {
       // If we can't get transaction details, just throw with status error
       const errStr = status.err && typeof status.err === 'object'
         ? JSON.stringify(status.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)

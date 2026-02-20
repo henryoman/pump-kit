@@ -15,11 +15,9 @@ export function tokensToRaw(amount: number, decimals: number): bigint {
   if (!Number.isInteger(decimals) || decimals < 0) {
     throw new Error("Token decimals must be a non-negative integer");
   }
-  const factor = BigInt(10) ** BigInt(decimals);
   return BigInt(Math.round(amount * 10 ** decimals));
 }
 
 export function rawToTokens(raw: bigint, decimals: number): number {
   return Number(raw) / 10 ** decimals;
 }
-

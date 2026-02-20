@@ -16,11 +16,11 @@
   </a>
 </p>
 
-A TypeScript SDK for Pump.fun built on **Solana Kit 5.0**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices.
+A TypeScript SDK for Pump.fun built on **Solana Kit 6**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices.
 
 ## Features
 
-- **Solana Kit 5.0** – Built on the latest Solana development framework
+- **Solana Kit 6** – Built on the latest Solana development framework
 - **Modern transaction patterns** – Optimized for speed and reliability
 - **Unified swaps** – `buy`/`sell` auto-route between bonding curves and AMM pools
 - **Curve helpers** – Direct access to bonding-curve instructions when you need them (`curveBuy`, `curveSell`)

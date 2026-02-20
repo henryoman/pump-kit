@@ -7,7 +7,6 @@ import { sell as buildSellInstruction } from "../clients/pump";
 import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
 import { DEFAULT_SLIPPAGE_BPS, subSlippage, validateSlippage } from "../utils/slippage";
 import { tokensToRaw, solToLamports } from "../utils/amounts";
-import { getDefaultCommitment } from "../config/commitment";
 
 const DEFAULT_TOKEN_DECIMALS = 6;
 

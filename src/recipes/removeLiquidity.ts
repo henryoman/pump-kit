@@ -31,14 +31,14 @@ export interface RemoveLiquidityParams {
  */
 export async function removeLiquidity(params: RemoveLiquidityParams): Promise<Instruction> {
   const {
-    user,
-    baseMint,
-    quoteMint,
+    user: _user,
+    baseMint: _baseMint,
+    quoteMint: _quoteMint,
     lpAmount,
     estimatedBaseOut,
     estimatedQuoteOut,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
-    poolIndex = 0,
+    poolIndex: _poolIndex = 0,
   } = params;
 
   // Validate inputs
@@ -48,8 +48,8 @@ export async function removeLiquidity(params: RemoveLiquidityParams): Promise<In
   if (estimatedQuoteOut < 0n) throw new Error("Estimated quote output cannot be negative");
 
   // Calculate minimum outputs with slippage protection
-  const minBaseOut = subSlippage(estimatedBaseOut, slippageBps);
-  const minQuoteOut = subSlippage(estimatedQuoteOut, slippageBps);
+  const _minBaseOut = subSlippage(estimatedBaseOut, slippageBps);
+  const _minQuoteOut = subSlippage(estimatedQuoteOut, slippageBps);
 
   // TODO: Implement using AMM client once available
   // This would use getWithdrawInstruction from src/ammsdk/generated/instructions

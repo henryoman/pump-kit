@@ -87,7 +87,7 @@ export function quoteBuyWithSolAmount(
     throw new Error("Total SOL cost must be positive");
   }
 
-  const { combinedFeeBps, totalFeeBps } = sumFees(fees);
+  const { combinedFeeBps } = sumFees(fees);
 
   const feeLamports = mulDivFloor(totalSolCostLamports, combinedFeeBps, BPS_DENOMINATOR);
   const creatorFeeLamports = mulDivFloor(

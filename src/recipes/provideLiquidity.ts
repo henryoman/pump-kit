@@ -32,14 +32,14 @@ export interface ProvideLiquidityParams {
  */
 export async function provideLiquidity(params: ProvideLiquidityParams): Promise<Instruction> {
   const {
-    user,
-    baseMint,
-    quoteMint,
+    user: _user,
+    baseMint: _baseMint,
+    quoteMint: _quoteMint,
     baseIn,
     quoteIn,
     estimatedLpOut,
     slippageBps = DEFAULT_SLIPPAGE_BPS,
-    poolIndex = 0,
+    poolIndex: _poolIndex = 0,
   } = params;
 
   // Validate inputs
@@ -49,7 +49,7 @@ export async function provideLiquidity(params: ProvideLiquidityParams): Promise<
   if (estimatedLpOut <= 0n) throw new Error("Estimated LP output must be positive");
 
   // Calculate minimum LP tokens to accept
-  const minLpOut = subSlippage(estimatedLpOut, slippageBps);
+  const _minLpOut = subSlippage(estimatedLpOut, slippageBps);
 
   // TODO: Implement using AMM client once available
   // This would use getDepositInstruction from src/ammsdk/generated/instructions

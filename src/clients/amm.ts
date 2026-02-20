@@ -35,7 +35,6 @@ import {
   getWithdrawInstruction,
   getBuyInstruction,
   getSellInstruction,
-  getCreatePoolInstruction,
 } from "../ammsdk/generated/instructions";
 import { fetchPool } from "../ammsdk/generated/accounts/pool";
 import { fetchGlobalConfig } from "../ammsdk/generated/accounts/globalConfig";
@@ -70,8 +69,8 @@ export async function createPool(params: CreatePoolParams) {
   
   // Derive PDAs (all async)
   const pool = await poolPda(index, userAddr, base, quote);
-  const lpMint = await lpMintPda(pool);
-  const globalConfig = await globalConfigPda();
+  const _lpMint = await lpMintPda(pool);
+  const _globalConfig = await globalConfigPda();
 
   // TODO: Complete with actual instruction builder once API is confirmed
   throw new Error("createPool not yet implemented - needs generated instruction verification");

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { buildWrapSolInstructions, buildUnwrapSolInstructions, WSOL } from "../../src/utils/wsol";
+import { buildWrapSolInstructions, buildUnwrapSolInstructions } from "../../src/utils/wsol";
 import { generateKeyPairSigner } from "@solana/signers";
 import { address } from "@solana/kit";
 
