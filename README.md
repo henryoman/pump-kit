@@ -1,20 +1,10 @@
 # Pump Kit
 
-<p align="center">
-  <img src="https://amaranth-manual-buzzard-640.mypinata.cloud/ipfs/bafkreif6akiu636nsc53bkexhuxoy3ddscyjepsbjdzldf3wxyl6rl4tqm" alt="Pump Kit - Solana Kit 6" width="600" />
-</p>
+![Pump Kit - Solana Kit 6](https://amaranth-manual-buzzard-640.mypinata.cloud/ipfs/bafkreif6akiu636nsc53bkexhuxoy3ddscyjepsbjdzldf3wxyl6rl4tqm)
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/pump-kit">
-    <img src="https://img.shields.io/npm/v/pump-kit.svg?logo=npm&label=npm" alt="npm version" />
-  </a>
-  <a href="https://bun.sh">
-    <img src="https://img.shields.io/badge/bun-%3E%3D1.3.0-000000?logo=bun&logoColor=fff" alt="Bun >= 1.3.0" />
-  </a>
-  <a href="https://nodejs.org/en">
-    <img src="https://img.shields.io/badge/node-%3E%3D20-43853d?logo=node.js&logoColor=fff" alt="Node.js >= 20" />
-  </a>
-</p>
+[![npm version](https://img.shields.io/npm/v/pump-kit.svg?logo=npm&label=npm)](https://www.npmjs.com/package/pump-kit)
+![Bun >= 1.3.0](https://img.shields.io/badge/bun-%3E%3D1.3.0-000000?logo=bun&logoColor=fff)
+![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-43853d?logo=node.js&logoColor=fff)
 
 A TypeScript SDK for Pump.fun built on **Solana Kit 6**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices.
 
@@ -174,24 +164,3 @@ simulateTransaction({ instructions, payer, rpc, options? })
 ## License
 
 MIT
-
-## Release Flow
-
-1. Cut a release from local once your branch is ready:
-   - `bun run release:cut patch`
-   - or `bun run release:cut minor`
-   - or `bun run release:cut major`
-   - or explicit: `bun run release:cut 0.2.1`
-2. The script runs `bun run ci`, bumps `package.json`, commits, tags, and pushes.
-3. Tag push (`vX.Y.Z`) triggers `.github/workflows/release.yml`:
-   - runs CI
-   - builds a Bun Linux binary (`dist/bin/pump-kit`)
-   - uploads release assets (`pump-kit-linux-x64`, `.sha256`, `.tar.gz`)
-   - publishes npm package
-   - creates GitHub release notes from commits since the previous tag.
-
-One-command ship flow (cut + wait for GitHub release job):
-
-- `bun run release:ship:patch`
-- `bun run release:ship:minor`
-- `bun run release:ship:major`
