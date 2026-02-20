@@ -161,6 +161,13 @@ simulateTransaction({ instructions, payer, rpc, options? })
 
 ---
 
+## Agent Integration
+
+- `llms.txt` provides an LLM-oriented index of the SDK and usage constraints.
+- `metadata/actions-registry.json` provides a machine-readable action map for tool/agent wrappers.
+
+---
+
 ## License
 
 MIT

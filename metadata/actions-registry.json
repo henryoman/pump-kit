@@ -1,0 +1,278 @@
+{
+  "schemaVersion": "1.0.0",
+  "package": "pump-kit",
+  "entrypoints": [
+    "pump-kit",
+    "pump-kit/simple"
+  ],
+  "jsonConventions": {
+    "bigintEncoding": "decimal-string",
+    "notes": [
+      "When invoking from JSON tools, encode bigint inputs as strings, then cast to BigInt in runtime code.",
+      "All slippage values are basis points (bps)."
+    ]
+  },
+  "actions": [
+    {
+      "name": "buy",
+      "entrypoint": "pump-kit",
+      "mapsTo": "curveBuy",
+      "description": "Alias for curve buy."
+    },
+    {
+      "name": "sell",
+      "entrypoint": "pump-kit",
+      "mapsTo": "curveSell",
+      "description": "Alias for curve sell."
+    },
+    {
+      "name": "curveBuy",
+      "entrypoint": "pump-kit",
+      "description": "Build bonding-curve buy instruction with slippage guard.",
+      "requiredParams": [
+        "user",
+        "mint",
+        "solAmount",
+        "rpc"
+      ],
+      "optionalParams": [
+        "slippageBps",
+        "feeRecipient",
+        "bondingCurveCreator",
+        "trackVolume",
+        "curveStateOverride",
+        "feeStructureOverride",
+        "allowAtaCreation",
+        "commitment"
+      ],
+      "returns": "Instruction"
+    },
+    {
+      "name": "curveSell",
+      "entrypoint": "pump-kit",
+      "description": "Build bonding-curve sell instruction using fixed token amount or wallet percentage.",
+      "requiredParams": [
+        "user",
+        "mint",
+        "rpc"
+      ],
+      "optionalParams": [
+        "tokenAmount",
+        "useWalletPercentage",
+        "walletPercentage",
+        "tokenDecimals",
+        "slippageBps",
+        "feeRecipient",
+        "bondingCurveCreator",
+        "curveStateOverride",
+        "feeStructureOverride",
+        "commitment"
+      ],
+      "returns": "Instruction"
+    },
+    {
+      "name": "ammBuy",
+      "entrypoint": "pump-kit",
+      "description": "Build AMM buy instruction from a SOL budget.",
+      "requiredParams": [
+        "user",
+        "mint",
+        "solAmount",
+        "rpc"
+      ],
+      "optionalParams": [
+        "slippageBps",
+        "poolAddress",
+        "poolCreator",
+        "poolIndex",
+        "quoteMint",
+        "allowTrackVolume",
+        "commitment"
+      ],
+      "returns": "Instruction"
+    },
+    {
+      "name": "ammSell",
+      "entrypoint": "pump-kit",
+      "description": "Build AMM sell instruction using fixed amount or wallet percentage.",
+      "requiredParams": [
+        "user",
+        "mint",
+        "rpc"
+      ],
+      "optionalParams": [
+        "tokenAmount",
+        "tokenDecimals",
+        "slippageBps",
+        "useWalletPercentage",
+        "walletPercentage",
+        "poolAddress",
+        "poolCreator",
+        "poolIndex",
+        "quoteMint",
+        "allowTrackVolume",
+        "commitment"
+      ],
+      "returns": "Instruction"
+    },
+    {
+      "name": "addLiquidity",
+      "entrypoint": "pump-kit",
+      "description": "Build AMM liquidity deposit instruction.",
+      "requiredParams": [
+        "user",
+        "baseMint",
+        "maxBaseAmountIn",
+        "maxQuoteAmountIn"
+      ],
+      "optionalParams": [
+        "quoteMint",
+        "poolIndex",
+        "poolAddress",
+        "poolCreator",
+        "minLpTokensOut",
+        "tokenProgram",
+        "token2022Program"
+      ],
+      "returns": "Instruction"
+    },
+    {
+      "name": "removeLiquidity",
+      "entrypoint": "pump-kit",
+      "description": "Build AMM liquidity withdraw instruction.",
+      "requiredParams": [
+        "user",
+        "baseMint",
+        "lpAmountIn"
+      ],
+      "optionalParams": [
+        "quoteMint",
+        "poolIndex",
+        "poolAddress",
+        "poolCreator",
+        "minBaseAmountOut",
+        "minQuoteAmountOut",
+        "tokenProgram",
+        "token2022Program"
+      ],
+      "returns": "Instruction"
+    },
+    {
+      "name": "mintWithFirstBuy",
+      "entrypoint": "pump-kit",
+      "description": "Create token mint + initial curve buy instructions.",
+      "requiredParams": [
+        "user",
+        "mint",
+        "mintAuthority",
+        "name",
+        "symbol",
+        "uri",
+        "firstBuyTokenAmount",
+        "estimatedFirstBuyCost",
+        "rpc"
+      ],
+      "optionalParams": [
+        "slippageBps",
+        "feeRecipient",
+        "bondingCurveCreator",
+        "trackVolume",
+        "commitment"
+      ],
+      "returns": "MintAndBuyInstructions"
+    },
+    {
+      "name": "createAndBuy",
+      "entrypoint": "pump-kit",
+      "description": "Generate mint signer, create mint+buy instructions, then send+confirm transaction.",
+      "requiredParams": [
+        "creator",
+        "metadata",
+        "firstBuyTokenAmount",
+        "estimatedFirstBuyCost",
+        "rpc",
+        "rpcSubscriptions"
+      ],
+      "optionalParams": [
+        "slippageBps",
+        "feeRecipient",
+        "bondingCurveCreator",
+        "mintAuthority",
+        "mint",
+        "priorityFees",
+        "prependInstructions",
+        "appendInstructions",
+        "additionalSigners",
+        "sendOptions",
+        "commitment"
+      ],
+      "returns": "CreateAndBuyResult"
+    },
+    {
+      "name": "buildTransaction",
+      "entrypoint": "pump-kit",
+      "description": "Build transaction message with optional priority fee and prepend/append instruction hooks.",
+      "requiredParams": [
+        "instructions",
+        "payer",
+        "rpc"
+      ],
+      "optionalParams": [
+        "additionalSigners",
+        "latestBlockhash",
+        "lastValidBlockHeight",
+        "prependInstructions",
+        "appendInstructions",
+        "priorityFees",
+        "version",
+        "commitment"
+      ],
+      "returns": "BuiltTransaction"
+    },
+    {
+      "name": "sendAndConfirmTransaction",
+      "entrypoint": "pump-kit",
+      "description": "Build, sign, send, and confirm transaction.",
+      "requiredParams": [
+        "instructions",
+        "payer",
+        "rpc",
+        "rpcSubscriptions"
+      ],
+      "optionalParams": [
+        "additionalSigners",
+        "latestBlockhash",
+        "lastValidBlockHeight",
+        "prependInstructions",
+        "appendInstructions",
+        "priorityFees",
+        "version",
+        "sendOptions",
+        "commitment"
+      ],
+      "returns": "TransactionResult"
+    },
+    {
+      "name": "simulateTransaction",
+      "entrypoint": "pump-kit",
+      "description": "Build and simulate transaction without sending.",
+      "requiredParams": [
+        "instructions",
+        "payer",
+        "rpc"
+      ],
+      "optionalParams": [
+        "additionalSigners",
+        "latestBlockhash",
+        "lastValidBlockHeight",
+        "prependInstructions",
+        "appendInstructions",
+        "priorityFees",
+        "version",
+        "options",
+        "commitment"
+      ],
+      "returns": "SimulationResponse"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# pump-kit
+> TypeScript SDK for Pump.fun built on Solana Kit 6.
+
+Canonical docs: `README.md`
+Testing guide: `TESTING.md`
+WSOL guide: `WRAPPING.md`
+Machine-readable action registry: `metadata/actions-registry.json`
+
+Entry points:
+- `pump-kit` (full API)
+- `pump-kit/simple` (minimal API)
+
+Agent integration notes:
+- Pass slippage in basis points (`slippageBps`), not percent.
+- For swap helpers, use either explicit lamport limits or estimate+`slippageBps` mode; do not mix modes.
+- JSON transports should encode bigint values as decimal strings and cast with `BigInt(...)` before calling SDK functions.
+- Provide `bondingCurveCreator`/`poolCreator` when known to avoid extra RPC lookups.
+
+High-value actions:
+- `curveBuy`, `curveSell`
+- `ammBuy`, `ammSell`
+- `addLiquidity`, `removeLiquidity`
+- `mintWithFirstBuy`, `createAndBuy`
+- `buildTransaction`, `sendAndConfirmTransaction`, `simulateTransaction`
