@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 function run(cmd: string, args: string[], label: string): string {
   const result = spawnSync(cmd, args, { stdio: "pipe", encoding: "utf8" });
@@ -22,9 +23,23 @@ const bump = args[0] ?? "patch";
 
 runStreaming("bun", ["run", "scripts/cut-release.ts", bump], "cut release");
 
+const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
+const expectedTitle = `Release v${pkg.version}`;
+
 const runId = run(
   "gh",
-  ["run", "list", "--workflow", "release.yml", "--limit", "1", "--json", "databaseId", "--jq", ".[0].databaseId"],
+  [
+    "run",
+    "list",
+    "--workflow",
+    "release.yml",
+    "--limit",
+    "20",
+    "--json",
+    "databaseId,displayTitle",
+    "--jq",
+    `map(select(.displayTitle == "${expectedTitle}"))[0].databaseId`,
+  ],
   "get release run id",
 );
 

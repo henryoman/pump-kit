@@ -177,14 +177,13 @@ MIT
 
 ## Release Flow
 
-1. Configure repo secret `NPM_TOKEN` in GitHub Actions (use an npm automation token).
-2. Cut a release from local once your branch is ready:
+1. Cut a release from local once your branch is ready:
    - `bun run release:cut patch`
    - or `bun run release:cut minor`
    - or `bun run release:cut major`
    - or explicit: `bun run release:cut 0.2.1`
-3. The script runs `bun run ci`, bumps `package.json`, commits, tags, and pushes.
-4. Tag push (`vX.Y.Z`) triggers `.github/workflows/release.yml`:
+2. The script runs `bun run ci`, bumps `package.json`, commits, tags, and pushes.
+3. Tag push (`vX.Y.Z`) triggers `.github/workflows/release.yml`:
    - runs CI
    - builds a Bun Linux binary (`dist/bin/pump-kit`)
    - uploads release assets (`pump-kit-linux-x64`, `.sha256`, `.tar.gz`)
