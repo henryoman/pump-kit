@@ -10,6 +10,7 @@ import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
 import {
   appendTransactionMessageInstruction,
+  compressTransactionMessageUsingAddressLookupTables,
   createTransactionMessage,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -24,16 +25,34 @@ import {
 } from "@solana/signers";
 import {
   getBase64EncodedWireTransaction,
+  assertIsTransactionWithinSizeLimit,
   getSignatureFromTransaction,
 } from "@solana/transactions";
 
-const COMPUTE_BUDGET_PROGRAM = toAddress(
-  "ComputeBudget111111111111111111111111111111"
-);
+import { getSetComputeUnitLimitInstruction, getSetComputeUnitPriceInstruction } from "@solana-program/compute-budget";
+
+export type TransactionLifetime = Readonly<{
+  blockhash: string;
+  lastValidBlockHeight: bigint;
+}>;
 
 export interface TransactionResult {
   signature: string;
   slot?: number | bigint | null;
+}
+
+/** An unknown result must be reconciled using this signature before signing another order. */
+export class TransactionExecutionError extends Error {
+  constructor(
+    message: string,
+    readonly outcome: "failed" | "unknown",
+    readonly signature: string,
+    readonly lifetime: TransactionLifetime,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "TransactionExecutionError";
+  }
 }
 
 export interface BuildTransactionParams {
@@ -41,16 +60,16 @@ export interface BuildTransactionParams {
   payer: Address | TransactionSigner;
   /** Optional additional signers that should be associated with the transaction message. */
   additionalSigners?: readonly TransactionSigner[];
-  /** Optional override for the blockhash lifetime. */
-  latestBlockhash?: string;
-  /** Optional override for the last valid block height associated with the blockhash. */
-  lastValidBlockHeight?: bigint | number;
+  /** The blockhash and expiration from one RPC response. Omit to fetch a complete pair. */
+  lifetime?: TransactionLifetime;
   /** Instructions to insert ahead of the provided instruction list (e.g. priority fee config). */
   prependInstructions?: readonly Instruction[];
   /** Instructions to append after the provided instruction list. */
   appendInstructions?: readonly Instruction[];
   /** Optional priority fee instructions to prepend automatically. */
   priorityFees?: PriorityFeeOptions;
+  /** Addresses from active on-chain lookup tables, for version 0 messages. */
+  addressLookupTables?: Record<string, readonly Address[]>;
   /** Transaction message version. Defaults to legacy. */
   version?: "legacy" | 0;
   /** Custom RPC client (useful for testing). */
@@ -79,6 +98,8 @@ export interface SendAndConfirmTransactionParams
   extends Omit<BuildTransactionParams, "payer"> {
   payer: TransactionSigner;
   sendOptions?: SendOptions;
+  /** Persist the signed transaction identity before any broadcast. Failure prevents submission. */
+  onSigned?: (record: { signature: string; latestBlockhash: string; lastValidBlockHeight: bigint }) => Promise<void>;
   rpc: RpcClient;
   rpcSubscriptions: RpcSubscriptionsClient;
   commitment?: Commitment;
@@ -125,9 +146,9 @@ export async function buildTransaction({
   instructions,
   payer,
   additionalSigners = [],
-  latestBlockhash,
-  lastValidBlockHeight,
+  lifetime,
   version = "legacy",
+  addressLookupTables,
   rpc: rpcClient,
   commitment = getDefaultCommitment(),
   prependInstructions = [],
@@ -141,26 +162,10 @@ export async function buildTransaction({
 
   const priorityInstructions = buildPriorityFeeInstructions(priorityFees);
 
-  // Extract any prepend instructions from instruction objects themselves
-  const instructionPrepend: Instruction[] = [];
-  const cleanedInstructions: Instruction[] = [];
-  
-  for (const instruction of instructions) {
-    if ('prepend' in instruction && Array.isArray(instruction.prepend)) {
-      instructionPrepend.push(...instruction.prepend);
-      // Remove prepend property for clean instruction
-      const { prepend: _prepend, ...cleanInstruction } = instruction as any;
-      cleanedInstructions.push(cleanInstruction);
-    } else {
-      cleanedInstructions.push(instruction);
-    }
-  }
-
   const orderedInstructions = [
     ...priorityInstructions,
-    ...instructionPrepend,
     ...(prependInstructions ?? []),
-    ...cleanedInstructions,
+    ...instructions,
     ...(appendInstructions ?? []),
   ];
 
@@ -215,21 +220,12 @@ export async function buildTransaction({
       ? (addSignersToTransactionMessage(signers, messageWithFeePayer as any) as TransactionMessageWithFeePayer)
       : messageWithFeePayer;
 
-  let blockhash = latestBlockhash;
-  let validBlockHeight =
-    lastValidBlockHeight !== undefined
-      ? BigInt(lastValidBlockHeight)
-      : undefined;
-
-  if (!blockhash || validBlockHeight === undefined) {
-    const { value } = await rpcClient
-      .getLatestBlockhash({ commitment })
-      .send();
-    blockhash = blockhash ?? value.blockhash;
-    if (validBlockHeight === undefined) {
-      validBlockHeight = BigInt(value.lastValidBlockHeight);
-    }
+  if (lifetime && (!lifetime.blockhash || typeof lifetime.lastValidBlockHeight !== "bigint")) {
+    throw new Error("Transaction lifetime requires a blockhash and bigint lastValidBlockHeight");
   }
+  const resolvedLifetime = lifetime ?? (await rpcClient.getLatestBlockhash({ commitment }).send()).value;
+  const blockhash = resolvedLifetime.blockhash;
+  const validBlockHeight = BigInt(resolvedLifetime.lastValidBlockHeight);
 
   const messageWithLifetime = setTransactionMessageLifetimeUsingBlockhash(
     {
@@ -240,7 +236,9 @@ export async function buildTransaction({
   ) as TransactionMessageWithSignersLifetime;
 
   return {
-    transactionMessage: messageWithLifetime,
+    transactionMessage: addressLookupTables
+      ? compressTransactionMessageUsingAddressLookupTables(messageWithLifetime as any, addressLookupTables as any) as TransactionMessageWithSignersLifetime
+      : messageWithLifetime,
     latestBlockhash: blockhash!,
     lastValidBlockHeight: validBlockHeight!,
   };
@@ -253,9 +251,9 @@ export async function sendAndConfirmTransaction({
   instructions,
   payer,
   additionalSigners = [],
-  latestBlockhash,
-  lastValidBlockHeight,
+  lifetime,
   version,
+  addressLookupTables,
   prependInstructions,
   appendInstructions,
   priorityFees,
@@ -263,14 +261,15 @@ export async function sendAndConfirmTransaction({
   rpcSubscriptions: rpcSubscriptionsClient,
   commitment = getDefaultCommitment(),
   sendOptions = {},
+  onSigned,
 }: SendAndConfirmTransactionParams): Promise<TransactionResult> {
   const built = await buildTransaction({
     instructions,
     payer,
     additionalSigners,
-    latestBlockhash,
-    lastValidBlockHeight,
+    lifetime,
     version,
+    addressLookupTables,
     prependInstructions,
     appendInstructions,
     priorityFees,
@@ -282,7 +281,9 @@ export async function sendAndConfirmTransaction({
     built.transactionMessage as any
   );
 
+  assertIsTransactionWithinSizeLimit(signedTransaction);
   const signature = getSignatureFromTransaction(signedTransaction);
+  await onSigned?.({ signature, latestBlockhash: built.latestBlockhash, lastValidBlockHeight: built.lastValidBlockHeight });
 
   const sendAndConfirm = sendAndConfirmTransactionFactory({
     rpc: rpcClient,
@@ -303,54 +304,45 @@ export async function sendAndConfirmTransaction({
     sendConfig.preflightCommitment = sendOptions.preflightCommitment;
   }
 
-  await sendAndConfirm(signedTransaction as any, sendConfig as any);
+  let sendError: unknown;
+  try {
+    await sendAndConfirm(signedTransaction as any, sendConfig as any);
+  } catch (error) {
+    sendError = error;
+  }
 
-  const statusResponse = await rpcClient
-    .getSignatureStatuses([signature], { searchTransactionHistory: false })
-    .send();
-  const status = statusResponse.value?.[0] ?? null;
+  const lifetimeIdentity = { blockhash: built.latestBlockhash, lastValidBlockHeight: built.lastValidBlockHeight };
+  let status;
+  try {
+    const response = await rpcClient.getSignatureStatuses([signature], { searchTransactionHistory: true }).send();
+    status = response.value?.[0] ?? null;
+  } catch (error) {
+    throw new TransactionExecutionError("Transaction outcome is unknown; reconcile the original signature before retrying",
+      "unknown", signature, lifetimeIdentity, { cause: sendError ?? error });
+  }
 
-  // CRITICAL: Check if transaction actually succeeded
   if (status?.err) {
-    // Get transaction details for better error message
+    const serialize = (value: unknown) => JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item);
+    let errorMessage = `Transaction failed: ${serialize(status.err)}`;
     try {
-      const txResponse = await rpcClient
-        .getTransaction(signature, { commitment, encoding: "json", maxSupportedTransactionVersion: 0 })
-        .send();
-      const tx = txResponse;
-      
-      let errorMessage = `Transaction failed`;
-      if (status.err) {
-        // Convert BigInt to string for JSON serialization
-        const errStr = typeof status.err === 'object' 
-          ? JSON.stringify(status.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)
-          : String(status.err);
-        errorMessage = `Transaction failed: ${errStr}`;
+      const tx = await rpcClient.getTransaction(signature, {
+        commitment, encoding: "json", maxSupportedTransactionVersion: 0,
+      }).send();
+      if (tx?.meta?.logMessages?.length) {
+        errorMessage += `\nProgram logs:\n${tx.meta.logMessages.join("\n")}`;
       }
-      if (tx?.meta?.err) {
-        const errStr = typeof tx.meta.err === 'object'
-          ? JSON.stringify(tx.meta.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)
-          : String(tx.meta.err);
-        errorMessage = `Transaction failed: ${errStr}`;
-      }
-      if (tx?.meta?.logMessages) {
-        const errorLogs = tx.meta.logMessages.filter((log: string) => 
-          log.toLowerCase().includes('error') || 
-          log.includes('Program log:')
-        );
-        if (errorLogs.length > 0) {
-          errorMessage += `\nProgram logs:\n${errorLogs.slice(0, 10).join('\n')}`;
-        }
-      }
-      
-      throw new Error(errorMessage);
     } catch {
-      // If we can't get transaction details, just throw with status error
-      const errStr = status.err && typeof status.err === 'object'
-        ? JSON.stringify(status.err, (key, value) => typeof value === 'bigint' ? value.toString() : value)
-        : String(status.err);
-      throw new Error(`Transaction failed: ${errStr}`);
+      // Diagnostic reads can fail; retain the confirmed execution error.
     }
+    throw new TransactionExecutionError(errorMessage, "failed", signature, lifetimeIdentity, { cause: sendError });
+  }
+
+  const confirmed = status?.confirmationStatus === "finalized" ||
+    (commitment !== "finalized" && status?.confirmationStatus === "confirmed") ||
+    (commitment === "processed" && status?.confirmationStatus === "processed");
+  if (!confirmed) {
+    throw new TransactionExecutionError("Transaction outcome is unknown; reconcile the original signature before retrying",
+      "unknown", signature, lifetimeIdentity, { cause: sendError });
   }
 
   return {
@@ -366,9 +358,9 @@ export async function simulateTransaction({
   instructions,
   payer,
   additionalSigners = [],
-  latestBlockhash,
-  lastValidBlockHeight,
+  lifetime,
   version,
+  addressLookupTables,
   prependInstructions,
   appendInstructions,
   priorityFees,
@@ -380,9 +372,9 @@ export async function simulateTransaction({
     instructions,
     payer,
     additionalSigners,
-    latestBlockhash,
-    lastValidBlockHeight,
+    lifetime,
     version,
+    addressLookupTables,
     prependInstructions,
     appendInstructions,
     priorityFees,
@@ -394,9 +386,11 @@ export async function simulateTransaction({
     built.transactionMessage as any
   );
 
+  assertIsTransactionWithinSizeLimit(signedTransaction);
   const encoded = getBase64EncodedWireTransaction(signedTransaction);
 
   const simulateConfig: Record<string, unknown> = {
+    encoding: "base64",
     commitment: options.commitment ?? commitment,
   };
 
@@ -409,7 +403,7 @@ export async function simulateTransaction({
   }
 
   if (options.replaceRecentBlockhash !== undefined) {
-    if (options.sigVerify) {
+    if (options.replaceRecentBlockhash === true && options.sigVerify === true) {
       throw new Error(
         "replaceRecentBlockhash cannot be true when sigVerify is enabled."
       );
@@ -465,7 +459,7 @@ export function buildPriorityFeeInstructions(
     priorityFees.computeUnitLimit > 0
   ) {
     instructions.push(
-      createSetComputeUnitLimitInstruction(priorityFees.computeUnitLimit)
+      getSetComputeUnitLimitInstruction({ units: priorityFees.computeUnitLimit })
     );
   }
 
@@ -474,35 +468,9 @@ export function buildPriorityFeeInstructions(
     BigInt(priorityFees.computeUnitPriceMicroLamports) > 0n
   ) {
     instructions.push(
-      createSetComputeUnitPriceInstruction(
-        BigInt(priorityFees.computeUnitPriceMicroLamports)
-      )
+      getSetComputeUnitPriceInstruction({ microLamports: BigInt(priorityFees.computeUnitPriceMicroLamports) })
     );
   }
 
   return instructions;
-}
-
-function createSetComputeUnitLimitInstruction(units: number): Instruction {
-  const data = new Uint8Array(5);
-  data[0] = 0; // SetComputeUnitLimit discriminator
-  new DataView(data.buffer).setUint32(1, units, true);
-  return {
-    programAddress: COMPUTE_BUDGET_PROGRAM,
-    accounts: [],
-    data,
-  };
-}
-
-function createSetComputeUnitPriceInstruction(
-  microLamports: bigint
-): Instruction {
-  const data = new Uint8Array(9);
-  data[0] = 3; // SetComputeUnitPrice discriminator
-  new DataView(data.buffer).setBigUint64(1, microLamports, true);
-  return {
-    programAddress: COMPUTE_BUDGET_PROGRAM,
-    accounts: [],
-    data,
-  };
 }

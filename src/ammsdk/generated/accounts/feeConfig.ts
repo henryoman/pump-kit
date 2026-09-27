@@ -63,6 +63,8 @@ export type FeeConfig = {
   admin: Address;
   flatFees: Fees;
   feeTiers: Array<FeeTier>;
+  stableFeeTiers: Array<FeeTier>;
+  exoticFlatFees: Fees;
 };
 
 export type FeeConfigArgs = {
@@ -70,6 +72,8 @@ export type FeeConfigArgs = {
   admin: Address;
   flatFees: FeesArgs;
   feeTiers: Array<FeeTierArgs>;
+  stableFeeTiers: Array<FeeTierArgs>;
+  exoticFlatFees: FeesArgs;
 };
 
 export function getFeeConfigEncoder(): Encoder<FeeConfigArgs> {
@@ -80,6 +84,8 @@ export function getFeeConfigEncoder(): Encoder<FeeConfigArgs> {
       ['admin', getAddressEncoder()],
       ['flatFees', getFeesEncoder()],
       ['feeTiers', getArrayEncoder(getFeeTierEncoder())],
+      ['stableFeeTiers', getArrayEncoder(getFeeTierEncoder())],
+      ['exoticFlatFees', getFeesEncoder()],
     ]),
     (value) => ({ ...value, discriminator: FEE_CONFIG_DISCRIMINATOR })
   );
@@ -92,6 +98,8 @@ export function getFeeConfigDecoder(): Decoder<FeeConfig> {
     ['admin', getAddressDecoder()],
     ['flatFees', getFeesDecoder()],
     ['feeTiers', getArrayDecoder(getFeeTierDecoder())],
+    ['stableFeeTiers', getArrayDecoder(getFeeTierDecoder())],
+    ['exoticFlatFees', getFeesDecoder()],
   ]);
 }
 

@@ -4,6 +4,7 @@
 
 import type { TransactionSigner, Instruction } from "@solana/kit";
 import { deposit as buildDepositInstruction, withdraw as buildWithdrawInstruction } from "./clients/amm";
+import type { RpcClient } from "./config/connection";
 import { WSOL_ADDRESS } from "./utils/wsol";
 
 // Wrapped SOL address
@@ -18,9 +19,12 @@ export interface AddLiquidityParams {
   poolCreator?: string;
   maxBaseAmountIn: bigint;
   maxQuoteAmountIn: bigint;
-  minLpTokensOut?: bigint;
+  lpTokenAmountOut: bigint;
   tokenProgram?: string;
   token2022Program?: string;
+  baseTokenProgram?: string;
+  quoteTokenProgram?: string;
+  rpc?: RpcClient;
 }
 
 export interface RemoveLiquidityParams {
@@ -35,6 +39,9 @@ export interface RemoveLiquidityParams {
   minQuoteAmountOut?: bigint;
   tokenProgram?: string;
   token2022Program?: string;
+  baseTokenProgram?: string;
+  quoteTokenProgram?: string;
+  rpc?: RpcClient;
 }
 
 /**
@@ -50,7 +57,7 @@ export async function addLiquidity(params: AddLiquidityParams): Promise<Instruct
     poolCreator,
     maxBaseAmountIn,
     maxQuoteAmountIn,
-    minLpTokensOut,
+    lpTokenAmountOut,
     tokenProgram,
     token2022Program,
   } = params;
@@ -67,9 +74,12 @@ export async function addLiquidity(params: AddLiquidityParams): Promise<Instruct
     poolCreator,
     maxBaseIn: maxBaseAmountIn,
     maxQuoteIn: maxQuoteAmountIn,
-    minLpOut: minLpTokensOut ?? 0n,
+    lpTokenAmountOut,
     tokenProgram,
     token2022Program,
+    baseTokenProgram: params.baseTokenProgram,
+    quoteTokenProgram: params.quoteTokenProgram,
+    rpc: params.rpc,
   });
 }
 
@@ -105,18 +115,21 @@ export async function removeLiquidity(params: RemoveLiquidityParams): Promise<In
     minQuoteOut: minQuoteAmountOut ?? 0n,
     tokenProgram,
     token2022Program,
+    baseTokenProgram: params.baseTokenProgram,
+    quoteTokenProgram: params.quoteTokenProgram,
+    rpc: params.rpc,
   });
 }
 
 /**
- * Quick helper to add liquidity with sensible defaults (quote defaults to wSOL, min LP = 0).
+ * Quick helper to add liquidity with sensible defaults (quote defaults to wSOL; exact LP output is required).
  */
 export async function quickAddLiquidity(
   user: TransactionSigner,
   baseMint: string,
   maxBaseAmountIn: bigint,
   maxQuoteAmountIn: bigint,
-  options: Omit<AddLiquidityParams, "user" | "baseMint" | "maxBaseAmountIn" | "maxQuoteAmountIn"> = {}
+  options: Omit<AddLiquidityParams, "user" | "baseMint" | "maxBaseAmountIn" | "maxQuoteAmountIn">
 ): Promise<Instruction> {
   return addLiquidity({
     user,

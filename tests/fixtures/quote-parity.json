@@ -1,0 +1,100 @@
+{
+  "sources": {
+    "curve": "@pump-fun/pump-sdk@2.0.0",
+    "amm": "@pump-fun/pump-swap-sdk@1.20.0"
+  },
+  "curve": [
+    {
+      "token": "1073000000000000",
+      "quote": "30000000000",
+      "real": "793100000000000",
+      "budget": "1000000000",
+      "amount": "1000000000000",
+      "fees": {
+        "protocolFeeBps": "75",
+        "creatorFeeBps": "25",
+        "lpFeeBps": "0"
+      },
+      "expectedBuy": "34281150096027",
+      "expectedCost": "28264927",
+      "expectedSell": "27653629"
+    },
+    {
+      "token": "1000",
+      "quote": "100",
+      "real": "500",
+      "budget": "14",
+      "amount": "100",
+      "fees": {
+        "protocolFeeBps": "75",
+        "creatorFeeBps": "25",
+        "lpFeeBps": "0"
+      },
+      "expectedBuy": "107",
+      "expectedCost": "14",
+      "expectedSell": "7"
+    },
+    {
+      "token": "40000000000",
+      "quote": "4000000000",
+      "real": "20000000000",
+      "budget": "1500000",
+      "amount": "1000000",
+      "fees": {
+        "protocolFeeBps": "75",
+        "creatorFeeBps": "25",
+        "lpFeeBps": "0"
+      },
+      "expectedBuy": "14845957",
+      "expectedCost": "101005",
+      "expectedSell": "98997"
+    }
+  ],
+  "amm": [
+    {
+      "base": "1000",
+      "quote": "100",
+      "virtual": "0",
+      "budget": "15",
+      "amount": "100",
+      "fees": {
+        "lpFeeBps": "75",
+        "protocolFeeBps": "75",
+        "creatorFeeBps": "25"
+      },
+      "expectedBuy": "99",
+      "expectedCost": "15",
+      "expectedSell": "6"
+    },
+    {
+      "base": "1000000000",
+      "quote": "50000000000",
+      "virtual": "3000000000",
+      "budget": "500000000",
+      "amount": "1000000",
+      "fees": {
+        "lpFeeBps": "75",
+        "protocolFeeBps": "75",
+        "creatorFeeBps": "25"
+      },
+      "expectedBuy": "9186532",
+      "expectedCost": "53981483",
+      "expectedSell": "52020478"
+    },
+    {
+      "base": "9007199254740993",
+      "quote": "90071992547409930",
+      "virtual": "0",
+      "budget": "9007199254740993",
+      "amount": "123456789",
+      "fees": {
+        "lpFeeBps": "75",
+        "protocolFeeBps": "75",
+        "creatorFeeBps": "25"
+      },
+      "expectedBuy": "806013356128947",
+      "expectedCost": "1256172847",
+      "expectedSell": "1212962933"
+    }
+  ]
+}

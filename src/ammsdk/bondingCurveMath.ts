@@ -1,7 +1,7 @@
 /**
  * Deterministic bonding curve math helpers shared across buy/sell flows.
  * Implements the same constant-product math used by the on-chain program,
- * accounting for flat protocol + creator fees expressed in basis points.
+ * accounting for resolved protocol + creator fees expressed in basis points.
  */
 
 import type { BondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
@@ -12,12 +12,12 @@ const BPS_DENOMINATOR = 10_000n;
 export type BondingCurveState = Pick<
   BondingCurve,
   | "virtualTokenReserves"
-  | "virtualSolReserves"
+  | "virtualQuoteReserves"
   | "realTokenReserves"
-  | "realSolReserves"
+  | "realQuoteReserves"
   | "creator"
   | "complete"
->;
+> & Partial<Pick<BondingCurve, "quoteMint" | "isMayhemMode" | "creatorFeeBps" | "tokenTotalSupply">>;
 
 export type FeeStructure = Pick<Fees, "lpFeeBps" | "protocolFeeBps" | "creatorFeeBps">;
 
@@ -40,13 +40,6 @@ export type SellQuote = {
   creatorFeeLamports: bigint;
 };
 
-const mulDivFloor = (value: bigint, numerator: bigint, denominator: bigint): bigint => {
-  if (denominator <= 0n) {
-    throw new Error("Division by zero (floor)");
-  }
-  return (value * numerator) / denominator;
-};
-
 const mulDivCeil = (value: bigint, numerator: bigint, denominator: bigint): bigint => {
   if (denominator <= 0n) {
     throw new Error("Division by zero (ceil)");
@@ -57,21 +50,19 @@ const mulDivCeil = (value: bigint, numerator: bigint, denominator: bigint): bigi
 };
 
 const sumFees = (fees: FeeStructure): { totalFeeBps: bigint; combinedFeeBps: bigint } => {
-  const lp = BigInt(fees.lpFeeBps);
   const protocol = BigInt(fees.protocolFeeBps);
   const creator = BigInt(fees.creatorFeeBps);
-  const combined = lp + protocol;
-  const total = combined + creator;
-  if (total >= BPS_DENOMINATOR) {
-    throw new Error("Total fee basis points must be less than 10_000");
+  if (protocol < 0n || creator < 0n || protocol + creator >= BPS_DENOMINATOR) {
+    throw new Error("Curve fees must be non-negative and total less than 10_000 bps");
   }
-  return { totalFeeBps: total, combinedFeeBps: combined };
+  // Bonding curves charge protocol and creator fees; LP fees apply only to AMM pools.
+  return { totalFeeBps: protocol + creator, combinedFeeBps: protocol };
 };
 
-const computeInvariant = (state: BondingCurveState): bigint => {
-  const tokenReserve = state.virtualTokenReserves + state.realTokenReserves;
-  const solReserve = state.virtualSolReserves + state.realSolReserves;
-  return tokenReserve * solReserve;
+const validateReserves = (state: BondingCurveState): void => {
+  if (state.virtualTokenReserves <= 0n || state.virtualQuoteReserves <= 0n || state.realTokenReserves < 0n || state.realQuoteReserves < 0n) {
+    throw new Error("Invalid bonding curve reserves");
+  }
 };
 
 /**
@@ -87,50 +78,24 @@ export function quoteBuyWithSolAmount(
     throw new Error("Total SOL cost must be positive");
   }
 
-  const { combinedFeeBps } = sumFees(fees);
-
-  const feeLamports = mulDivFloor(totalSolCostLamports, combinedFeeBps, BPS_DENOMINATOR);
-  const creatorFeeLamports = mulDivFloor(
-    totalSolCostLamports,
-    BigInt(fees.creatorFeeBps),
-    BPS_DENOMINATOR
-  );
-
-  const effectiveSolInLamports =
-    totalSolCostLamports - feeLamports - creatorFeeLamports;
-
-  if (effectiveSolInLamports <= 0n) {
-    throw new Error("Net SOL after fees must be positive");
+  validateReserves(state);
+  const { totalFeeBps } = sumFees(fees);
+  const input = ((totalSolCostLamports - 1n) * BPS_DENOMINATOR) / (BPS_DENOMINATOR + totalFeeBps);
+  const rawTokens = (input * state.virtualTokenReserves) / (state.virtualQuoteReserves + input);
+  let tokenAmount = rawTokens < state.realTokenReserves ? rawTokens : state.realTokenReserves;
+  if (tokenAmount <= 0n) throw new Error("SOL amount is too small to purchase any tokens");
+  // Separate fee ceilings may need a further unit of headroom. Binary search
+  // preserves the hard budget without walking token units one at a time.
+  let low = 0n;
+  let high = tokenAmount;
+  while (low < high) {
+    const middle = (low + high + 1n) / 2n;
+    if (quoteSolCostForBuy(state, fees, middle).totalSolCostLamports <= totalSolCostLamports) low = middle;
+    else high = middle - 1n;
   }
-
-  const invariant = computeInvariant(state);
-  const startingSolReserve = state.virtualSolReserves + state.realSolReserves;
-  const startingTokenReserve = state.virtualTokenReserves + state.realTokenReserves;
-
-  const endingSolReserve = startingSolReserve + effectiveSolInLamports;
-  const endingTokenReserve = invariant / endingSolReserve;
-  const rawTokensOut = startingTokenReserve - endingTokenReserve;
-  let tokenAmount = rawTokensOut > state.realTokenReserves
-    ? state.realTokenReserves
-    : rawTokensOut;
-
-  if (tokenAmount <= 0n) {
-    throw new Error("SOL amount is too small to purchase any tokens");
-  }
-
-  let resolvedQuote = quoteSolCostForBuy(state, fees, tokenAmount);
-
-  while (
-    resolvedQuote.totalSolCostLamports > totalSolCostLamports &&
-    tokenAmount > 0n
-  ) {
-    tokenAmount -= 1n;
-    resolvedQuote = quoteSolCostForBuy(state, fees, tokenAmount);
-  }
-
-  if (resolvedQuote.totalSolCostLamports > totalSolCostLamports) {
-    throw new Error("Insufficient SOL to purchase any tokens with fees applied");
-  }
+  tokenAmount = low;
+  if (tokenAmount <= 0n) throw new Error("Insufficient SOL to purchase any tokens with fees applied");
+  const resolvedQuote = quoteSolCostForBuy(state, fees, tokenAmount);
 
   return {
     tokenAmount,
@@ -156,35 +121,13 @@ export function quoteSolCostForBuy(
     throw new Error("Token amount exceeds available reserves");
   }
 
-  const { combinedFeeBps, totalFeeBps } = sumFees(fees);
-  const invariant = computeInvariant(state);
-  const startingSolReserve = state.virtualSolReserves + state.realSolReserves;
-  const startingTokenReserve = state.virtualTokenReserves + state.realTokenReserves;
-
-  const endingTokenReserve = startingTokenReserve - tokenAmount;
-  if (endingTokenReserve <= 0n) {
-    throw new Error("Purchase would exhaust token reserves");
-  }
-
-  const endingSolReserve = invariant / endingTokenReserve;
-  const effectiveSolInLamports = endingSolReserve - startingSolReserve;
-  if (effectiveSolInLamports <= 0n) {
-    throw new Error("Resolved SOL input must be positive");
-  }
-
-  const netBps = BPS_DENOMINATOR - totalFeeBps;
-  const totalSolCostLamports = mulDivCeil(
-    effectiveSolInLamports,
-    BPS_DENOMINATOR,
-    netBps
-  );
-
-  const feeLamports = mulDivFloor(totalSolCostLamports, combinedFeeBps, BPS_DENOMINATOR);
-  const creatorFeeLamports = mulDivFloor(
-    totalSolCostLamports,
-    BigInt(fees.creatorFeeBps),
-    BPS_DENOMINATOR
-  );
+  validateReserves(state);
+  const { combinedFeeBps } = sumFees(fees);
+  if (tokenAmount >= state.virtualTokenReserves) throw new Error("Purchase would exhaust virtual reserves");
+  const effectiveSolInLamports = (tokenAmount * state.virtualQuoteReserves) / (state.virtualTokenReserves - tokenAmount) + 1n;
+  const feeLamports = mulDivCeil(effectiveSolInLamports, combinedFeeBps, BPS_DENOMINATOR);
+  const creatorFeeLamports = mulDivCeil(effectiveSolInLamports, BigInt(fees.creatorFeeBps), BPS_DENOMINATOR);
+  const totalSolCostLamports = effectiveSolInLamports + feeLamports + creatorFeeLamports;
 
   return {
     tokenAmount,
@@ -207,35 +150,14 @@ export function quoteSellForTokenAmount(
     throw new Error("Token amount must be positive");
   }
 
-  const invariant = computeInvariant(state);
-  const startingSolReserve = state.virtualSolReserves + state.realSolReserves;
-  const startingTokenReserve = state.virtualTokenReserves + state.realTokenReserves;
-  const endingTokenReserve = startingTokenReserve + tokenAmount;
-
-  const endingSolReserve = invariant / endingTokenReserve;
-  const preFeeSolOutputLamports = startingSolReserve - endingSolReserve;
-  if (preFeeSolOutputLamports <= 0n) {
-    throw new Error("No SOL output available for the given token amount");
-  }
-
+  validateReserves(state);
   const { combinedFeeBps } = sumFees(fees);
-  const feeLamports = mulDivFloor(
-    preFeeSolOutputLamports,
-    combinedFeeBps,
-    BPS_DENOMINATOR
-  );
-  const creatorFeeLamports = mulDivFloor(
-    preFeeSolOutputLamports,
-    BigInt(fees.creatorFeeBps),
-    BPS_DENOMINATOR
-  );
-
-  const solOutputLamports =
-    preFeeSolOutputLamports - feeLamports - creatorFeeLamports;
-
-  if (solOutputLamports <= 0n) {
-    throw new Error("SOL output after fees is non-positive");
-  }
+  const preFeeSolOutputLamports = (tokenAmount * state.virtualQuoteReserves) / (state.virtualTokenReserves + tokenAmount);
+  if (preFeeSolOutputLamports > state.realQuoteReserves) throw new Error("Curve has insufficient real quote liquidity");
+  const feeLamports = mulDivCeil(preFeeSolOutputLamports, combinedFeeBps, BPS_DENOMINATOR);
+  const creatorFeeLamports = mulDivCeil(preFeeSolOutputLamports, BigInt(fees.creatorFeeBps), BPS_DENOMINATOR);
+  const solOutputLamports = preFeeSolOutputLamports - feeLamports - creatorFeeLamports;
+  if (solOutputLamports <= 0n) throw new Error("SOL output after fees is non-positive");
 
   return {
     solOutputLamports,

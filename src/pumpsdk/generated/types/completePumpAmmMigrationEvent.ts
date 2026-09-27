@@ -26,22 +26,34 @@ export type CompletePumpAmmMigrationEvent = {
   user: Address;
   mint: Address;
   mintAmount: bigint;
+  /**
+   * The variable is interpreted as `amount` in the offchain services
+   * It is amount in terms of quoteMint for the bondingCurve
+   * The rename is not done yet to avoid breaking changes in offchain services.
+   */
   solAmount: bigint;
   poolMigrationFee: bigint;
   bondingCurve: Address;
   timestamp: bigint;
   pool: Address;
+  quoteMint: Address;
 };
 
 export type CompletePumpAmmMigrationEventArgs = {
   user: Address;
   mint: Address;
   mintAmount: number | bigint;
+  /**
+   * The variable is interpreted as `amount` in the offchain services
+   * It is amount in terms of quoteMint for the bondingCurve
+   * The rename is not done yet to avoid breaking changes in offchain services.
+   */
   solAmount: number | bigint;
   poolMigrationFee: number | bigint;
   bondingCurve: Address;
   timestamp: number | bigint;
   pool: Address;
+  quoteMint: Address;
 };
 
 export function getCompletePumpAmmMigrationEventEncoder(): FixedSizeEncoder<CompletePumpAmmMigrationEventArgs> {
@@ -54,6 +66,7 @@ export function getCompletePumpAmmMigrationEventEncoder(): FixedSizeEncoder<Comp
     ['bondingCurve', getAddressEncoder()],
     ['timestamp', getI64Encoder()],
     ['pool', getAddressEncoder()],
+    ['quoteMint', getAddressEncoder()],
   ]);
 }
 
@@ -67,6 +80,7 @@ export function getCompletePumpAmmMigrationEventDecoder(): FixedSizeDecoder<Comp
     ['bondingCurve', getAddressDecoder()],
     ['timestamp', getI64Decoder()],
     ['pool', getAddressDecoder()],
+    ['quoteMint', getAddressDecoder()],
   ]);
 }
 

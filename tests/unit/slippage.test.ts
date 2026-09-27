@@ -99,3 +99,14 @@ describe("Slippage Utilities", () => {
   });
 });
 
+
+test("rejects non-integer and non-finite slippage at every entry point", () => {
+  for (const bps of [NaN, Infinity, -Infinity, 0.5, -1, 10001]) {
+    expect(() => validateSlippage(bps)).toThrow();
+    expect(() => addSlippage(100n, bps)).toThrow();
+    expect(() => subSlippage(100n, bps)).toThrow();
+  }
+  expect(() => addSlippage(-1n)).toThrow();
+  expect(() => subSlippage(-1n)).toThrow();
+  expect(() => percentToBps(NaN)).toThrow();
+});

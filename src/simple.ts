@@ -24,3 +24,10 @@ export type { MintWithFirstBuyParams } from "./recipes/mintFirstBuy";
 
 // Re-export essential types
 export type { TransactionSigner, Instruction, Address } from "@solana/kit";
+
+export { createPump, type LaunchRecord, type PrepareLaunchOptions } from "./launch/session";
+export { validateLaunchConfig, type LaunchConfig } from "./launch/config";
+
+export type { SwapPlan, SwapQuote } from "./swap/plan";
+
+export { resolveSwapVenue, MigrationPendingError, type SwapVenue } from "./swap/venue";

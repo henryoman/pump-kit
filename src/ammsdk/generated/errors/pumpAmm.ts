@@ -108,7 +108,7 @@ export const PUMP_AMM_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS = 0x179c; // 6044
 export const PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_BASE_MINT = 0x179d; // 6045
 /** InvalidSharingConfigCoinCreator:  */
 export const PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_COIN_CREATOR = 0x179e; // 6046
-/** CoinCreatorMigratedToSharingConfig: coin creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead */
+/** CoinCreatorMigratedToSharingConfig: coin creator has been migrated to sharing config */
 export const PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG = 0x179f; // 6047
 /** CreatorVaultMigratedToSharingConfig: creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead */
 export const PUMP_AMM_ERROR__CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG = 0x17a0; // 6048
@@ -118,20 +118,81 @@ export const PUMP_AMM_ERROR__CASHBACK_NOT_ENABLED = 0x17a1; // 6049
 export const PUMP_AMM_ERROR__ONLY_PUMP_POOLS_CASHBACK = 0x17a2; // 6050
 /** CashbackNotInDesiredState:  */
 export const PUMP_AMM_ERROR__CASHBACK_NOT_IN_DESIRED_STATE = 0x17a3; // 6051
-/** CashbackEarnedDoesNotMatchTokenInVault:  */
-export const PUMP_AMM_ERROR__CASHBACK_EARNED_DOES_NOT_MATCH_TOKEN_IN_VAULT = 0x17a4; // 6052
+/** TokensInVaultLessThanCashbackEarned:  */
+export const PUMP_AMM_ERROR__TOKENS_IN_VAULT_LESS_THAN_CASHBACK_EARNED = 0x17a4; // 6052
+/** BuybackFeeRecipientNotAuthorized: Buyback fee recipient not authorized */
+export const PUMP_AMM_ERROR__BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED = 0x17a5; // 6053
+/** AllBuybackFeeRecipientsShouldBeNonZero:  */
+export const PUMP_AMM_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO = 0x17a6; // 6054
+/** NotUniqueBuybackFeeRecipients:  */
+export const PUMP_AMM_ERROR__NOT_UNIQUE_BUYBACK_FEE_RECIPIENTS = 0x17a7; // 6055
+/** BuybackBasisPointsOutOfRange: buyback_basis_points must be <= 10_000 */
+export const PUMP_AMM_ERROR__BUYBACK_BASIS_POINTS_OUT_OF_RANGE = 0x17a8; // 6056
+/** WrongBuybackFeeRecipientsCount: buyback fee recipients require exactly 8 remaining accounts (or none) */
+export const PUMP_AMM_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT = 0x17a9; // 6057
+/** BuybackFeeRecipientMissing:  */
+export const PUMP_AMM_ERROR__BUYBACK_FEE_RECIPIENT_MISSING = 0x17aa; // 6058
+/** MissingCashbackAccounts: Cashback trade is missing the required remaining accounts */
+export const PUMP_AMM_ERROR__MISSING_CASHBACK_ACCOUNTS = 0x17ab; // 6059
+/** InvalidCashbackAccumulator: Cashback user_volume_accumulator account is invalid */
+export const PUMP_AMM_ERROR__INVALID_CASHBACK_ACCUMULATOR = 0x17ac; // 6060
+/** InvalidCashbackAccumulatorAta: Cashback user_volume_accumulator ATA is missing or invalid */
+export const PUMP_AMM_ERROR__INVALID_CASHBACK_ACCUMULATOR_ATA = 0x17ad; // 6061
+/** InvalidPoolV2: pool_v2 remaining account is missing or invalid */
+export const PUMP_AMM_ERROR__INVALID_POOL_V2 = 0x17ae; // 6062
+/** InsufficientRealQuoteReserves: BOOST: sell output exceeds the real quote vault. effective = real + virtual is pricing-only; payout is capped at real_vault, so quote min(out, real_vault) */
+export const PUMP_AMM_ERROR__INSUFFICIENT_REAL_QUOTE_RESERVES = 0x17af; // 6063
+/** BoostPoolLiquidityUnsupported: BOOST: deposit/withdraw don't apply to boost pools */
+export const PUMP_AMM_ERROR__BOOST_POOL_LIQUIDITY_UNSUPPORTED = 0x17b0; // 6064
+/** PoolCannotBoost: BOOST: pool cannot be boosted (no virtual reserves) */
+export const PUMP_AMM_ERROR__POOL_CANNOT_BOOST = 0x17b1; // 6065
+/** BoostDisabled: BOOST: boost is disabled */
+export const PUMP_AMM_ERROR__BOOST_DISABLED = 0x17b2; // 6066
+/** SeedLockViolation: BOOST: lp_supply must never drop below the circulating LP mint supply */
+export const PUMP_AMM_ERROR__SEED_LOCK_VIOLATION = 0x17b3; // 6067
+/** CreatorFeeNotConfigurable: Configurable creator fee is disabled */
+export const PUMP_AMM_ERROR__CREATOR_FEE_NOT_CONFIGURABLE = 0x17b4; // 6068
+/** CreatorFeeBpsOutOfRange: Creator fee basis points must be between 1 and the configured maximum */
+export const PUMP_AMM_ERROR__CREATOR_FEE_BPS_OUT_OF_RANGE = 0x17b5; // 6069
+/** CreatorFeeNotEditable: Creator fee is not editable for this pool */
+export const PUMP_AMM_ERROR__CREATOR_FEE_NOT_EDITABLE = 0x17b6; // 6070
+/** CreatorFeeNotAllowedForCashbackCoin: Cashback coins cannot have a creator fee */
+export const PUMP_AMM_ERROR__CREATOR_FEE_NOT_ALLOWED_FOR_CASHBACK_COIN = 0x17b7; // 6071
+/** SharingConfigNotActive: Sharing config is not active */
+export const PUMP_AMM_ERROR__SHARING_CONFIG_NOT_ACTIVE = 0x17b8; // 6072
+/** NotAuthorized: Not authorized */
+export const PUMP_AMM_ERROR__NOT_AUTHORIZED = 0x17b9; // 6073
+/** HolderRewardCreatorImmutable: The coin creator of a holder-reward pool cannot be changed */
+export const PUMP_AMM_ERROR__HOLDER_REWARD_CREATOR_IMMUTABLE = 0x17ba; // 6074
+/** CtoNotAllowedForMayhemPool: CTO is not allowed on a mayhem-mode pool */
+export const PUMP_AMM_ERROR__CTO_NOT_ALLOWED_FOR_MAYHEM_POOL = 0x17bb; // 6075
+/** InvalidHolderRewardCoinCreator: A holder-reward pool's coin creator must be the holder-rewards PDA */
+export const PUMP_AMM_ERROR__INVALID_HOLDER_REWARD_COIN_CREATOR = 0x17bc; // 6076
+/** CreatorFeeNotConfigurableForQuote: Creator fee is not configurable on a SOL or USDC quote; the fee schedule applies */
+export const PUMP_AMM_ERROR__CREATOR_FEE_NOT_CONFIGURABLE_FOR_QUOTE = 0x17bd; // 6077
 
 export type PumpAmmError =
   | typeof PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED
+  | typeof PUMP_AMM_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
   | typeof PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
+  | typeof PUMP_AMM_ERROR__BOOST_DISABLED
+  | typeof PUMP_AMM_ERROR__BOOST_POOL_LIQUIDITY_UNSUPPORTED
+  | typeof PUMP_AMM_ERROR__BUYBACK_BASIS_POINTS_OUT_OF_RANGE
+  | typeof PUMP_AMM_ERROR__BUYBACK_FEE_RECIPIENT_MISSING
+  | typeof PUMP_AMM_ERROR__BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED
   | typeof PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES
   | typeof PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES
   | typeof PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT
-  | typeof PUMP_AMM_ERROR__CASHBACK_EARNED_DOES_NOT_MATCH_TOKEN_IN_VAULT
   | typeof PUMP_AMM_ERROR__CASHBACK_NOT_ENABLED
   | typeof PUMP_AMM_ERROR__CASHBACK_NOT_IN_DESIRED_STATE
   | typeof PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG
+  | typeof PUMP_AMM_ERROR__CREATOR_FEE_BPS_OUT_OF_RANGE
+  | typeof PUMP_AMM_ERROR__CREATOR_FEE_NOT_ALLOWED_FOR_CASHBACK_COIN
+  | typeof PUMP_AMM_ERROR__CREATOR_FEE_NOT_CONFIGURABLE
+  | typeof PUMP_AMM_ERROR__CREATOR_FEE_NOT_CONFIGURABLE_FOR_QUOTE
+  | typeof PUMP_AMM_ERROR__CREATOR_FEE_NOT_EDITABLE
   | typeof PUMP_AMM_ERROR__CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG
+  | typeof PUMP_AMM_ERROR__CTO_NOT_ALLOWED_FOR_MAYHEM_POOL
   | typeof PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE
   | typeof PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX
   | typeof PUMP_AMM_ERROR__DISABLED_BUY
@@ -145,34 +206,48 @@ export type PumpAmmError =
   | typeof PUMP_AMM_ERROR__END_TIME_IN_THE_PAST
   | typeof PUMP_AMM_ERROR__EXCEEDED_SLIPPAGE
   | typeof PUMP_AMM_ERROR__FEE_BASIS_POINTS_EXCEEDS_MAXIMUM
+  | typeof PUMP_AMM_ERROR__HOLDER_REWARD_CREATOR_IMMUTABLE
+  | typeof PUMP_AMM_ERROR__INSUFFICIENT_REAL_QUOTE_RESERVES
   | typeof PUMP_AMM_ERROR__INVALID_ADMIN
   | typeof PUMP_AMM_ERROR__INVALID_ADMIN_SET_COIN_CREATOR_AUTHORITY
   | typeof PUMP_AMM_ERROR__INVALID_BASE_MINT
+  | typeof PUMP_AMM_ERROR__INVALID_CASHBACK_ACCUMULATOR
+  | typeof PUMP_AMM_ERROR__INVALID_CASHBACK_ACCUMULATOR_ATA
+  | typeof PUMP_AMM_ERROR__INVALID_HOLDER_REWARD_COIN_CREATOR
   | typeof PUMP_AMM_ERROR__INVALID_INCENTIVE_MINT
   | typeof PUMP_AMM_ERROR__INVALID_LP_MINT
   | typeof PUMP_AMM_ERROR__INVALID_POOL_BASE_TOKEN_ACCOUNT
   | typeof PUMP_AMM_ERROR__INVALID_POOL_QUOTE_TOKEN_ACCOUNT
+  | typeof PUMP_AMM_ERROR__INVALID_POOL_V2
   | typeof PUMP_AMM_ERROR__INVALID_PROTOCOL_FEE_RECIPIENT
   | typeof PUMP_AMM_ERROR__INVALID_QUOTE_MINT
   | typeof PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_BASE_MINT
   | typeof PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_COIN_CREATOR
   | typeof PUMP_AMM_ERROR__MAYHEM_MODE_DISABLED
   | typeof PUMP_AMM_ERROR__MAYHEM_MODE_IN_DESIRED_STATE
+  | typeof PUMP_AMM_ERROR__MISSING_CASHBACK_ACCOUNTS
   | typeof PUMP_AMM_ERROR__NEW_SIZE_LESS_THAN_CURRENT_SIZE
+  | typeof PUMP_AMM_ERROR__NOT_AUTHORIZED
   | typeof PUMP_AMM_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS
+  | typeof PUMP_AMM_ERROR__NOT_UNIQUE_BUYBACK_FEE_RECIPIENTS
   | typeof PUMP_AMM_ERROR__ONLY_CANONICAL_PUMP_POOLS_CAN_HAVE_COIN_CREATOR
   | typeof PUMP_AMM_ERROR__ONLY_PUMP_POOLS_CASHBACK
   | typeof PUMP_AMM_ERROR__ONLY_PUMP_POOLS_MAYHEM_MODE
   | typeof PUMP_AMM_ERROR__OVERFLOW
+  | typeof PUMP_AMM_ERROR__POOL_CANNOT_BOOST
   | typeof PUMP_AMM_ERROR__SAME_MINT
+  | typeof PUMP_AMM_ERROR__SEED_LOCK_VIOLATION
+  | typeof PUMP_AMM_ERROR__SHARING_CONFIG_NOT_ACTIVE
   | typeof PUMP_AMM_ERROR__START_TIME_IN_THE_PAST
   | typeof PUMP_AMM_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE
   | typeof PUMP_AMM_ERROR__TIME_RANGE_TOO_LARGE
+  | typeof PUMP_AMM_ERROR__TOKENS_IN_VAULT_LESS_THAN_CASHBACK_EARNED
   | typeof PUMP_AMM_ERROR__TOO_LITTLE_POOL_TOKEN_LIQUIDITY
   | typeof PUMP_AMM_ERROR__TRUNCATION
   | typeof PUMP_AMM_ERROR__UNSORTED_NOT_UNIQUE_PROTOCOL_FEE_RECIPIENTS
   | typeof PUMP_AMM_ERROR__UNSUPPORTED_BASE_MINT
   | typeof PUMP_AMM_ERROR__UNSUPPORTED_QUOTE_MINT
+  | typeof PUMP_AMM_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT
   | typeof PUMP_AMM_ERROR__ZERO_BASE_AMOUNT
   | typeof PUMP_AMM_ERROR__ZERO_QUOTE_AMOUNT;
 
@@ -180,15 +255,26 @@ let pumpAmmErrorMessages: Record<PumpAmmError, string> | undefined;
 if (process.env.NODE_ENV !== 'production') {
   pumpAmmErrorMessages = {
     [PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED]: ``,
+    [PUMP_AMM_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
     [PUMP_AMM_ERROR__ALL_PROTOCOL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
+    [PUMP_AMM_ERROR__BOOST_DISABLED]: `BOOST: boost is disabled`,
+    [PUMP_AMM_ERROR__BOOST_POOL_LIQUIDITY_UNSUPPORTED]: `BOOST: deposit/withdraw don't apply to boost pools`,
+    [PUMP_AMM_ERROR__BUYBACK_BASIS_POINTS_OUT_OF_RANGE]: `buyback_basis_points must be <= 10_000`,
+    [PUMP_AMM_ERROR__BUYBACK_FEE_RECIPIENT_MISSING]: ``,
+    [PUMP_AMM_ERROR__BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED]: `Buyback fee recipient not authorized`,
     [PUMP_AMM_ERROR__BUY_MORE_BASE_AMOUNT_THAN_POOL_RESERVES]: ``,
     [PUMP_AMM_ERROR__BUY_NOT_ENOUGH_QUOTE_TOKENS_TO_COVER_FEES]: `buy: Not enough quote tokens to cover for fees.`,
     [PUMP_AMM_ERROR__BUY_SLIPPAGE_BELOW_MIN_BASE_AMOUNT_OUT]: `buy: slippage - would buy less tokens than expected min_base_amount_out`,
-    [PUMP_AMM_ERROR__CASHBACK_EARNED_DOES_NOT_MATCH_TOKEN_IN_VAULT]: ``,
     [PUMP_AMM_ERROR__CASHBACK_NOT_ENABLED]: `Cashback is disabled`,
     [PUMP_AMM_ERROR__CASHBACK_NOT_IN_DESIRED_STATE]: ``,
-    [PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG]: `coin creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead`,
+    [PUMP_AMM_ERROR__COIN_CREATOR_MIGRATED_TO_SHARING_CONFIG]: `coin creator has been migrated to sharing config`,
+    [PUMP_AMM_ERROR__CREATOR_FEE_BPS_OUT_OF_RANGE]: `Creator fee basis points must be between 1 and the configured maximum`,
+    [PUMP_AMM_ERROR__CREATOR_FEE_NOT_ALLOWED_FOR_CASHBACK_COIN]: `Cashback coins cannot have a creator fee`,
+    [PUMP_AMM_ERROR__CREATOR_FEE_NOT_CONFIGURABLE]: `Configurable creator fee is disabled`,
+    [PUMP_AMM_ERROR__CREATOR_FEE_NOT_CONFIGURABLE_FOR_QUOTE]: `Creator fee is not configurable on a SOL or USDC quote; the fee schedule applies`,
+    [PUMP_AMM_ERROR__CREATOR_FEE_NOT_EDITABLE]: `Creator fee is not editable for this pool`,
     [PUMP_AMM_ERROR__CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG]: `creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead`,
+    [PUMP_AMM_ERROR__CTO_NOT_ALLOWED_FOR_MAYHEM_POOL]: `CTO is not allowed on a mayhem-mode pool`,
     [PUMP_AMM_ERROR__DAY_IN_ACTIVE_RANGE]: ``,
     [PUMP_AMM_ERROR__DAY_INDEX_AFTER_END_INDEX]: ``,
     [PUMP_AMM_ERROR__DISABLED_BUY]: ``,
@@ -202,34 +288,48 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_AMM_ERROR__END_TIME_IN_THE_PAST]: ``,
     [PUMP_AMM_ERROR__EXCEEDED_SLIPPAGE]: ``,
     [PUMP_AMM_ERROR__FEE_BASIS_POINTS_EXCEEDS_MAXIMUM]: ``,
+    [PUMP_AMM_ERROR__HOLDER_REWARD_CREATOR_IMMUTABLE]: `The coin creator of a holder-reward pool cannot be changed`,
+    [PUMP_AMM_ERROR__INSUFFICIENT_REAL_QUOTE_RESERVES]: `BOOST: sell output exceeds the real quote vault. effective = real + virtual is pricing-only; payout is capped at real_vault, so quote min(out, real_vault)`,
     [PUMP_AMM_ERROR__INVALID_ADMIN]: ``,
     [PUMP_AMM_ERROR__INVALID_ADMIN_SET_COIN_CREATOR_AUTHORITY]: ``,
     [PUMP_AMM_ERROR__INVALID_BASE_MINT]: ``,
+    [PUMP_AMM_ERROR__INVALID_CASHBACK_ACCUMULATOR]: `Cashback user_volume_accumulator account is invalid`,
+    [PUMP_AMM_ERROR__INVALID_CASHBACK_ACCUMULATOR_ATA]: `Cashback user_volume_accumulator ATA is missing or invalid`,
+    [PUMP_AMM_ERROR__INVALID_HOLDER_REWARD_COIN_CREATOR]: `A holder-reward pool's coin creator must be the holder-rewards PDA`,
     [PUMP_AMM_ERROR__INVALID_INCENTIVE_MINT]: ``,
     [PUMP_AMM_ERROR__INVALID_LP_MINT]: ``,
     [PUMP_AMM_ERROR__INVALID_POOL_BASE_TOKEN_ACCOUNT]: ``,
     [PUMP_AMM_ERROR__INVALID_POOL_QUOTE_TOKEN_ACCOUNT]: ``,
+    [PUMP_AMM_ERROR__INVALID_POOL_V2]: `pool_v2 remaining account is missing or invalid`,
     [PUMP_AMM_ERROR__INVALID_PROTOCOL_FEE_RECIPIENT]: ``,
     [PUMP_AMM_ERROR__INVALID_QUOTE_MINT]: ``,
     [PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_BASE_MINT]: ``,
     [PUMP_AMM_ERROR__INVALID_SHARING_CONFIG_COIN_CREATOR]: ``,
     [PUMP_AMM_ERROR__MAYHEM_MODE_DISABLED]: ``,
     [PUMP_AMM_ERROR__MAYHEM_MODE_IN_DESIRED_STATE]: ``,
+    [PUMP_AMM_ERROR__MISSING_CASHBACK_ACCOUNTS]: `Cashback trade is missing the required remaining accounts`,
     [PUMP_AMM_ERROR__NEW_SIZE_LESS_THAN_CURRENT_SIZE]: ``,
+    [PUMP_AMM_ERROR__NOT_AUTHORIZED]: `Not authorized`,
     [PUMP_AMM_ERROR__NOT_ENOUGH_REMAINING_ACCOUNTS]: ``,
+    [PUMP_AMM_ERROR__NOT_UNIQUE_BUYBACK_FEE_RECIPIENTS]: ``,
     [PUMP_AMM_ERROR__ONLY_CANONICAL_PUMP_POOLS_CAN_HAVE_COIN_CREATOR]: ``,
     [PUMP_AMM_ERROR__ONLY_PUMP_POOLS_CASHBACK]: ``,
     [PUMP_AMM_ERROR__ONLY_PUMP_POOLS_MAYHEM_MODE]: ``,
     [PUMP_AMM_ERROR__OVERFLOW]: ``,
+    [PUMP_AMM_ERROR__POOL_CANNOT_BOOST]: `BOOST: pool cannot be boosted (no virtual reserves)`,
     [PUMP_AMM_ERROR__SAME_MINT]: ``,
+    [PUMP_AMM_ERROR__SEED_LOCK_VIOLATION]: `BOOST: lp_supply must never drop below the circulating LP mint supply`,
+    [PUMP_AMM_ERROR__SHARING_CONFIG_NOT_ACTIVE]: `Sharing config is not active`,
     [PUMP_AMM_ERROR__START_TIME_IN_THE_PAST]: ``,
     [PUMP_AMM_ERROR__SUPPLY_UPDATE_FOR_FINISHED_RANGE]: ``,
     [PUMP_AMM_ERROR__TIME_RANGE_TOO_LARGE]: ``,
+    [PUMP_AMM_ERROR__TOKENS_IN_VAULT_LESS_THAN_CASHBACK_EARNED]: ``,
     [PUMP_AMM_ERROR__TOO_LITTLE_POOL_TOKEN_LIQUIDITY]: ``,
     [PUMP_AMM_ERROR__TRUNCATION]: ``,
     [PUMP_AMM_ERROR__UNSORTED_NOT_UNIQUE_PROTOCOL_FEE_RECIPIENTS]: ``,
     [PUMP_AMM_ERROR__UNSUPPORTED_BASE_MINT]: ``,
     [PUMP_AMM_ERROR__UNSUPPORTED_QUOTE_MINT]: ``,
+    [PUMP_AMM_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT]: `buyback fee recipients require exactly 8 remaining accounts (or none)`,
     [PUMP_AMM_ERROR__ZERO_BASE_AMOUNT]: ``,
     [PUMP_AMM_ERROR__ZERO_QUOTE_AMOUNT]: ``,
   };

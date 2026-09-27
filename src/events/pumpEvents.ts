@@ -1,5 +1,8 @@
-import { Connection, PublicKey, LogsCallback, Logs, Commitment } from "@solana/web3.js";
-import type { Address } from "@solana/kit";
+import { address } from "@solana/kit";
+import type { Address, Commitment } from "@solana/kit";
+import type { RpcSubscriptions, LogsNotificationsApi } from "@solana/rpc-subscriptions";
+
+export type PumpLogsSubscriptions = RpcSubscriptions<LogsNotificationsApi>;
 import { PUMP_PROGRAM_ID } from "../config/addresses";
 
 export type PumpEventType = "create" | "trade" | "complete" | "raw";
@@ -23,26 +26,29 @@ interface ListenerEntry {
 export interface PumpEventManagerOptions {
   programId?: Address | string;
   commitment?: Commitment;
+  onError?: (error: unknown) => void;
 }
 
 export class PumpEventManager {
-  private connection: Connection;
-  private programId: PublicKey;
+  private connection: PumpLogsSubscriptions;
+  private programId: Address;
   private commitment: Commitment;
   private listeners: Map<number, ListenerEntry> = new Map();
   private nextListenerId = 1;
-  private subscriptionId: number | null = null;
+  private controller: AbortController | null = null;
+  private onError: (error: unknown) => void;
 
-  constructor(connection: Connection, options: PumpEventManagerOptions = {}) {
+  constructor(connection: PumpLogsSubscriptions, options: PumpEventManagerOptions = {}) {
     this.connection = connection;
-    this.programId = new PublicKey(options.programId ?? PUMP_PROGRAM_ID);
+    this.programId = address(options.programId ?? PUMP_PROGRAM_ID);
     this.commitment = options.commitment ?? "confirmed";
+    this.onError = options.onError ?? (error => console.error("Pump log subscription failed", error));
   }
 
   addEventListener(type: PumpEventType, callback: PumpEventListener): number {
     const id = this.nextListenerId++;
     this.listeners.set(id, { id, type, callback });
-    this.ensureSubscription();
+    void this.ensureSubscription();
     return id;
   }
 
@@ -53,31 +59,30 @@ export class PumpEventManager {
     }
   }
 
-  private ensureSubscription() {
-    if (this.subscriptionId !== null) return;
-    const handler: LogsCallback = (logs, ctx) => {
-      this.dispatch(logs, ctx.slot);
-    };
+  private async ensureSubscription() {
+    if (this.controller) return;
+    const controller = new AbortController();
+    this.controller = controller;
     try {
-      const id = this.connection.onLogs(this.programId, handler, this.commitment);
-      this.subscriptionId = id;
-    } catch (err) {
-      console.error("Failed to subscribe to Pump.fun logs", err);
-    }
-  }
-
-  private async teardownSubscription() {
-    if (this.subscriptionId !== null) {
-      try {
-        await this.connection.removeOnLogsListener(this.subscriptionId);
-      } catch (err) {
-        console.warn("Failed to remove Pump.fun log listener", err);
+      const stream = await this.connection.logsNotifications({ mentions: [this.programId] },
+        { commitment: this.commitment }).subscribe({ abortSignal: controller.signal });
+      for await (const notification of stream) {
+        if (controller.signal.aborted) break;
+        this.dispatch(notification.value, Number(notification.context.slot));
       }
-      this.subscriptionId = null;
+    } catch (error) {
+      if (!controller.signal.aborted) this.onError(error);
+    } finally {
+      if (this.controller === controller) this.controller = null;
     }
   }
 
-  private dispatch(logRecord: Logs, slot: number) {
+  private teardownSubscription() {
+    this.controller?.abort();
+    this.controller = null;
+  }
+
+  private dispatch(logRecord: { signature: string; logs: readonly string[] }, slot: number) {
     const signature = logRecord.signature ?? "";
     for (const rawLog of logRecord.logs) {
       const event = parsePumpEvent(rawLog, slot, signature);
@@ -128,7 +133,7 @@ function parsePumpEvent(rawLog: string, slot: number, signature: string): PumpEv
 }
 
 export function createPumpEventManager(
-  connection: Connection,
+  connection: PumpLogsSubscriptions,
   options: PumpEventManagerOptions = {}
 ): PumpEventManager {
   return new PumpEventManager(connection, options);

@@ -9,9 +9,9 @@ import {
 
 const curveState: BondingCurveState = {
   virtualTokenReserves: 40_000_000_000n,
-  virtualSolReserves: 4_000_000_000n,
+  virtualQuoteReserves: 4_000_000_000n,
   realTokenReserves: 20_000_000_000n,
-  realSolReserves: 800_000_000n,
+  realQuoteReserves: 800_000_000n,
   creator: "11111111111111111111111111111111",
 };
 
@@ -46,4 +46,25 @@ describe("Bonding curve math helpers", () => {
     expect(sellQuote.solOutputLamports).toBeGreaterThan(0n);
     expect(sellQuote.solOutputLamports).toBeLessThan(sellQuote.preFeeSolOutputLamports);
   });
+});
+
+test("uses virtual reserves alone and rounds protocol and creator fees up separately", () => {
+  const state: BondingCurveState = { ...curveState, virtualTokenReserves: 1000n,
+    virtualQuoteReserves: 100n, realTokenReserves: 500n, realQuoteReserves: 999999n };
+  const rates = { lpFeeBps: 9999n, protocolFeeBps: 100n, creatorFeeBps: 50n };
+  const buy = quoteSolCostForBuy(state, rates, 100n);
+  expect(buy.effectiveSolInLamports).toBe(12n);
+  expect(buy.feeLamports).toBe(1n);
+  expect(buy.creatorFeeLamports).toBe(1n);
+  expect(buy.totalSolCostLamports).toBe(14n);
+  expect(quoteBuyWithSolAmount(state, rates, 14n).tokenAmount).toBe(107n);
+  expect(quoteSellForTokenAmount(state, rates, 100n).solOutputLamports).toBe(7n);
+  expect(() => quoteBuyWithSolAmount(state, rates, 1n)).toThrow();
+  expect(() => quoteSolCostForBuy(state, { ...rates, creatorFeeBps: -1n }, 1n)).toThrow();
+});
+
+
+test("curve quotes enforce real liquidity without adding it to pricing reserves", () => {
+  expect(() => quoteSolCostForBuy(curveState, fees, curveState.realTokenReserves + 1n)).toThrow("available reserves");
+  expect(() => quoteSellForTokenAmount({ ...curveState, realQuoteReserves: 0n }, fees, 1000000n)).toThrow("real quote liquidity");
 });

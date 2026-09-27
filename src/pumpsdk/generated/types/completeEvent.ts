@@ -25,6 +25,7 @@ export type CompleteEvent = {
   mint: Address;
   bondingCurve: Address;
   timestamp: bigint;
+  quoteMint: Address;
 };
 
 export type CompleteEventArgs = {
@@ -32,6 +33,7 @@ export type CompleteEventArgs = {
   mint: Address;
   bondingCurve: Address;
   timestamp: number | bigint;
+  quoteMint: Address;
 };
 
 export function getCompleteEventEncoder(): FixedSizeEncoder<CompleteEventArgs> {
@@ -40,6 +42,7 @@ export function getCompleteEventEncoder(): FixedSizeEncoder<CompleteEventArgs> {
     ['mint', getAddressEncoder()],
     ['bondingCurve', getAddressEncoder()],
     ['timestamp', getI64Encoder()],
+    ['quoteMint', getAddressEncoder()],
   ]);
 }
 
@@ -49,6 +52,7 @@ export function getCompleteEventDecoder(): FixedSizeDecoder<CompleteEvent> {
     ['mint', getAddressDecoder()],
     ['bondingCurve', getAddressDecoder()],
     ['timestamp', getI64Decoder()],
+    ['quoteMint', getAddressDecoder()],
   ]);
 }
 

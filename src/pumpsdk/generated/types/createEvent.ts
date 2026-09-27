@@ -46,6 +46,10 @@ export type CreateEvent = {
   tokenProgram: Address;
   isMayhemMode: boolean;
   isCashbackEnabled: boolean;
+  quoteMint: Address;
+  virtualQuoteReserves: bigint;
+  creatorFeeBps: bigint;
+  isHolderReward: boolean;
 };
 
 export type CreateEventArgs = {
@@ -64,6 +68,10 @@ export type CreateEventArgs = {
   tokenProgram: Address;
   isMayhemMode: boolean;
   isCashbackEnabled: boolean;
+  quoteMint: Address;
+  virtualQuoteReserves: number | bigint;
+  creatorFeeBps: number | bigint;
+  isHolderReward: boolean;
 };
 
 export function getCreateEventEncoder(): Encoder<CreateEventArgs> {
@@ -83,6 +91,10 @@ export function getCreateEventEncoder(): Encoder<CreateEventArgs> {
     ['tokenProgram', getAddressEncoder()],
     ['isMayhemMode', getBooleanEncoder()],
     ['isCashbackEnabled', getBooleanEncoder()],
+    ['quoteMint', getAddressEncoder()],
+    ['virtualQuoteReserves', getU64Encoder()],
+    ['creatorFeeBps', getU64Encoder()],
+    ['isHolderReward', getBooleanEncoder()],
   ]);
 }
 
@@ -103,6 +115,10 @@ export function getCreateEventDecoder(): Decoder<CreateEvent> {
     ['tokenProgram', getAddressDecoder()],
     ['isMayhemMode', getBooleanDecoder()],
     ['isCashbackEnabled', getBooleanDecoder()],
+    ['quoteMint', getAddressDecoder()],
+    ['virtualQuoteReserves', getU64Decoder()],
+    ['creatorFeeBps', getU64Decoder()],
+    ['isHolderReward', getBooleanDecoder()],
   ]);
 }
 

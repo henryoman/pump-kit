@@ -1,17 +1,17 @@
-import type { Address, Instruction, TransactionSigner } from "@solana/kit";
+import { loadCurveSnapshot } from "./snapshot";
+import type { SwapPlan } from "./plan";
+import type { Address, TransactionSigner } from "@solana/kit";
 import { address as toAddress } from "@solana/kit";
 
 import type { RpcClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
-import { buySimple } from "../recipes/buy";
-import { sellSimple } from "../recipes/sell";
-import { bondingCurvePda, feeConfigPda } from "../pda/pump";
+import { buyV2, sellV2, buyExactQuoteInV2 } from "../clients/trade_v2";
+import { resolveTokenProgram } from "../utils/token_program";
+import { fetchGlobal } from "../pumpsdk/generated/accounts/global";
+import { globalPda } from "../pda/pump";
 import { findAssociatedTokenPda } from "../pda/ata";
 import { TOKEN_PROGRAM_ID } from "../config/addresses";
 import { buildCreateAtaInstruction } from "../utils/ata";
-import { fetchBondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
-import { fetchFeeConfig } from "../pumpsdk/generated/accounts/feeConfig";
-import type { Fees } from "../pumpsdk/generated/types/fees";
 import {
   quoteBuyWithSolAmount,
   quoteSellForTokenAmount,
@@ -19,28 +19,42 @@ import {
   type BondingCurveState,
   type FeeStructure,
 } from "../ammsdk/bondingCurveMath";
-import { solToLamports, tokensToRaw } from "../utils/amounts";
+import { positiveAmountToRaw } from "../utils/amounts";
 import {
   DEFAULT_SLIPPAGE_BPS,
   addSlippage,
   subSlippage,
   validateSlippage,
 } from "../utils/slippage";
-import { DEFAULT_FEE_RECIPIENT } from "../config/constants";
+
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
 type WithRpcOptions = {
   rpc: RpcClient;
   commitment?: CommitmentLevel;
+  /** Required slot for complete state overrides; fetched state retains its snapshot slot. */
+  contextSlot?: bigint;
 };
 
 export type CurveBuyParams = WithRpcOptions & {
   user: TransactionSigner;
   mint: Address | string;
-  solAmount: number;
+  solAmount?: number | string;
+  /** Swap budget in lamports (mutually exclusive with solAmount). */
+  amountIn?: bigint;
+  /** Defaults to exactIn. exactOut uses a fixed token output derived from the budget. */
+  kind?: "exactIn" | "exactOut";
+  /** Fixed token base-unit target for exactOut buys. */
+  amountOut?: bigint;
+  /** Explicit lamport spending cap; replaces slippageBps. */
+  maxAmountIn?: bigint;
+  minAmountOut?: bigint;
   slippageBps?: number;
   feeRecipient?: Address | string;
+  buybackFeeRecipient?: Address | string;
+  baseTokenProgram?: Address | string;
+  quoteTokenProgram?: Address | string;
   bondingCurveCreator?: Address | string;
   trackVolume?: boolean;
   curveStateOverride?: BondingCurveState;
@@ -51,31 +65,27 @@ export type CurveBuyParams = WithRpcOptions & {
 export type CurveSellParams = WithRpcOptions & {
   user: TransactionSigner;
   mint: Address | string;
-  tokenAmount?: number;
+  tokenAmount?: number | string;
+  /** Token base units (mutually exclusive with tokenAmount and percentage mode). */
+  amountIn?: bigint;
+  /** Explicit quote output floor; replaces slippageBps. */
+  minAmountOut?: bigint;
   useWalletPercentage?: boolean;
   walletPercentage?: number;
   tokenDecimals?: number;
   slippageBps?: number;
   feeRecipient?: Address | string;
+  buybackFeeRecipient?: Address | string;
+  baseTokenProgram?: Address | string;
+  quoteTokenProgram?: Address | string;
   bondingCurveCreator?: Address | string;
   curveStateOverride?: BondingCurveState;
   feeStructureOverride?: FeeStructure;
 };
 
-const DEFAULT_FEE_RECIPIENT_ADDRESS = DEFAULT_FEE_RECIPIENT;
 const PERCENTAGE_SCALE = 10_000;
 
-const ensurePositiveNumber = (value: number, field: string) => {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`${field} must be a positive number`);
-  }
-};
 
-const toFeeStructure = (flatFees: Fees): FeeStructure => ({
-  lpFeeBps: flatFees.lpFeeBps,
-  protocolFeeBps: flatFees.protocolFeeBps,
-  creatorFeeBps: flatFees.creatorFeeBps,
-});
 
 type CurveLoadOverrides = {
   curve?: BondingCurveState;
@@ -88,31 +98,30 @@ async function loadCurveState(
   commitment: CommitmentLevel,
   overrides?: CurveLoadOverrides
 ) {
-  const curvePromise = overrides?.curve
-    ? Promise.resolve(overrides.curve)
-    : (async () => {
-        const address = await bondingCurvePda(mint);
-        const account = await fetchBondingCurve(rpcClient, address, { commitment });
-        return account.data;
-      })();
-
-  const feesPromise = overrides?.fees
-    ? Promise.resolve(overrides.fees)
-    : (async () => {
-        const address = await feeConfigPda();
-        const account = await fetchFeeConfig(rpcClient, address, { commitment });
-        return toFeeStructure(account.data.flatFees);
-      })();
-
-  try {
-    const [curve, fees] = await Promise.all([curvePromise, feesPromise]);
-    return { curve, fees } as const;
-  } catch (error) {
-    throw new Error(
-      "Failed to load bonding curve state. Provide overrides or ensure the RPC endpoint can access Pump accounts.",
-      { cause: error }
-    );
+  if (!overrides?.curve || !overrides?.fees) {
+    return loadCurveSnapshot({ rpc: rpcClient, mint, commitment });
   }
+  return { curve: overrides.curve, fees: overrides.fees, contextSlot: undefined,
+    global: undefined, baseMint: undefined, quoteMint: undefined } as const;
+
+}
+
+async function resolveTradeContext(params: CurveBuyParams | CurveSellParams, curve: BondingCurveState, snapshot?: Awaited<ReturnType<typeof loadCurveState>>) {
+  if (snapshot?.baseMint && params.baseTokenProgram && toAddress(params.baseTokenProgram) !== snapshot.baseMint.tokenProgram) {
+    throw new Error("Token program hint does not match snapshot mint owner");
+  }
+  if (snapshot?.quoteMint && params.quoteTokenProgram && toAddress(params.quoteTokenProgram) !== snapshot.quoteMint.tokenProgram) {
+    throw new Error("Quote token program hint does not match snapshot mint owner");
+  }
+  const [baseTokenProgram, quoteTokenProgram] = await Promise.all([
+    resolveTokenProgram({ rpc: params.rpc, mint: params.mint, tokenProgram: snapshot?.baseMint?.tokenProgram ?? params.baseTokenProgram }),
+    resolveTokenProgram({ rpc: params.rpc, mint: "So11111111111111111111111111111111111111112", tokenProgram: snapshot?.quoteMint?.tokenProgram ?? params.quoteTokenProgram ?? TOKEN_PROGRAM_ID }),
+  ]);
+  const global = snapshot?.global ?? (params.feeRecipient && params.buybackFeeRecipient ? undefined : (await fetchGlobal(params.rpc, await globalPda())).data);
+  const feeRecipient = toAddress(params.feeRecipient ?? (curve.isMayhemMode ? global!.reservedFeeRecipient : global!.feeRecipient));
+  const buybackFeeRecipient = params.buybackFeeRecipient ?? global!.buybackFeeRecipients.find(value => value !== toAddress("11111111111111111111111111111111"));
+  if (!buybackFeeRecipient) throw new Error("No buyback fee recipient configured");
+  return { baseTokenProgram, quoteTokenProgram, feeRecipient, buybackFeeRecipient: toAddress(buybackFeeRecipient) };
 }
 
 function percentageToScaled(percentage: number): bigint {
@@ -122,21 +131,42 @@ function percentageToScaled(percentage: number): bigint {
   return BigInt(Math.round(percentage * 100));
 }
 
-export async function curveBuy(params: CurveBuyParams): Promise<Instruction> {
-  ensurePositiveNumber(params.solAmount, "solAmount");
+export async function curveBuy(params: CurveBuyParams): Promise<SwapPlan> {
+  const explicitOutput = params.amountOut !== undefined;
+  if (explicitOutput) {
+    if (params.kind !== "exactOut" || params.amountIn !== undefined || params.solAmount !== undefined || params.minAmountOut !== undefined) {
+      throw new Error("amountOut requires exactOut and cannot be mixed with input budgets or output floors");
+    }
+    if (typeof params.amountOut !== "bigint" || params.amountOut <= 0n) throw new Error("amountOut must be a positive bigint");
+  } else if ((params.amountIn === undefined) === (params.solAmount === undefined)) {
+    throw new Error("Supply exactly one of amountIn or solAmount");
+  }
+  if (params.maxAmountIn !== undefined && (params.kind !== "exactOut" || params.slippageBps !== undefined)) {
+    throw new Error("maxAmountIn requires exactOut and cannot be mixed with slippageBps");
+  }
+  if (params.maxAmountIn !== undefined && (typeof params.maxAmountIn !== "bigint" || params.maxAmountIn <= 0n)) throw new Error("maxAmountIn must be a positive bigint");
+  const solBudgetLamports = explicitOutput ? 0n : params.amountIn ?? positiveAmountToRaw(params.solAmount!, 9, "solAmount");
+  if (!explicitOutput && (typeof solBudgetLamports !== "bigint" || solBudgetLamports <= 0n)) throw new Error("amountIn must be a positive bigint");
 
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
 
-  const feeRecipient = params.feeRecipient ?? DEFAULT_FEE_RECIPIENT_ADDRESS;
+
   const rpcClient = params.rpc;
   const commitment = params.commitment ?? getDefaultCommitment();
 
-  const { curve, fees } = await loadCurveState(params.mint, rpcClient, commitment, {
+
+  const snapshot = await loadCurveState(params.mint, rpcClient, commitment, {
     curve: params.curveStateOverride,
     fees: params.feeStructureOverride,
   });
+  const { curve, fees } = snapshot;
+  const contextSlot = snapshot.contextSlot ?? params.contextSlot;
+  if (contextSlot === undefined) throw new Error("State overrides require contextSlot");
 
+  if (curve.quoteMint && curve.quoteMint !== toAddress("11111111111111111111111111111111") && curve.quoteMint !== toAddress("So11111111111111111111111111111111111111112")) {
+    throw new Error("SOL helpers require a SOL-paired curve; use explicit quote v2 builders for other pairs");
+  }
   if (curve.complete) {
     throw new Error("Token has migrated to the AMM. Use ammBuy instead of curveBuy.");
   }
@@ -145,84 +175,75 @@ export async function curveBuy(params: CurveBuyParams): Promise<Instruction> {
     ? toAddress(params.bondingCurveCreator)
     : curve.creator;
 
-  const solBudgetLamports = solToLamports(params.solAmount);
 
-  const budgetQuote = quoteBuyWithSolAmount(curve, fees, solBudgetLamports);
-  const tokenAmountToBuy = budgetQuote.tokenAmount;
-
+  const tokenAmountToBuy = params.amountOut ?? quoteBuyWithSolAmount(curve, fees, solBudgetLamports).tokenAmount;
   const exactCost = quoteSolCostForBuy(curve, fees, tokenAmountToBuy);
   const slippageAdjustedCost = addSlippage(exactCost.totalSolCostLamports, slippageBps);
-  const maxSolCostLamports = slippageAdjustedCost * 2n;
+  const budgetLimit = explicitOutput ? slippageAdjustedCost : addSlippage(solBudgetLamports, slippageBps);
+  const maxSolCostLamports = params.maxAmountIn ?? (slippageAdjustedCost < budgetLimit ? slippageAdjustedCost : budgetLimit);
 
+  const tradeContext = await resolveTradeContext(params, curve, snapshot);
   const mintAddress = toAddress(params.mint);
-  const [userAta] = await findAssociatedTokenPda({
-    owner: params.user.address,
+  const createAtaInstruction = params.allowAtaCreation === false ? undefined : await buildCreateAtaInstruction({
+    payer: params.user,
+    owner: params.user,
     mint: mintAddress,
+    tokenProgram: tradeContext.baseTokenProgram,
   });
 
-  let createAtaInstruction: Instruction | undefined;
-  if (params.allowAtaCreation !== false) {
-    try {
-      const ataAccount = await params.rpc
-        .getAccountInfo(userAta, { encoding: "base64" })
-        .send();
-      if (!ataAccount.value) {
-        createAtaInstruction = buildCreateAtaInstruction({
-          payer: params.user,
-          owner: params.user,
-          mint: mintAddress,
-        });
-      }
-    } catch (checkError) {
-      // If we can't check, assume it needs to be created
-      console.warn("[curveBuy] getAccountInfo failed for user ATA, defaulting to create", checkError);
-      createAtaInstruction = buildCreateAtaInstruction({
-        payer: params.user,
-        owner: params.user,
-        mint: mintAddress,
-      });
+  if (params.kind !== "exactOut") {
+    if (params.minAmountOut !== undefined && params.slippageBps !== undefined) {
+      throw new Error("Do not mix minAmountOut with slippageBps");
     }
+    const minAmountOut = params.minAmountOut ?? subSlippage(tokenAmountToBuy, slippageBps);
+    if (typeof minAmountOut !== "bigint" || minAmountOut <= 0n) throw new Error("minAmountOut must be a positive bigint");
+    const instruction = await buyExactQuoteInV2({ user: params.user, mint: params.mint,
+      quoteAmountRaw: solBudgetLamports, minTokenOutputRaw: minAmountOut,
+      ...tradeContext, bondingCurveCreator: creator, rpc: rpcClient });
+    return { venue: "curve", contextSlot,
+      instructions: createAtaInstruction ? [createAtaInstruction, instruction] : [instruction],
+      quote: { kind: "exactIn", amountIn: solBudgetLamports, expectedAmountOut: tokenAmountToBuy, minAmountOut } };
   }
-
-  const buyInstruction = await buySimple({
+  if (params.minAmountOut !== undefined) throw new Error("minAmountOut applies only to exactIn buys");
+  const buyInstruction = await buyV2({
     user: params.user,
     mint: params.mint,
-    tokenAmount: tokenAmountToBuy,
-    maxSolCostLamports,
-    feeRecipient,
-    trackVolume: params.trackVolume,
+    tokenAmountRaw: tokenAmountToBuy,
+    maxQuoteInputRaw: maxSolCostLamports,
+    ...tradeContext,
     bondingCurveCreator: creator,
     rpc: rpcClient,
-    commitment,
   });
 
-  if (createAtaInstruction) {
-    const instructionWithPrepend = Object.assign({}, buyInstruction) as Instruction & {
-      prepend?: Instruction[];
-    };
-    instructionWithPrepend.prepend = [
-      createAtaInstruction,
-      ...(instructionWithPrepend.prepend ?? []),
-    ];
-    return instructionWithPrepend;
-  }
+  return { venue: "curve", contextSlot,
+    instructions: createAtaInstruction ? [createAtaInstruction, buyInstruction] : [buyInstruction],
+    quote: { kind: "exactOut", amountOut: tokenAmountToBuy,
+      expectedAmountIn: exactCost.totalSolCostLamports, maxAmountIn: maxSolCostLamports } };
 
-  return buyInstruction;
 }
 
-export async function curveSell(params: CurveSellParams): Promise<Instruction> {
+export async function curveSell(params: CurveSellParams): Promise<SwapPlan> {
+  if (params.minAmountOut !== undefined && params.slippageBps !== undefined) throw new Error("Do not mix minAmountOut with slippageBps");
+  if (params.minAmountOut !== undefined && (typeof params.minAmountOut !== "bigint" || params.minAmountOut <= 0n)) throw new Error("minAmountOut must be a positive bigint");
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
 
-  const feeRecipient = params.feeRecipient ?? DEFAULT_FEE_RECIPIENT_ADDRESS;
+
   const rpcClient = params.rpc;
   const commitment = params.commitment ?? getDefaultCommitment();
 
-  const { curve, fees } = await loadCurveState(params.mint, rpcClient, commitment, {
+
+  const snapshot = await loadCurveState(params.mint, rpcClient, commitment, {
     curve: params.curveStateOverride,
     fees: params.feeStructureOverride,
   });
+  const { curve, fees } = snapshot;
+  const contextSlot = snapshot.contextSlot ?? params.contextSlot;
+  if (contextSlot === undefined) throw new Error("State overrides require contextSlot");
 
+  if (curve.quoteMint && curve.quoteMint !== toAddress("11111111111111111111111111111111") && curve.quoteMint !== toAddress("So11111111111111111111111111111111111111112")) {
+    throw new Error("SOL helpers require a SOL-paired curve; use explicit quote v2 builders for other pairs");
+  }
   if (curve.complete) {
     throw new Error("Token has migrated to the AMM. Use ammSell instead of curveSell.");
   }
@@ -231,21 +252,26 @@ export async function curveSell(params: CurveSellParams): Promise<Instruction> {
     ? toAddress(params.bondingCurveCreator)
     : curve.creator;
 
+  const tradeContext = await resolveTradeContext(params, curve, snapshot);
   const useWalletPercentage = params.useWalletPercentage ?? false;
   const mintAddress = toAddress(params.mint);
   let tokenAmountRaw: bigint;
 
-  if (useWalletPercentage) {
+  if (params.amountIn !== undefined) {
+    if (params.tokenAmount !== undefined || useWalletPercentage) throw new Error("Do not mix raw, decimal, and percentage amounts");
+    if (typeof params.amountIn !== "bigint" || params.amountIn <= 0n) throw new Error("amountIn must be a positive bigint");
+    tokenAmountRaw = params.amountIn;
+  } else if (useWalletPercentage) {
     const percentage = params.walletPercentage ?? 100;
     const scaled = percentageToScaled(percentage);
 
     const [associatedUser] = await findAssociatedTokenPda({
       owner: toAddress(params.user.address),
       mint: mintAddress,
-      tokenProgram: toAddress(TOKEN_PROGRAM_ID),
+      tokenProgram: tradeContext.baseTokenProgram,
     });
 
-    const balanceResponse = await rpcClient.getTokenAccountBalance(associatedUser).send();
+    const balanceResponse = await rpcClient.getTokenAccountBalance(associatedUser, { commitment }).send();
     const rawBalance = BigInt(balanceResponse.value.amount);
     if (rawBalance === 0n) {
       throw new Error("Wallet token balance is zero; nothing to sell");
@@ -253,34 +279,36 @@ export async function curveSell(params: CurveSellParams): Promise<Instruction> {
 
     tokenAmountRaw = (rawBalance * scaled) / BigInt(PERCENTAGE_SCALE);
     if (tokenAmountRaw <= 0n) {
-      tokenAmountRaw = 1n;
+      throw new Error("Percentage sell rounds to zero token units");
     }
   } else {
     if (params.tokenAmount === undefined) {
       throw new Error("tokenAmount is required when useWalletPercentage is false");
     }
-    ensurePositiveNumber(params.tokenAmount, "tokenAmount");
-    const decimals = params.tokenDecimals ?? 6;
-    tokenAmountRaw = tokensToRaw(params.tokenAmount, decimals);
+    const decimals = params.tokenDecimals ?? snapshot.baseMint?.decimals ?? 6;
+    tokenAmountRaw = positiveAmountToRaw(params.tokenAmount, decimals, "tokenAmount");
   }
 
   const quote = quoteSellForTokenAmount(curve, fees, tokenAmountRaw);
-  const minSolOutputLamports = subSlippage(quote.solOutputLamports, slippageBps);
+  const minSolOutputLamports = params.minAmountOut ?? subSlippage(quote.solOutputLamports, slippageBps);
 
   if (minSolOutputLamports <= 0n) {
     throw new Error("Slippage settings would result in zero SOL output");
   }
 
-  return sellSimple({
+  const instruction = await sellV2({
     user: params.user,
     mint: params.mint,
     tokenAmountRaw,
-    minSolOutputLamports,
-    feeRecipient,
+    minQuoteOutputRaw: minSolOutputLamports,
+    ...tradeContext,
     bondingCurveCreator: creator,
     rpc: rpcClient,
-    commitment,
   });
+  return { venue: "curve", contextSlot, instructions: [instruction],
+    quote: { kind: "exactIn", amountIn: tokenAmountRaw,
+      expectedAmountOut: quote.solOutputLamports, minAmountOut: minSolOutputLamports } };
+
 }
 
 

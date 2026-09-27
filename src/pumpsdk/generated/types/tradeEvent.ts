@@ -12,6 +12,8 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getArrayDecoder,
+  getArrayEncoder,
   getBooleanDecoder,
   getBooleanEncoder,
   getI64Decoder,
@@ -29,6 +31,12 @@ import {
   type Decoder,
   type Encoder,
 } from '@solana/kit';
+import {
+  getShareholderDecoder,
+  getShareholderEncoder,
+  type Shareholder,
+  type ShareholderArgs,
+} from '.';
 
 /** ix_name: "buy" | "sell" | "buy_exact_sol_in" */
 export type TradeEvent = {
@@ -57,6 +65,15 @@ export type TradeEvent = {
   mayhemMode: boolean;
   cashbackFeeBasisPoints: bigint;
   cashback: bigint;
+  buybackFeeBasisPoints: bigint;
+  buybackFee: bigint;
+  shareholders: Array<Shareholder>;
+  quoteMint: Address;
+  quoteAmount: bigint;
+  virtualQuoteReserves: bigint;
+  realQuoteReserves: bigint;
+  holderRewardsBps: bigint;
+  holderRewards: bigint;
 };
 
 export type TradeEventArgs = {
@@ -85,6 +102,15 @@ export type TradeEventArgs = {
   mayhemMode: boolean;
   cashbackFeeBasisPoints: number | bigint;
   cashback: number | bigint;
+  buybackFeeBasisPoints: number | bigint;
+  buybackFee: number | bigint;
+  shareholders: Array<ShareholderArgs>;
+  quoteMint: Address;
+  quoteAmount: number | bigint;
+  virtualQuoteReserves: number | bigint;
+  realQuoteReserves: number | bigint;
+  holderRewardsBps: number | bigint;
+  holderRewards: number | bigint;
 };
 
 export function getTradeEventEncoder(): Encoder<TradeEventArgs> {
@@ -114,6 +140,15 @@ export function getTradeEventEncoder(): Encoder<TradeEventArgs> {
     ['mayhemMode', getBooleanEncoder()],
     ['cashbackFeeBasisPoints', getU64Encoder()],
     ['cashback', getU64Encoder()],
+    ['buybackFeeBasisPoints', getU64Encoder()],
+    ['buybackFee', getU64Encoder()],
+    ['shareholders', getArrayEncoder(getShareholderEncoder())],
+    ['quoteMint', getAddressEncoder()],
+    ['quoteAmount', getU64Encoder()],
+    ['virtualQuoteReserves', getU64Encoder()],
+    ['realQuoteReserves', getU64Encoder()],
+    ['holderRewardsBps', getU64Encoder()],
+    ['holderRewards', getU64Encoder()],
   ]);
 }
 
@@ -144,6 +179,15 @@ export function getTradeEventDecoder(): Decoder<TradeEvent> {
     ['mayhemMode', getBooleanDecoder()],
     ['cashbackFeeBasisPoints', getU64Decoder()],
     ['cashback', getU64Decoder()],
+    ['buybackFeeBasisPoints', getU64Decoder()],
+    ['buybackFee', getU64Decoder()],
+    ['shareholders', getArrayDecoder(getShareholderDecoder())],
+    ['quoteMint', getAddressDecoder()],
+    ['quoteAmount', getU64Decoder()],
+    ['virtualQuoteReserves', getU64Decoder()],
+    ['realQuoteReserves', getU64Decoder()],
+    ['holderRewardsBps', getU64Decoder()],
+    ['holderRewards', getU64Decoder()],
   ]);
 }
 

@@ -6,7 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './adminSetCreatorEvent';
+export * from './addQuoteControlMintEvent';
+export * from './adminCtoEvent';
 export * from './adminSetIdlAuthorityEvent';
 export * from './adminUpdateTokenIncentivesEvent';
 export * from './claimCashbackEvent';
@@ -18,6 +19,7 @@ export * from './completePumpAmmMigrationEvent';
 export * from './configStatus';
 export * from './createEvent';
 export * from './distributeCreatorFeesEvent';
+export * from './distributeFeeToHoldersEvent';
 export * from './extendAccountEvent';
 export * from './fees';
 export * from './feeTier';
@@ -25,12 +27,16 @@ export * from './initUserVolumeAccumulatorEvent';
 export * from './migrateBondingCurveCreatorEvent';
 export * from './minimumDistributableFeeEvent';
 export * from './optionBool';
+export * from './quoteControlMint';
+export * from './removeQuoteControlMintEvent';
 export * from './reservedFeeRecipientsEvent';
 export * from './setCreatorEvent';
 export * from './setMetaplexCreatorEvent';
 export * from './setParamsEvent';
+export * from './setQuoteControlAdminEvent';
 export * from './shareholder';
 export * from './syncUserVolumeAccumulatorEvent';
 export * from './tradeEvent';
+export * from './updateCreatorFeeConfigEvent';
 export * from './updateGlobalAuthorityEvent';
 export * from './updateMayhemVirtualParamsEvent';

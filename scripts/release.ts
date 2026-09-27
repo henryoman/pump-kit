@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 type BumpType = "patch" | "minor" | "major";
@@ -13,83 +13,80 @@ function run(cmd: string, args: string[], label: string): string {
   return result.stdout?.trim() ?? "";
 }
 
-function readPackageJson(): { name: string; version: string } {
-  return JSON.parse(readFileSync("package.json", "utf8")) as {
-    name: string;
-    version: string;
-  };
-}
-
-function parseSemver(version: string): [number, number, number] {
-  const core = version.trim().replace(/^v/, "").split("-")[0];
-  const [major, minor, patch] = core.split(".").map(Number);
-  if (
-    Number.isNaN(major) ||
-    Number.isNaN(minor) ||
-    Number.isNaN(patch) ||
-    major < 0 ||
-    minor < 0 ||
-    patch < 0
-  ) {
-    throw new Error(`Invalid semver: ${version}`);
+function runStreaming(cmd: string, args: string[], label: string): void {
+  const result = spawnSync(cmd, args, { stdio: "inherit", encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`${label} failed with exit code ${result.status ?? "unknown"}.`);
   }
-  return [major, minor, patch];
 }
 
-function compareSemver(a: string, b: string): number {
-  const av = parseSemver(a);
-  const bv = parseSemver(b);
-  for (let i = 0; i < 3; i += 1) {
-    if (av[i] > bv[i]) return 1;
-    if (av[i] < bv[i]) return -1;
+function isSemver(value: string): boolean {
+  return /^(\d+)\.(\d+)\.(\d+)$/.test(value);
+}
+
+function ensureCleanTree(): void {
+  const status = run("git", ["status", "--porcelain"], "git status");
+  if (status.length > 0) {
+    throw new Error(
+      "Working tree is not clean. Commit or stash your changes before running release.",
+    );
   }
-  return 0;
 }
 
-function npmLatestVersion(packageName: string): string {
-  const output = run("npm", ["view", packageName, "version", "--json"], "npm view");
-  const parsed = JSON.parse(output) as string | string[];
-  return Array.isArray(parsed) ? parsed.at(-1) ?? "" : parsed;
+function readVersion(): string {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
+  return pkg.version;
 }
 
 const args = process.argv.slice(2);
-const dryRun = args.includes("--dry-run");
-const bumpArg = args.find((arg) => arg === "patch" || arg === "minor" || arg === "major");
-const bumpType: BumpType = (bumpArg as BumpType | undefined) ?? "patch";
-const otpArg = args.find((arg) => arg.startsWith("--otp="));
-const otp = otpArg ? otpArg.slice("--otp=".length) : process.env.NPM_OTP;
+const skipCi = args.includes("--skip-ci");
+const noPush = args.includes("--no-push");
+const rawTarget = args.find((arg) => !arg.startsWith("--")) ?? "patch";
 
-console.log("Running CI checks...");
-run("bun", ["run", "ci"], "CI checks");
-
-const originalPkg = readPackageJson();
-const publishedVersion = npmLatestVersion(originalPkg.name);
-let releaseVersion = originalPkg.version;
-
-if (compareSemver(releaseVersion, publishedVersion) <= 0) {
-  console.log(
-    `Local version ${releaseVersion} is not ahead of npm (${publishedVersion}). Bumping ${bumpType}...`,
-  );
-  run("npm", ["version", bumpType, "--no-git-tag-version"], "npm version");
-  releaseVersion = readPackageJson().version;
-}
-
-if (compareSemver(releaseVersion, publishedVersion) <= 0) {
+const target: BumpType | string = rawTarget;
+if (rawTarget !== "patch" && rawTarget !== "minor" && rawTarget !== "major" && !isSemver(rawTarget)) {
   throw new Error(
-    `Release version ${releaseVersion} is still not ahead of npm ${publishedVersion}.`,
+    `Invalid version target "${rawTarget}". Use patch|minor|major or explicit x.y.z.`,
   );
 }
 
-const publishArgs = ["publish", "--access", "public"];
-if (dryRun) publishArgs.push("--dry-run");
-if (otp) publishArgs.push(`--otp=${otp}`);
+ensureCleanTree();
 
-console.log(
-  `${dryRun ? "Dry-run publishing" : "Publishing"} ${originalPkg.name}@${releaseVersion}...`,
-);
-run("npm", publishArgs, "npm publish");
-console.log(
-  dryRun
-    ? `Dry-run complete for ${originalPkg.name}@${releaseVersion}.`
-    : `Published ${originalPkg.name}@${releaseVersion}.`,
-);
+if (!skipCi) {
+  console.log("Running CI checks...");
+  runStreaming("bun", ["run", "ci"], "CI checks");
+}
+
+const beforeVersion = readVersion();
+console.log(`Current version: ${beforeVersion}`);
+
+const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+if (target === "patch" || target === "minor" || target === "major") {
+  const parts = beforeVersion.split(".").map(Number);
+  if (parts.length !== 3 || parts.some(part => !Number.isSafeInteger(part))) throw new Error("Current version must be x.y.z");
+  const [major, minor, patch] = parts as [number, number, number];
+  pkg.version = target === "major" ? `${major + 1}.0.0`
+    : target === "minor" ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+} else {
+  pkg.version = target;
+}
+writeFileSync("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
+runStreaming("bun", ["install", "--lockfile-only"], "refresh release lockfile");
+
+const nextVersion = readVersion();
+const tag = `v${nextVersion}`;
+console.log(`Prepared release version: ${nextVersion}`);
+
+run("git", ["add", "package.json", "bun.lock"], "git add");
+run("git", ["commit", "-m", `Release ${tag}`], "git commit");
+run("git", ["tag", tag], "git tag");
+
+if (!noPush) {
+  runStreaming("git", ["push", "origin", "HEAD"], "git push");
+  runStreaming("git", ["push", "origin", tag], "git push tag");
+  console.log(`Release tag pushed: ${tag}`);
+} else {
+  console.log(`Release tag created locally: ${tag}`);
+}
+
+console.log("Done. GitHub Actions release workflow will run on the tag.");

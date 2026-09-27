@@ -26,10 +26,10 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
-  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
+  type WritableSignerAccount,
 } from '@solana/kit';
 import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
@@ -62,7 +62,7 @@ export type ExtendAccountInstruction<
         ? WritableAccount<TAccountAccount>
         : TAccountAccount,
       TAccountUser extends string
-        ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+        ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
         : TAccountUser,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
@@ -152,7 +152,7 @@ export async function getExtendAccountInstructionAsync<
   // Original accounts.
   const originalAccounts = {
     account: { value: input.account ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: false },
+    user: { value: input.user ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
@@ -246,7 +246,7 @@ export function getExtendAccountInstruction<
   // Original accounts.
   const originalAccounts = {
     account: { value: input.account ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: false },
+    user: { value: input.user ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },

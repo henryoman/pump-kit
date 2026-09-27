@@ -14,35 +14,53 @@ import {
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
-  type ParsedAdminSetCreatorInstruction,
+  type ParsedAddQuoteControlMintInstruction,
+  type ParsedAddQuoteMintInstruction,
+  type ParsedAdminCtoInstruction,
   type ParsedAdminSetIdlAuthorityInstruction,
   type ParsedAdminUpdateTokenIncentivesInstruction,
+  type ParsedBuyExactQuoteInV2Instruction,
   type ParsedBuyExactSolInInstruction,
   type ParsedBuyInstruction,
+  type ParsedBuyV2Instruction,
   type ParsedClaimCashbackInstruction,
+  type ParsedClaimCashbackV2Instruction,
   type ParsedClaimTokenIncentivesInstruction,
   type ParsedCloseUserVolumeAccumulatorInstruction,
   type ParsedCollectCreatorFeeInstruction,
+  type ParsedCollectCreatorFeeV2Instruction,
   type ParsedCreateInstruction,
   type ParsedCreateV2Instruction,
   type ParsedDistributeCreatorFeesInstruction,
+  type ParsedDistributeCreatorFeesV2Instruction,
+  type ParsedDistributeFeeToHoldersInstruction,
   type ParsedExtendAccountInstruction,
   type ParsedGetMinimumDistributableFeeInstruction,
   type ParsedInitializeInstruction,
+  type ParsedInitializeQuoteControlInstruction,
   type ParsedInitUserVolumeAccumulatorInstruction,
   type ParsedMigrateBondingCurveCreatorInstruction,
   type ParsedMigrateInstruction,
+  type ParsedMigrateV2Instruction,
+  type ParsedRemoveQuoteControlMintInstruction,
+  type ParsedRemoveQuoteMintInstruction,
   type ParsedSellInstruction,
+  type ParsedSellV2Instruction,
   type ParsedSetCreatorInstruction,
   type ParsedSetMayhemVirtualParamsInstruction,
   type ParsedSetMetaplexCreatorInstruction,
   type ParsedSetParamsInstruction,
+  type ParsedSetQuoteControlAdminInstruction,
   type ParsedSetReservedFeeRecipientsInstruction,
+  type ParsedSetVirtualQuoteReservesInstruction,
   type ParsedSyncUserVolumeAccumulatorInstruction,
   type ParsedToggleCashbackEnabledInstruction,
   type ParsedToggleCreateV2Instruction,
   type ParsedToggleMayhemModeInstruction,
+  type ParsedUpdateBuybackConfigInstruction,
+  type ParsedUpdateCreatorFeeConfigInstruction,
   type ParsedUpdateGlobalAuthorityInstruction,
+  type ParsedUpdateHolderRewardConfigInstruction,
 } from '../instructions';
 
 export const PUMP_PROGRAM_ADDRESS =
@@ -53,6 +71,7 @@ export enum PumpAccount {
   FeeConfig,
   Global,
   GlobalVolumeAccumulator,
+  QuoteControl,
   SharingConfig,
   UserVolumeAccumulator,
 }
@@ -109,6 +128,17 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([56, 244, 35, 238, 193, 213, 162, 201])
+      ),
+      0
+    )
+  ) {
+    return PumpAccount.QuoteControl;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75])
       ),
       0
@@ -133,35 +163,53 @@ export function identifyPumpAccount(
 }
 
 export enum PumpInstruction {
-  AdminSetCreator,
+  AddQuoteControlMint,
+  AddQuoteMint,
+  AdminCto,
   AdminSetIdlAuthority,
   AdminUpdateTokenIncentives,
   Buy,
+  BuyExactQuoteInV2,
   BuyExactSolIn,
+  BuyV2,
   ClaimCashback,
+  ClaimCashbackV2,
   ClaimTokenIncentives,
   CloseUserVolumeAccumulator,
   CollectCreatorFee,
+  CollectCreatorFeeV2,
   Create,
   CreateV2,
   DistributeCreatorFees,
+  DistributeCreatorFeesV2,
+  DistributeFeeToHolders,
   ExtendAccount,
   GetMinimumDistributableFee,
   InitUserVolumeAccumulator,
   Initialize,
+  InitializeQuoteControl,
   Migrate,
   MigrateBondingCurveCreator,
+  MigrateV2,
+  RemoveQuoteControlMint,
+  RemoveQuoteMint,
   Sell,
+  SellV2,
   SetCreator,
   SetMayhemVirtualParams,
   SetMetaplexCreator,
   SetParams,
+  SetQuoteControlAdmin,
   SetReservedFeeRecipients,
+  SetVirtualQuoteReserves,
   SyncUserVolumeAccumulator,
   ToggleCashbackEnabled,
   ToggleCreateV2,
   ToggleMayhemMode,
+  UpdateBuybackConfig,
+  UpdateCreatorFeeConfig,
   UpdateGlobalAuthority,
+  UpdateHolderRewardConfig,
 }
 
 export function identifyPumpInstruction(
@@ -172,12 +220,34 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([69, 25, 171, 142, 57, 239, 13, 4])
+        new Uint8Array([2, 14, 61, 138, 170, 142, 14, 95])
       ),
       0
     )
   ) {
-    return PumpInstruction.AdminSetCreator;
+    return PumpInstruction.AddQuoteControlMint;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([111, 121, 21, 56, 40, 24, 94, 209])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.AddQuoteMint;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([125, 126, 214, 134, 77, 229, 188, 89])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.AdminCto;
   }
   if (
     containsBytes(
@@ -216,6 +286,17 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([194, 171, 28, 70, 104, 77, 91, 47])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.BuyExactQuoteInV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([56, 252, 116, 8, 158, 223, 205, 95])
       ),
       0
@@ -227,12 +308,34 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([184, 23, 238, 97, 103, 197, 211, 61])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.BuyV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197])
       ),
       0
     )
   ) {
     return PumpInstruction.ClaimCashback;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([122, 243, 204, 65, 94, 116, 29, 55])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.ClaimCashbackV2;
   }
   if (
     containsBytes(
@@ -271,6 +374,17 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([207, 17, 138, 242, 4, 34, 19, 56])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.CollectCreatorFeeV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([24, 30, 200, 40, 5, 28, 7, 119])
       ),
       0
@@ -299,6 +413,28 @@ export function identifyPumpInstruction(
     )
   ) {
     return PumpInstruction.DistributeCreatorFees;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([255, 203, 19, 79, 244, 68, 8, 159])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.DistributeCreatorFeesV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([98, 54, 145, 97, 2, 70, 173, 43])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.DistributeFeeToHolders;
   }
   if (
     containsBytes(
@@ -348,6 +484,17 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([239, 73, 245, 173, 209, 177, 84, 66])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.InitializeQuoteControl;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([155, 234, 231, 146, 236, 158, 162, 30])
       ),
       0
@@ -370,12 +517,56 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([187, 203, 18, 31, 206, 237, 254, 41])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.MigrateV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([223, 7, 253, 26, 81, 165, 218, 166])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.RemoveQuoteControlMint;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([177, 65, 223, 38, 88, 209, 158, 155])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.RemoveQuoteMint;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173])
       ),
       0
     )
   ) {
     return PumpInstruction.Sell;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([93, 246, 130, 60, 231, 233, 64, 178])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.SellV2;
   }
   if (
     containsBytes(
@@ -425,12 +616,34 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([62, 79, 161, 211, 165, 170, 214, 210])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.SetQuoteControlAdmin;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142])
       ),
       0
     )
   ) {
     return PumpInstruction.SetReservedFeeRecipients;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([101, 135, 191, 104, 9, 88, 20, 96])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.SetVirtualQuoteReserves;
   }
   if (
     containsBytes(
@@ -480,12 +693,45 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([251, 224, 171, 146, 160, 26, 113, 233])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.UpdateBuybackConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.UpdateCreatorFeeConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([227, 181, 74, 196, 208, 21, 97, 213])
       ),
       0
     )
   ) {
     return PumpInstruction.UpdateGlobalAuthority;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([225, 252, 66, 4, 199, 35, 236, 16])
+      ),
+      0
+    )
+  ) {
+    return PumpInstruction.UpdateHolderRewardConfig;
   }
   throw new Error(
     'The provided instruction could not be identified as a pump instruction.'
@@ -496,8 +742,14 @@ export type ParsedPumpInstruction<
   TProgram extends string = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
 > =
   | ({
-      instructionType: PumpInstruction.AdminSetCreator;
-    } & ParsedAdminSetCreatorInstruction<TProgram>)
+      instructionType: PumpInstruction.AddQuoteControlMint;
+    } & ParsedAddQuoteControlMintInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.AddQuoteMint;
+    } & ParsedAddQuoteMintInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.AdminCto;
+    } & ParsedAdminCtoInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.AdminSetIdlAuthority;
     } & ParsedAdminSetIdlAuthorityInstruction<TProgram>)
@@ -506,11 +758,20 @@ export type ParsedPumpInstruction<
     } & ParsedAdminUpdateTokenIncentivesInstruction<TProgram>)
   | ({ instructionType: PumpInstruction.Buy } & ParsedBuyInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.BuyExactQuoteInV2;
+    } & ParsedBuyExactQuoteInV2Instruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.BuyExactSolIn;
     } & ParsedBuyExactSolInInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.BuyV2;
+    } & ParsedBuyV2Instruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.ClaimCashback;
     } & ParsedClaimCashbackInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.ClaimCashbackV2;
+    } & ParsedClaimCashbackV2Instruction<TProgram>)
   | ({
       instructionType: PumpInstruction.ClaimTokenIncentives;
     } & ParsedClaimTokenIncentivesInstruction<TProgram>)
@@ -521,6 +782,9 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.CollectCreatorFee;
     } & ParsedCollectCreatorFeeInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.CollectCreatorFeeV2;
+    } & ParsedCollectCreatorFeeV2Instruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.Create;
     } & ParsedCreateInstruction<TProgram>)
   | ({
@@ -529,6 +793,12 @@ export type ParsedPumpInstruction<
   | ({
       instructionType: PumpInstruction.DistributeCreatorFees;
     } & ParsedDistributeCreatorFeesInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.DistributeCreatorFeesV2;
+    } & ParsedDistributeCreatorFeesV2Instruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.DistributeFeeToHolders;
+    } & ParsedDistributeFeeToHoldersInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.ExtendAccount;
     } & ParsedExtendAccountInstruction<TProgram>)
@@ -542,14 +812,29 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.Initialize;
     } & ParsedInitializeInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.InitializeQuoteControl;
+    } & ParsedInitializeQuoteControlInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.Migrate;
     } & ParsedMigrateInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.MigrateBondingCurveCreator;
     } & ParsedMigrateBondingCurveCreatorInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.MigrateV2;
+    } & ParsedMigrateV2Instruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.RemoveQuoteControlMint;
+    } & ParsedRemoveQuoteControlMintInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.RemoveQuoteMint;
+    } & ParsedRemoveQuoteMintInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.Sell;
     } & ParsedSellInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.SellV2;
+    } & ParsedSellV2Instruction<TProgram>)
   | ({
       instructionType: PumpInstruction.SetCreator;
     } & ParsedSetCreatorInstruction<TProgram>)
@@ -563,8 +848,14 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.SetParams;
     } & ParsedSetParamsInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.SetQuoteControlAdmin;
+    } & ParsedSetQuoteControlAdminInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.SetReservedFeeRecipients;
     } & ParsedSetReservedFeeRecipientsInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.SetVirtualQuoteReserves;
+    } & ParsedSetVirtualQuoteReservesInstruction<TProgram>)
   | ({
       instructionType: PumpInstruction.SyncUserVolumeAccumulator;
     } & ParsedSyncUserVolumeAccumulatorInstruction<TProgram>)
@@ -578,5 +869,14 @@ export type ParsedPumpInstruction<
       instructionType: PumpInstruction.ToggleMayhemMode;
     } & ParsedToggleMayhemModeInstruction<TProgram>)
   | ({
+      instructionType: PumpInstruction.UpdateBuybackConfig;
+    } & ParsedUpdateBuybackConfigInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.UpdateCreatorFeeConfig;
+    } & ParsedUpdateCreatorFeeConfigInstruction<TProgram>)
+  | ({
       instructionType: PumpInstruction.UpdateGlobalAuthority;
-    } & ParsedUpdateGlobalAuthorityInstruction<TProgram>);
+    } & ParsedUpdateGlobalAuthorityInstruction<TProgram>)
+  | ({
+      instructionType: PumpInstruction.UpdateHolderRewardConfig;
+    } & ParsedUpdateHolderRewardConfigInstruction<TProgram>);

@@ -1,5 +1,9 @@
+import * as actualSnapshot from "../../src/swap/snapshot";
 import { describe, test, expect, beforeAll, beforeEach, afterEach, mock } from "bun:test";
+import { address } from "@solana/kit";
+import { findAssociatedTokenPda } from "../../src/pda/ata";
 import type { Instruction, TransactionSigner } from "@solana/kit";
+import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, PUMP_AMM_PROGRAM_ID } from "../../src/config/addresses";
 import { addSlippage, subSlippage } from "../../src/utils/slippage";
 import { solToLamports, tokensToRaw } from "../../src/utils/amounts";
 import { createTestWallet } from "../setup";
@@ -12,11 +16,12 @@ const MOCK_GLOBAL_CONFIG_ADDRESS = "3SghDUFxuDrPq3NbS1RyCBj3Tz7kRXKuX3sX5Yucs5cj
 const BASE_ATA = "9jqMADYjX4jG3Ejj6LikUeJ8V4aHcRUW2YCiMzFxLrR2";
 const QUOTE_ATA = "9i6PjaVXrDm6uSPRqCMgfHTCqkfNNpJBWQAbQHV2feRv";
 
-const TOTAL_FEE_BPS = 150n; // 1.5% combined LP + protocol fee
+const TOTAL_FEE_BPS = 175n; // 1.5% combined LP + protocol fee
 const BPS_DENOMINATOR = 10_000n;
 
 const baseReserve = 1_000_000_000n;
 const quoteReserve = 50_000_000_000n;
+let virtualQuoteReserves = 0n;
 
 const ammBuyCalls: any[] = [];
 const ammSellCalls: any[] = [];
@@ -43,32 +48,48 @@ const buildAmmSellMock = mock(
   }
 );
 
+mock.module("../../src/swap/snapshot", () => ({
+  ...actualSnapshot,
+  loadAmmSnapshot: async ({ context }: any) => ({
+    contextSlot: 100n, poolAddress: context.poolAddress, poolCreator: MOCK_POOL_CREATOR,
+    poolData: (await readPool()).data,
+    globalConfigData: { lpFeeBasisPoints: 75n, protocolFeeBasisPoints: 75n },
+    baseMint: { mint: MOCK_BASE_MINT, tokenProgram: TOKEN_2022_PROGRAM_ID, decimals: 6 },
+    quoteMint: { mint: MOCK_QUOTE_MINT, tokenProgram: TOKEN_PROGRAM_ID, decimals: 9 },
+    baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID,
+    baseReserve, realQuoteReserve: quoteReserve, quoteReserve: quoteReserve + virtualQuoteReserves,
+    fees: { lpFeeBps: 75n, protocolFeeBps: 75n, creatorFeeBps: 25n },
+  }),
+}));
+
 mock.module("../../src/clients/amm", () => ({
   ammBuy: buildAmmBuyMock,
   ammSell: buildAmmSellMock,
 }));
 
-mock.module("../../src/pumpsdk/generated/accounts/bondingCurve", () => ({
-  fetchBondingCurve: async () => ({
-    data: {
-      creator: MOCK_POOL_CREATOR,
-    },
-  }),
-}));
-
-mock.module("../../src/ammsdk/generated/accounts/pool", () => ({
-  fetchPool: async () => ({
+let poolResolutionReads = 0;
+let poolReady = true;
+let poolReadError: Error | undefined;
+const readPool = async () => {
+  if (poolReadError) throw poolReadError;
+  return { exists: poolReady, programAddress: PUMP_AMM_PROGRAM_ID,
     data: {
       index: 0,
       creator: MOCK_POOL_CREATOR,
       baseMint: MOCK_BASE_MINT,
       quoteMint: MOCK_QUOTE_MINT,
+      baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID,
       lpMint: "LpMint11111111111111111111111111111111111",
       poolBaseTokenAccount: BASE_ATA,
       poolQuoteTokenAccount: QUOTE_ATA,
       lpSupply: 1_000_000n,
+      coinCreator: MOCK_POOL_CREATOR,
+      virtualQuoteReserves,
     },
-  }),
+  };
+};
+mock.module("../../src/ammsdk/generated/accounts/pool", () => ({
+  fetchPool: async () => { poolResolutionReads++; return readPool(); }, fetchMaybePool: readPool,
 }));
 
 mock.module("../../src/ammsdk/generated/accounts/globalConfig", () => ({
@@ -80,23 +101,23 @@ mock.module("../../src/ammsdk/generated/accounts/globalConfig", () => ({
   }),
 }));
 
+mock.module("../../src/ammsdk/generated/accounts/feeConfig", () => ({
+  fetchFeeConfig: async () => ({ data: {
+    flatFees: { lpFeeBps: 75n, protocolFeeBps: 75n, creatorFeeBps: 25n },
+    feeTiers: [], stableFeeTiers: [], exoticFlatFees: { lpFeeBps: 0n, protocolFeeBps: 0n, creatorFeeBps: 0n },
+  } }),
+}));
+
 mock.module("../../src/pda/pumpAmm", () => ({
   poolPda: async () => MOCK_POOL_ADDRESS,
   poolTokenAta: async (_pool: string, tokenMint: string) => {
     return tokenMint === MOCK_BASE_MINT ? BASE_ATA : QUOTE_ATA;
   },
   globalConfigPda: async () => MOCK_GLOBAL_CONFIG_ADDRESS,
+  ammFeeConfigPda: async () => MOCK_GLOBAL_CONFIG_ADDRESS,
 }));
 
-mock.module("../../src/utils/ata", () => ({
-  buildCreateAtaInstruction: () => ({
-    programAddress: "AtaProgram1111111111111111111111111111111",
-    accounts: [],
-    data: new Uint8Array(),
-  }),
-}));
-
-const { ammBuy, ammSell } = await import("../../src/swap");
+const { ammBuy, ammSell, buy, sell, resolveSwapVenue, resolveAmmTradingContext } = await import("../../src/swap");
 
 type RpcStub = ReturnType<typeof createRpcStub>;
 
@@ -105,6 +126,7 @@ function createRpcStub() {
   const accountInfos = new Map<string, { value: unknown }>();
 
   return {
+    getSlot: () => ({ send: async () => 100n }),
     setBalance(address: string, amount: bigint) {
       balances.set(address, { value: { amount: amount.toString() } });
     },
@@ -136,8 +158,8 @@ function createRpcStub() {
 }
 
 function applyInputFees(amount: bigint, totalFeeBps: bigint): bigint {
-  const denominator = BPS_DENOMINATOR - totalFeeBps;
-  return (amount * denominator) / BPS_DENOMINATOR;
+  const denominator = BPS_DENOMINATOR + totalFeeBps;
+  return (amount * BPS_DENOMINATOR) / denominator;
 }
 
 function computeTokensOut(netQuoteIn: bigint, baseRes: bigint, quoteRes: bigint): bigint {
@@ -150,9 +172,9 @@ function computeQuoteForTokens(
   baseRes: bigint,
   totalFeeBps: bigint
 ): bigint {
-  const netQuoteIn = (tokensOut * quoteRes) / (baseRes - tokensOut);
-  const denominator = BPS_DENOMINATOR - totalFeeBps;
-  return (netQuoteIn * BPS_DENOMINATOR + (denominator - 1n)) / denominator;
+  const netQuoteIn = (tokensOut * quoteRes + baseRes - tokensOut - 1n) / (baseRes - tokensOut);
+  void totalFeeBps;
+  return netQuoteIn + (netQuoteIn * 75n + 9999n) / 10000n * 2n + (netQuoteIn * 25n + 9999n) / 10000n;
 }
 
 function computeQuoteOut(netBaseIn: bigint, baseRes: bigint, quoteRes: bigint): bigint {
@@ -168,6 +190,9 @@ describe("AMM swap helpers", () => {
   });
 
   beforeEach(() => {
+    virtualQuoteReserves = 0n;
+    poolReady = true;
+    poolReadError = undefined;
     ammBuyCalls.length = 0;
     ammSellCalls.length = 0;
     buildAmmBuyMock.mockClear();
@@ -188,7 +213,10 @@ describe("AMM swap helpers", () => {
     const solBudgetLamports = solToLamports(solAmount);
     const totalFees = TOTAL_FEE_BPS;
 
-    const netQuoteIn = applyInputFees(solBudgetLamports, totalFees);
+    let netQuoteIn = applyInputFees(solBudgetLamports, totalFees);
+    const feeTotal = (netQuoteIn * 75n + 9999n) / 10000n * 2n + (netQuoteIn * 25n + 9999n) / 10000n;
+    if (netQuoteIn + feeTotal > solBudgetLamports) netQuoteIn -= netQuoteIn + feeTotal - solBudgetLamports;
+    netQuoteIn -= 1n;
     let expectedTokens = computeTokensOut(netQuoteIn, baseReserve, quoteReserve);
     if (expectedTokens >= baseReserve) {
       expectedTokens = baseReserve - 1n;
@@ -201,19 +229,22 @@ describe("AMM swap helpers", () => {
     }
     const expectedMaxQuoteIn = addSlippage(quoteRequired, slippageBps);
 
-    const instruction = await ammBuy({
+    const plan = await ammBuy({
       user: wallet,
       mint: MOCK_BASE_MINT,
       solAmount,
+      kind: "exactOut",
       slippageBps,
       rpc: rpc as any,
       poolAddress: MOCK_POOL_ADDRESS,
       poolCreator: MOCK_POOL_CREATOR,
       quoteMint: MOCK_QUOTE_MINT,
+      baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID,
     });
 
+    const instruction = plan.instructions.find(ix => ix.programAddress === "AmmProgram1111111111111111111111111111111")!;
     expect(instruction.programAddress).toBe("AmmProgram1111111111111111111111111111111");
-    expect(instruction.prepend?.length).toBe(1);
+    expect(plan.instructions).toHaveLength(2);
     expect(buildAmmBuyMock).toHaveBeenCalledTimes(1);
     const params = ammBuyCalls[0];
     expect(params.tokenAmountOut).toBe(expectedTokens);
@@ -225,11 +256,11 @@ describe("AMM swap helpers", () => {
     const decimals = 6;
     const tokenAmountRaw = tokensToRaw(tokenAmount, decimals);
     const slippageBps = 175;
-    const netBaseIn = applyInputFees(tokenAmountRaw, TOTAL_FEE_BPS);
-    const quoteOut = computeQuoteOut(netBaseIn, baseReserve, quoteReserve);
+    const grossQuote = computeQuoteOut(tokenAmountRaw, baseReserve, quoteReserve);
+    const quoteOut = grossQuote - (grossQuote * 75n + 9999n) / 10000n * 2n - (grossQuote * 25n + 9999n) / 10000n;
     const expectedMinQuoteOut = subSlippage(quoteOut, slippageBps);
 
-    const instruction = await ammSell({
+    const plan = await ammSell({
       user: wallet,
       mint: MOCK_BASE_MINT,
       tokenAmount,
@@ -239,13 +270,125 @@ describe("AMM swap helpers", () => {
       poolAddress: MOCK_POOL_ADDRESS,
       poolCreator: MOCK_POOL_CREATOR,
       quoteMint: MOCK_QUOTE_MINT,
+      baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID,
     });
 
+    const instruction = plan.instructions.find(ix => ix.programAddress === "AmmProgram1111111111111111111111111111111")!;
     expect(instruction.programAddress).toBe("AmmProgram1111111111111111111111111111111");
     expect(buildAmmSellMock).toHaveBeenCalledTimes(1);
     const params = ammSellCalls[0];
     expect(params.tokenAmountIn).toBe(tokenAmountRaw);
     expect(params.minQuoteOut).toBe(expectedMinQuoteOut);
   });
+  test("AMM quotes include nonzero virtual quote reserves", async () => {
+    virtualQuoteReserves = quoteReserve;
+    const params = {
+      user: wallet, mint: MOCK_BASE_MINT, rpc: rpc as any,
+      poolAddress: MOCK_POOL_ADDRESS, poolCreator: MOCK_POOL_CREATOR,
+      quoteMint: MOCK_QUOTE_MINT,
+      baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, slippageBps: 0,
+    };
+    await ammBuy({ ...params, solAmount: 1 });
+    const withVirtual = ammBuyCalls[0].tokenAmountOut;
+    virtualQuoteReserves = 0n;
+    await ammBuy({ ...params, solAmount: 1 });
+    expect(withVirtual).toBeLessThan(ammBuyCalls[1].tokenAmountOut);
+    virtualQuoteReserves = quoteReserve;
+    await ammSell({ ...params, tokenAmount: 1 });
+    const sellWithVirtual = ammSellCalls[0].minQuoteOut;
+    virtualQuoteReserves = 0n;
+    await ammSell({ ...params, tokenAmount: 1 });
+    expect(sellWithVirtual).toBeGreaterThan(ammSellCalls[1].minQuoteOut);
+  });
+
+  test("public buy and sell route completed curves to the AMM", async () => {
+    const params = {
+      user: wallet, mint: MOCK_BASE_MINT, rpc: rpc as any,
+      poolAddress: MOCK_POOL_ADDRESS, poolCreator: MOCK_POOL_CREATOR,
+      quoteMint: MOCK_QUOTE_MINT, baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID,
+      curveStateOverride: { virtualTokenReserves: 1n, virtualQuoteReserves: 1n,
+        realTokenReserves: 0n, realQuoteReserves: 0n, creator: wallet.address, complete: true },
+    };
+    await buy({ ...params, solAmount: "0.1" });
+    await sell({ ...params, tokenAmount: "1" });
+    expect(ammBuyCalls).toHaveLength(1);
+    expect(ammSellCalls).toHaveLength(1);
+    expect(ammBuyCalls[0].exactQuoteIn.amountIn).toBe(100000000n);
+    expect(ammBuyCalls[0].exactQuoteIn.minAmountOut).toBeGreaterThan(0n);
+    expect(ammBuyCalls[0].maxQuoteIn).toBe(100000000n);
+    expect(ammBuyCalls[0].baseTokenProgram).toBe(TOKEN_2022_PROGRAM_ID);
+    expect(ammSellCalls[0].quoteTokenProgram).toBe(TOKEN_PROGRAM_ID);
+  });
+
+  test("AMM percentage sells reject amounts below one raw unit", async () => {
+    const [ata] = await findAssociatedTokenPda({ owner: wallet.address,
+      mint: address(MOCK_BASE_MINT), tokenProgram: address(TOKEN_2022_PROGRAM_ID) });
+    rpc.setBalance(ata, 1n);
+    await expect(ammSell({ user: wallet, mint: MOCK_BASE_MINT, rpc: rpc as any,
+      poolAddress: MOCK_POOL_ADDRESS, quoteMint: MOCK_QUOTE_MINT,
+      baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID,
+      useWalletPercentage: true, walletPercentage: 1 })).rejects.toThrow("Percentage sell rounds to zero token units");
+    expect(buildAmmSellMock).not.toHaveBeenCalled();
+  });
+
+  test("routing distinguishes completion from migration and preserves RPC errors", async () => {
+    const params = { user: wallet, mint: MOCK_BASE_MINT, rpc: rpc as any,
+      poolAddress: MOCK_POOL_ADDRESS, quoteMint: MOCK_QUOTE_MINT,
+      curveStateOverride: { virtualTokenReserves: 1n, virtualQuoteReserves: 1n,
+        realTokenReserves: 0n, realQuoteReserves: 0n, creator: wallet.address, complete: true } };
+    poolReady = false;
+    expect((await resolveSwapVenue(params)).status).toBe("migrationPending");
+    await expect(buy({ ...params, amountIn: 1000000n })).rejects.toThrow("not ready");
+    expect(buildAmmBuyMock).not.toHaveBeenCalled();
+    poolReadError = new Error("RPC transport unavailable");
+    await expect(resolveSwapVenue(params)).rejects.toThrow("RPC transport unavailable");
+    expect((await resolveSwapVenue({ ...params, curveStateOverride: { ...params.curveStateOverride, complete: false } })).status).toBe("curve");
+    poolReadError = undefined;
+    poolReady = true;
+    expect((await resolveSwapVenue(params)).status).toBe("amm");
+  });
+
+  test("AMM plans preserve exact-output targets and explicit input/output limits", async () => {
+    const params = { user: wallet, mint: MOCK_BASE_MINT, rpc: rpc as any,
+      poolAddress: MOCK_POOL_ADDRESS, quoteMint: MOCK_QUOTE_MINT,
+      baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID };
+    const plan = await ammBuy({ ...params, kind: "exactOut", amountOut: 100n, maxAmountIn: 10000n });
+    expect(ammBuyCalls[0].tokenAmountOut).toBe(100n);
+    expect(ammBuyCalls[0].maxQuoteIn).toBe(10000n);
+    expect(ammBuyCalls[0].exactQuoteIn).toBeUndefined();
+    expect(plan.quote.kind).toBe("exactOut");
+    await ammSell({ ...params, amountIn: 100n, minAmountOut: 10n });
+    expect(ammSellCalls[0].minQuoteOut).toBe(10n);
+    await expect(ammBuy({ ...params, kind: "exactOut", amountOut: 100n, amountIn: 10000n })).rejects.toThrow("cannot be mixed");
+    await expect(ammSell({ ...params, amountIn: 100n, minAmountOut: 10n, slippageBps: 50 })).rejects.toThrow("Do not mix");
+  });
+
 });
 
+
+test("retained AMM contexts avoid pool discovery for subsequent plans", async () => {
+  poolReadError = undefined;
+  poolReady = true;
+  virtualQuoteReserves = 0n;
+  const rpc = createRpcStub();
+  const before = poolResolutionReads;
+  const tradingContext = await resolveAmmTradingContext({ rpc: rpc as any,
+    mint: address(MOCK_BASE_MINT), quoteMint: address(MOCK_QUOTE_MINT),
+    poolAddress: MOCK_POOL_ADDRESS, commitment: "confirmed" });
+  expect(poolResolutionReads).toBe(before + 1);
+  const user = await createTestWallet();
+  const params = { user, mint: MOCK_BASE_MINT, quoteMint: MOCK_QUOTE_MINT,
+    rpc: rpc as any, tradingContext, amountIn: 1000000n };
+  const first = await ammBuy(params);
+  virtualQuoteReserves = 3000000000n;
+  const refreshed = await ammBuy(params);
+  expect(poolResolutionReads).toBe(before + 1);
+  expect(first.quote.kind).toBe("exactIn");
+  expect(refreshed.quote.kind).toBe("exactIn");
+  if (first.quote.kind === "exactIn" && refreshed.quote.kind === "exactIn") {
+    expect(refreshed.quote.expectedAmountOut).toBeLessThan(first.quote.expectedAmountOut);
+  }
+  await expect(ammBuy({ ...params, quoteTokenProgram: TOKEN_2022_PROGRAM_ID })).rejects.toThrow("mint owner");
+  await expect(ammSell({ ...params, tokenDecimals: 9 })).rejects.toThrow("tokenDecimals");
+  virtualQuoteReserves = 0n;
+});

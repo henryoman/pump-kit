@@ -42,6 +42,17 @@ async function patchIndexBarrel(outDir: string) {
   }
 }
 
+async function patchCompatibleAccount(outDir: string, name: string, discriminator: string, historicalSizes: number[], size: number) {
+  const path = join(outDir, "accounts", `${name}.ts`);
+  const content = await readFile(path, "utf8");
+  const original = "encodedAccount as MaybeEncodedAccount<TAddress>,";
+  if (!content.includes(original)) throw new Error(`Cannot install compatibility decoding in ${path}`);
+  const updated = 'import { normalizeProtocolAccount } from "../../../utils/protocol_accounts";\n' +
+    content.replace(original,
+      `normalizeProtocolAccount(encodedAccount as MaybeEncodedAccount<TAddress>, ${discriminator}, ${JSON.stringify(historicalSizes)}, ${size}),`);
+  await writeFile(path, updated, "utf8");
+}
+
 async function render(idlPath: string, outDir: string, { normalizePubkey = false } = {}) {
   console.log(`📖 Reading IDL from ${idlPath}...`);
   const idlJson = await readFile(idlPath, "utf8");
@@ -62,6 +73,11 @@ async function render(idlPath: string, outDir: string, { normalizePubkey = false
   
   await codama.accept(visitor);
   await patchIndexBarrel(outDir);
+  if (outDir === "src/pumpsdk/generated") {
+    await patchCompatibleAccount(outDir, "bondingCurve", "BONDING_CURVE_DISCRIMINATOR", [49, 81, 82, 83, 115, 123, 124], 125);
+  } else {
+    await patchCompatibleAccount(outDir, "pool", "POOL_DISCRIMINATOR", [211, 243, 244, 245, 261, 269, 270], 271);
+  }
   
   console.log(`✅ Generated code for ${idl.metadata?.name || "unknown"}`);
 }

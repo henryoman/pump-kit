@@ -19,6 +19,8 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  getTupleDecoder,
+  getTupleEncoder,
   getU16Decoder,
   getU16Encoder,
   getU64Decoder,
@@ -159,6 +161,9 @@ export type CreatePoolInstructionData = {
   coinCreator: Address;
   isMayhemMode: boolean;
   isCashbackCoin: OptionBool;
+  creatorFeeBps: readonly [bigint];
+  canEditCreatorFee: OptionBool;
+  isHolderReward: OptionBool;
 };
 
 export type CreatePoolInstructionDataArgs = {
@@ -168,6 +173,9 @@ export type CreatePoolInstructionDataArgs = {
   coinCreator: Address;
   isMayhemMode: boolean;
   isCashbackCoin: OptionBoolArgs;
+  creatorFeeBps: readonly [number | bigint];
+  canEditCreatorFee: OptionBoolArgs;
+  isHolderReward: OptionBoolArgs;
 };
 
 export function getCreatePoolInstructionDataEncoder(): FixedSizeEncoder<CreatePoolInstructionDataArgs> {
@@ -180,6 +188,9 @@ export function getCreatePoolInstructionDataEncoder(): FixedSizeEncoder<CreatePo
       ['coinCreator', getAddressEncoder()],
       ['isMayhemMode', getBooleanEncoder()],
       ['isCashbackCoin', getOptionBoolEncoder()],
+      ['creatorFeeBps', getTupleEncoder([getU64Encoder()])],
+      ['canEditCreatorFee', getOptionBoolEncoder()],
+      ['isHolderReward', getOptionBoolEncoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_POOL_DISCRIMINATOR })
   );
@@ -194,6 +205,9 @@ export function getCreatePoolInstructionDataDecoder(): FixedSizeDecoder<CreatePo
     ['coinCreator', getAddressDecoder()],
     ['isMayhemMode', getBooleanDecoder()],
     ['isCashbackCoin', getOptionBoolDecoder()],
+    ['creatorFeeBps', getTupleDecoder([getU64Decoder()])],
+    ['canEditCreatorFee', getOptionBoolDecoder()],
+    ['isHolderReward', getOptionBoolDecoder()],
   ]);
 }
 
@@ -251,6 +265,9 @@ export type CreatePoolAsyncInput<
   coinCreator: CreatePoolInstructionDataArgs['coinCreator'];
   isMayhemMode: CreatePoolInstructionDataArgs['isMayhemMode'];
   isCashbackCoin: CreatePoolInstructionDataArgs['isCashbackCoin'];
+  creatorFeeBps: CreatePoolInstructionDataArgs['creatorFeeBps'];
+  canEditCreatorFee: CreatePoolInstructionDataArgs['canEditCreatorFee'];
+  isHolderReward: CreatePoolInstructionDataArgs['isHolderReward'];
 };
 
 export async function getCreatePoolInstructionAsync<
@@ -561,6 +578,9 @@ export type CreatePoolInput<
   coinCreator: CreatePoolInstructionDataArgs['coinCreator'];
   isMayhemMode: CreatePoolInstructionDataArgs['isMayhemMode'];
   isCashbackCoin: CreatePoolInstructionDataArgs['isCashbackCoin'];
+  creatorFeeBps: CreatePoolInstructionDataArgs['creatorFeeBps'];
+  canEditCreatorFee: CreatePoolInstructionDataArgs['canEditCreatorFee'];
+  isHolderReward: CreatePoolInstructionDataArgs['isHolderReward'];
 };
 
 export function getCreatePoolInstruction<

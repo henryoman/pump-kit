@@ -78,6 +78,12 @@ export interface SimpleSellParams {
 }
 
 export async function sellSimple(params: SimpleSellParams): Promise<Instruction> {
+  if (params.minSolOutputLamports !== undefined && params.minSolOutputSol !== undefined) {
+    throw new Error("Provide exactly one SOL output limit");
+  }
+  if (params.tokenAmountRaw !== undefined && params.tokenAmount !== undefined) {
+    throw new Error("Provide exactly one token amount");
+  }
   const {
     user,
     mint,

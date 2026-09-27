@@ -21,8 +21,12 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  getTupleDecoder,
+  getTupleEncoder,
   getU32Decoder,
   getU32Encoder,
+  getU64Decoder,
+  getU64Encoder,
   getUtf8Decoder,
   getUtf8Encoder,
   transformEncoder,
@@ -153,6 +157,8 @@ export type CreateV2InstructionData = {
   creator: Address;
   isMayhemMode: boolean;
   isCashbackEnabled: OptionBool;
+  creatorFeeBps: readonly [bigint];
+  isHolderReward: OptionBool;
 };
 
 export type CreateV2InstructionDataArgs = {
@@ -162,6 +168,8 @@ export type CreateV2InstructionDataArgs = {
   creator: Address;
   isMayhemMode: boolean;
   isCashbackEnabled: OptionBoolArgs;
+  creatorFeeBps: readonly [number | bigint];
+  isHolderReward: OptionBoolArgs;
 };
 
 export function getCreateV2InstructionDataEncoder(): Encoder<CreateV2InstructionDataArgs> {
@@ -174,6 +182,8 @@ export function getCreateV2InstructionDataEncoder(): Encoder<CreateV2Instruction
       ['creator', getAddressEncoder()],
       ['isMayhemMode', getBooleanEncoder()],
       ['isCashbackEnabled', getOptionBoolEncoder()],
+      ['creatorFeeBps', getTupleEncoder([getU64Encoder()])],
+      ['isHolderReward', getOptionBoolEncoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_V2_DISCRIMINATOR })
   );
@@ -188,6 +198,8 @@ export function getCreateV2InstructionDataDecoder(): Decoder<CreateV2Instruction
     ['creator', getAddressDecoder()],
     ['isMayhemMode', getBooleanDecoder()],
     ['isCashbackEnabled', getOptionBoolDecoder()],
+    ['creatorFeeBps', getTupleDecoder([getU64Decoder()])],
+    ['isHolderReward', getOptionBoolDecoder()],
   ]);
 }
 
@@ -241,6 +253,8 @@ export type CreateV2AsyncInput<
   creator: CreateV2InstructionDataArgs['creator'];
   isMayhemMode: CreateV2InstructionDataArgs['isMayhemMode'];
   isCashbackEnabled: CreateV2InstructionDataArgs['isCashbackEnabled'];
+  creatorFeeBps: CreateV2InstructionDataArgs['creatorFeeBps'];
+  isHolderReward: CreateV2InstructionDataArgs['isHolderReward'];
 };
 
 export async function getCreateV2InstructionAsync<
@@ -539,6 +553,8 @@ export type CreateV2Input<
   creator: CreateV2InstructionDataArgs['creator'];
   isMayhemMode: CreateV2InstructionDataArgs['isMayhemMode'];
   isCashbackEnabled: CreateV2InstructionDataArgs['isCashbackEnabled'];
+  creatorFeeBps: CreateV2InstructionDataArgs['creatorFeeBps'];
+  isHolderReward: CreateV2InstructionDataArgs['isHolderReward'];
 };
 
 export function getCreateV2Instruction<

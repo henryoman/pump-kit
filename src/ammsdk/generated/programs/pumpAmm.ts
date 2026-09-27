@@ -14,8 +14,9 @@ import {
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
-  type ParsedAdminSetCoinCreatorInstruction,
+  type ParsedAdminCtoPoolInstruction,
   type ParsedAdminUpdateTokenIncentivesInstruction,
+  type ParsedBoostBuyAndBurnInstruction,
   type ParsedBuyExactQuoteInInstruction,
   type ParsedBuyInstruction,
   type ParsedClaimCashbackInstruction,
@@ -27,16 +28,22 @@ import {
   type ParsedDepositInstruction,
   type ParsedDisableInstruction,
   type ParsedExtendAccountInstruction,
+  type ParsedInitBoostInstruction,
   type ParsedInitUserVolumeAccumulatorInstruction,
   type ParsedMigratePoolCoinCreatorInstruction,
   type ParsedSellInstruction,
+  type ParsedSetBoostAuthorityInstruction,
   type ParsedSetCoinCreatorInstruction,
   type ParsedSetReservedFeeRecipientsInstruction,
   type ParsedSyncUserVolumeAccumulatorInstruction,
+  type ParsedToggleBoostInstruction,
   type ParsedToggleCashbackEnabledInstruction,
   type ParsedToggleMayhemModeInstruction,
   type ParsedTransferCreatorFeesToPumpInstruction,
+  type ParsedTransferCreatorFeesToPumpV2Instruction,
   type ParsedUpdateAdminInstruction,
+  type ParsedUpdateBuybackConfigInstruction,
+  type ParsedUpdateCreatorFeeConfigInstruction,
   type ParsedUpdateFeeConfigInstruction,
   type ParsedWithdrawInstruction,
 } from '../instructions';
@@ -141,8 +148,9 @@ export function identifyPumpAmmAccount(
 }
 
 export enum PumpAmmInstruction {
-  AdminSetCoinCreator,
+  AdminCtoPool,
   AdminUpdateTokenIncentives,
+  BoostBuyAndBurn,
   Buy,
   BuyExactQuoteIn,
   ClaimCashback,
@@ -154,16 +162,22 @@ export enum PumpAmmInstruction {
   Deposit,
   Disable,
   ExtendAccount,
+  InitBoost,
   InitUserVolumeAccumulator,
   MigratePoolCoinCreator,
   Sell,
+  SetBoostAuthority,
   SetCoinCreator,
   SetReservedFeeRecipients,
   SyncUserVolumeAccumulator,
+  ToggleBoost,
   ToggleCashbackEnabled,
   ToggleMayhemMode,
   TransferCreatorFeesToPump,
+  TransferCreatorFeesToPumpV2,
   UpdateAdmin,
+  UpdateBuybackConfig,
+  UpdateCreatorFeeConfig,
   UpdateFeeConfig,
   Withdraw,
 }
@@ -176,12 +190,12 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([242, 40, 117, 145, 73, 96, 105, 104])
+        new Uint8Array([45, 61, 165, 151, 104, 0, 49, 189])
       ),
       0
     )
   ) {
-    return PumpAmmInstruction.AdminSetCoinCreator;
+    return PumpAmmInstruction.AdminCtoPool;
   }
   if (
     containsBytes(
@@ -193,6 +207,17 @@ export function identifyPumpAmmInstruction(
     )
   ) {
     return PumpAmmInstruction.AdminUpdateTokenIncentives;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([105, 68, 6, 175, 0, 7, 35, 162])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.BoostBuyAndBurn;
   }
   if (
     containsBytes(
@@ -319,6 +344,17 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([140, 233, 33, 94, 132, 90, 194, 143])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.InitBoost;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183])
       ),
       0
@@ -347,6 +383,17 @@ export function identifyPumpAmmInstruction(
     )
   ) {
     return PumpAmmInstruction.Sell;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([227, 149, 76, 42, 130, 39, 234, 205])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.SetBoostAuthority;
   }
   if (
     containsBytes(
@@ -385,6 +432,17 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([117, 161, 160, 74, 223, 137, 118, 99])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.ToggleBoost;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195])
       ),
       0
@@ -418,12 +476,45 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 33, 78, 185, 33, 67, 44, 92])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.TransferCreatorFeesToPumpV2;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([161, 176, 40, 213, 60, 184, 179, 228])
       ),
       0
     )
   ) {
     return PumpAmmInstruction.UpdateAdmin;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([251, 224, 171, 146, 160, 26, 113, 233])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.UpdateBuybackConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175])
+      ),
+      0
+    )
+  ) {
+    return PumpAmmInstruction.UpdateCreatorFeeConfig;
   }
   if (
     containsBytes(
@@ -456,11 +547,14 @@ export type ParsedPumpAmmInstruction<
   TProgram extends string = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
 > =
   | ({
-      instructionType: PumpAmmInstruction.AdminSetCoinCreator;
-    } & ParsedAdminSetCoinCreatorInstruction<TProgram>)
+      instructionType: PumpAmmInstruction.AdminCtoPool;
+    } & ParsedAdminCtoPoolInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.AdminUpdateTokenIncentives;
     } & ParsedAdminUpdateTokenIncentivesInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.BoostBuyAndBurn;
+    } & ParsedBoostBuyAndBurnInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.Buy;
     } & ParsedBuyInstruction<TProgram>)
@@ -495,6 +589,9 @@ export type ParsedPumpAmmInstruction<
       instructionType: PumpAmmInstruction.ExtendAccount;
     } & ParsedExtendAccountInstruction<TProgram>)
   | ({
+      instructionType: PumpAmmInstruction.InitBoost;
+    } & ParsedInitBoostInstruction<TProgram>)
+  | ({
       instructionType: PumpAmmInstruction.InitUserVolumeAccumulator;
     } & ParsedInitUserVolumeAccumulatorInstruction<TProgram>)
   | ({
@@ -503,6 +600,9 @@ export type ParsedPumpAmmInstruction<
   | ({
       instructionType: PumpAmmInstruction.Sell;
     } & ParsedSellInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.SetBoostAuthority;
+    } & ParsedSetBoostAuthorityInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.SetCoinCreator;
     } & ParsedSetCoinCreatorInstruction<TProgram>)
@@ -513,6 +613,9 @@ export type ParsedPumpAmmInstruction<
       instructionType: PumpAmmInstruction.SyncUserVolumeAccumulator;
     } & ParsedSyncUserVolumeAccumulatorInstruction<TProgram>)
   | ({
+      instructionType: PumpAmmInstruction.ToggleBoost;
+    } & ParsedToggleBoostInstruction<TProgram>)
+  | ({
       instructionType: PumpAmmInstruction.ToggleCashbackEnabled;
     } & ParsedToggleCashbackEnabledInstruction<TProgram>)
   | ({
@@ -522,8 +625,17 @@ export type ParsedPumpAmmInstruction<
       instructionType: PumpAmmInstruction.TransferCreatorFeesToPump;
     } & ParsedTransferCreatorFeesToPumpInstruction<TProgram>)
   | ({
+      instructionType: PumpAmmInstruction.TransferCreatorFeesToPumpV2;
+    } & ParsedTransferCreatorFeesToPumpV2Instruction<TProgram>)
+  | ({
       instructionType: PumpAmmInstruction.UpdateAdmin;
     } & ParsedUpdateAdminInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.UpdateBuybackConfig;
+    } & ParsedUpdateBuybackConfigInstruction<TProgram>)
+  | ({
+      instructionType: PumpAmmInstruction.UpdateCreatorFeeConfig;
+    } & ParsedUpdateCreatorFeeConfigInstruction<TProgram>)
   | ({
       instructionType: PumpAmmInstruction.UpdateFeeConfig;
     } & ParsedUpdateFeeConfigInstruction<TProgram>)

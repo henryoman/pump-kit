@@ -26,12 +26,14 @@ export type CollectCreatorFeeEvent = {
   timestamp: bigint;
   creator: Address;
   creatorFee: bigint;
+  quoteMint: Address;
 };
 
 export type CollectCreatorFeeEventArgs = {
   timestamp: number | bigint;
   creator: Address;
   creatorFee: number | bigint;
+  quoteMint: Address;
 };
 
 export function getCollectCreatorFeeEventEncoder(): FixedSizeEncoder<CollectCreatorFeeEventArgs> {
@@ -39,6 +41,7 @@ export function getCollectCreatorFeeEventEncoder(): FixedSizeEncoder<CollectCrea
     ['timestamp', getI64Encoder()],
     ['creator', getAddressEncoder()],
     ['creatorFee', getU64Encoder()],
+    ['quoteMint', getAddressEncoder()],
   ]);
 }
 
@@ -47,6 +50,7 @@ export function getCollectCreatorFeeEventDecoder(): FixedSizeDecoder<CollectCrea
     ['timestamp', getI64Decoder()],
     ['creator', getAddressDecoder()],
     ['creatorFee', getU64Decoder()],
+    ['quoteMint', getAddressDecoder()],
   ]);
 }
 

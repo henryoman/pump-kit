@@ -1,15 +1,9 @@
-import { SystemProgram, PublicKey, TransactionInstruction } from "@solana/web3.js";
-import {
-  getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountInstruction,
-  createSyncNativeInstruction,
-  createCloseAccountInstruction,
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
-import { address as toAddress } from "@solana/kit";
-import { AccountRole } from "@solana/instructions";
+import { address } from "@solana/kit";
+import { getTransferSolInstruction } from "@solana-program/system";
+import { getSyncNativeInstruction, getCloseAccountInstruction } from "@solana-program/token";
+import { accountAddress, accountSigner, buildCreateAtaInstruction } from "./ata";
+import { findAssociatedTokenPda } from "../pda/ata";
 
 export interface WrapSolParams {
   owner: TransactionSigner | Address | string;
@@ -26,125 +20,33 @@ export interface WrapSolInstructions {
   associatedTokenAddress: Address;
 }
 
-export function buildWrapSolInstructions(params: WrapSolParams): WrapSolInstructions {
-  const {
-    owner,
-    amount,
-    payer = owner,
-    associatedTokenAddress,
-    createAta = true,
-    autoClose = false,
-  } = params;
-
-  if (amount <= 0n) {
-    throw new Error("Amount must be positive when wrapping SOL");
-  }
-
-  const ownerAddress = resolveAddress(owner);
-  const payerAddress = resolveAddress(payer);
-
-  const ataPubkey = associatedTokenAddress
-    ? new PublicKey(associatedTokenAddress)
-    : getAssociatedTokenAddressSync(
-        new PublicKey(WSOL_ADDRESS),
-        ownerAddress,
-        false,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      );
-
-  const prepend: Instruction[] = [];
-  const append: Instruction[] = [];
-
-  if (createAta) {
-    prepend.push(
-      convertInstruction(
-        createAssociatedTokenAccountInstruction(
-          payerAddress,
-          ataPubkey,
-          ownerAddress,
-          new PublicKey(WSOL_ADDRESS)
-        )
-      )
-    );
-  }
-
-  prepend.push(
-    convertInstruction(
-      SystemProgram.transfer({
-        fromPubkey: payerAddress,
-        toPubkey: ataPubkey,
-        lamports: Number(amount),
-      })
-    )
-  );
-
-  prepend.push(convertInstruction(createSyncNativeInstruction(ataPubkey)));
-
-  if (autoClose) {
-    append.push(
-      convertInstruction(
-        createCloseAccountInstruction(
-          ataPubkey,
-          payerAddress,
-          ownerAddress
-        )
-      )
-    );
-  }
-
-  return {
-    prepend,
-    append,
-    associatedTokenAddress: toAddress(ataPubkey.toBase58()),
-  };
-}
-
-export function buildUnwrapSolInstructions(owner: TransactionSigner | Address | string, associatedTokenAddress?: Address | string) {
-  const ownerAddress = resolveAddress(owner);
-  const ataPubkey = associatedTokenAddress
-    ? new PublicKey(associatedTokenAddress)
-    : getAssociatedTokenAddressSync(
-        new PublicKey(WSOL_ADDRESS),
-        ownerAddress,
-        false,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      );
-
-  return [
-    convertInstruction(
-      createCloseAccountInstruction(ataPubkey, ownerAddress, ownerAddress)
-    ),
-  ];
-}
-
-function resolveAddress(value: TransactionSigner | Address | string): PublicKey {
-  if (typeof value === "string") {
-    return new PublicKey(value);
-  }
-  if (typeof value === "object" && "address" in value) {
-    return new PublicKey(value.address);
-  }
-  return new PublicKey(value as Address);
-}
-
-function convertInstruction(ix: TransactionInstruction): Instruction {
-  return {
-    programAddress: toAddress(ix.programId.toBase58()),
-    accounts: ix.keys.map((key) => ({
-      address: toAddress(key.pubkey.toBase58()),
-      role: key.isSigner
-        ? key.isWritable
-          ? AccountRole.WRITABLE_SIGNER
-          : AccountRole.READONLY_SIGNER
-        : key.isWritable
-        ? AccountRole.WRITABLE
-        : AccountRole.READONLY,
-    })),
-    data: ix.data,
-  };
-}
-
 export const WSOL_ADDRESS = "So11111111111111111111111111111111111111112";
 export const WSOL = WSOL_ADDRESS;
+
+async function wsolAccount(owner: TransactionSigner | Address | string, supplied?: Address | string) {
+  return supplied ? address(supplied) : (await findAssociatedTokenPda({ owner: accountAddress(owner), mint: WSOL_ADDRESS }))[0];
+}
+
+export async function buildWrapSolInstructions(params: WrapSolParams): Promise<WrapSolInstructions> {
+  if (typeof params.amount !== "bigint" || params.amount <= 0n || params.amount > 18446744073709551615n) {
+    throw new Error("Amount must be a positive u64 bigint when wrapping SOL");
+  }
+  const payer = params.payer ?? params.owner;
+  const associatedTokenAddress = await wsolAccount(params.owner, params.associatedTokenAddress);
+  const prepend: Instruction[] = [];
+  if (params.createAta !== false) {
+    const creation = await buildCreateAtaInstruction({ payer, owner: params.owner, mint: WSOL_ADDRESS });
+    if (creation.accounts?.[1]?.address !== associatedTokenAddress) throw new Error("Supplied WSOL account is not the owner's ATA; set createAta: false for an existing custom account");
+    prepend.push(creation);
+  }
+  prepend.push(getTransferSolInstruction({ source: accountSigner(payer), destination: associatedTokenAddress, amount: params.amount }));
+  prepend.push(getSyncNativeInstruction({ account: associatedTokenAddress }));
+  const append = params.autoClose ? [getCloseAccountInstruction({ account: associatedTokenAddress,
+    destination: accountAddress(payer), owner: accountSigner(params.owner) })] : [];
+  return { prepend, append, associatedTokenAddress };
+}
+
+export async function buildUnwrapSolInstructions(owner: TransactionSigner | Address | string, associatedTokenAddress?: Address | string): Promise<Instruction[]> {
+  return [getCloseAccountInstruction({ account: await wsolAccount(owner, associatedTokenAddress),
+    destination: accountAddress(owner), owner: accountSigner(owner) })];
+}

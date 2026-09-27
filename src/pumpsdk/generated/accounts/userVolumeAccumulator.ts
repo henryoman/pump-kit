@@ -62,6 +62,8 @@ export type UserVolumeAccumulator = {
   hasTotalClaimedTokens: boolean;
   cashbackEarned: bigint;
   totalCashbackClaimed: bigint;
+  stableCashbackEarned: bigint;
+  totalStableCashbackClaimed: bigint;
 };
 
 export type UserVolumeAccumulatorArgs = {
@@ -74,6 +76,8 @@ export type UserVolumeAccumulatorArgs = {
   hasTotalClaimedTokens: boolean;
   cashbackEarned: number | bigint;
   totalCashbackClaimed: number | bigint;
+  stableCashbackEarned: number | bigint;
+  totalStableCashbackClaimed: number | bigint;
 };
 
 export function getUserVolumeAccumulatorEncoder(): FixedSizeEncoder<UserVolumeAccumulatorArgs> {
@@ -89,6 +93,8 @@ export function getUserVolumeAccumulatorEncoder(): FixedSizeEncoder<UserVolumeAc
       ['hasTotalClaimedTokens', getBooleanEncoder()],
       ['cashbackEarned', getU64Encoder()],
       ['totalCashbackClaimed', getU64Encoder()],
+      ['stableCashbackEarned', getU64Encoder()],
+      ['totalStableCashbackClaimed', getU64Encoder()],
     ]),
     (value) => ({
       ...value,
@@ -109,6 +115,8 @@ export function getUserVolumeAccumulatorDecoder(): FixedSizeDecoder<UserVolumeAc
     ['hasTotalClaimedTokens', getBooleanDecoder()],
     ['cashbackEarned', getU64Decoder()],
     ['totalCashbackClaimed', getU64Decoder()],
+    ['stableCashbackEarned', getU64Decoder()],
+    ['totalStableCashbackClaimed', getU64Decoder()],
   ]);
 }
 
@@ -192,5 +200,5 @@ export async function fetchAllMaybeUserVolumeAccumulator(
 }
 
 export function getUserVolumeAccumulatorSize(): number {
-  return 90;
+  return 106;
 }

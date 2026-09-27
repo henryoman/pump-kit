@@ -1,50 +1,15 @@
-/**
- * Helper to create Associated Token Account instructions
- */
-
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import {
-  getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountInstruction,
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
-import { address as toAddress } from "@solana/kit";
-import { AccountRole } from "@solana/instructions";
+import { address, createNoopSigner } from "@solana/kit";
+import { getCreateAssociatedTokenIdempotentInstruction } from "@solana-program/token";
+import { findAssociatedTokenPda } from "../pda/ata";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
 
-function resolveAddress(value: TransactionSigner | Address | string): PublicKey {
-  if (typeof value === "string") {
-    return new PublicKey(value);
-  }
-  if (typeof value === "object" && "address" in value) {
-    return new PublicKey(value.address);
-  }
-  return new PublicKey(value as Address);
+export function accountAddress(value: TransactionSigner | Address | string): Address {
+  return typeof value === "string" ? address(value) : value.address;
 }
 
-function resolveAddressToPublicKey(value: string | Address | PublicKey): PublicKey {
-  if (value instanceof PublicKey) {
-    return value;
-  }
-  return resolveAddress(value);
-}
-
-function convertInstruction(ix: TransactionInstruction): Instruction {
-  return {
-    programAddress: toAddress(ix.programId.toBase58()),
-    accounts: ix.keys.map((key) => ({
-      address: toAddress(key.pubkey.toBase58()),
-      role: key.isSigner
-        ? key.isWritable
-          ? AccountRole.WRITABLE_SIGNER
-          : AccountRole.READONLY_SIGNER
-        : key.isWritable
-        ? AccountRole.WRITABLE
-        : AccountRole.READONLY,
-    })),
-    data: ix.data,
-  };
+export function accountSigner(value: TransactionSigner | Address | string): TransactionSigner {
+  return typeof value === "string" ? createNoopSigner(address(value)) : value;
 }
 
 export interface CreateAtaParams {
@@ -55,41 +20,12 @@ export interface CreateAtaParams {
   associatedTokenProgram?: Address | string;
 }
 
-/**
- * Build an instruction to create an Associated Token Account if it doesn't exist.
- */
-export function buildCreateAtaInstruction(params: CreateAtaParams): Instruction {
-  const {
-    payer,
-    owner,
-    mint,
-    tokenProgram = TOKEN_PROGRAM_ID,
-    associatedTokenProgram = ASSOCIATED_TOKEN_PROGRAM_ID,
-  } = params;
-
-  const payerAddress = resolveAddress(payer);
-  const ownerAddress = resolveAddress(owner);
-  const mintAddress = resolveAddress(mint);
-  const tokenProgramAddress = resolveAddressToPublicKey(tokenProgram);
-  const associatedTokenProgramAddress = resolveAddressToPublicKey(associatedTokenProgram);
-
-  const ataPubkey = getAssociatedTokenAddressSync(
-    mintAddress,
-    ownerAddress,
-    false,
-    tokenProgramAddress,
-    associatedTokenProgramAddress
-  );
-
-  return convertInstruction(
-    createAssociatedTokenAccountInstruction(
-      payerAddress,
-      ataPubkey,
-      ownerAddress,
-      mintAddress,
-      tokenProgramAddress,
-      associatedTokenProgramAddress
-    )
-  );
+/** Kit-native idempotent creation, including Token-2022 and PDA owners. */
+export async function buildCreateAtaInstruction(params: CreateAtaParams): Promise<Instruction> {
+  const owner = accountAddress(params.owner);
+  const mint = address(params.mint);
+  const tokenProgram = address(params.tokenProgram ?? TOKEN_PROGRAM_ID);
+  const programAddress = address(params.associatedTokenProgram ?? ASSOCIATED_TOKEN_PROGRAM_ID);
+  const [ata] = await findAssociatedTokenPda({ owner, mint, tokenProgram, associatedTokenProgram: programAddress });
+  return getCreateAssociatedTokenIdempotentInstruction({ payer: accountSigner(params.payer), owner, mint, ata, tokenProgram }, { programAddress });
 }
-

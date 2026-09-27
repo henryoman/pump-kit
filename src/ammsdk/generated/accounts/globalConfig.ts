@@ -78,6 +78,12 @@ export type GlobalConfig = {
   mayhemModeEnabled: boolean;
   reservedFeeRecipients: Array<Address>;
   isCashbackEnabled: boolean;
+  buybackFeeRecipients: Array<Address>;
+  buybackBasisPoints: bigint;
+  boostAuthority: Address;
+  boostEnabled: boolean;
+  creatorFeeConfigurable: boolean;
+  maxConfigurableCreatorFeeBps: bigint;
 };
 
 export type GlobalConfigArgs = {
@@ -104,6 +110,12 @@ export type GlobalConfigArgs = {
   mayhemModeEnabled: boolean;
   reservedFeeRecipients: Array<Address>;
   isCashbackEnabled: boolean;
+  buybackFeeRecipients: Array<Address>;
+  buybackBasisPoints: number | bigint;
+  boostAuthority: Address;
+  boostEnabled: boolean;
+  creatorFeeConfigurable: boolean;
+  maxConfigurableCreatorFeeBps: number | bigint;
 };
 
 export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
@@ -128,6 +140,15 @@ export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
         getArrayEncoder(getAddressEncoder(), { size: 7 }),
       ],
       ['isCashbackEnabled', getBooleanEncoder()],
+      [
+        'buybackFeeRecipients',
+        getArrayEncoder(getAddressEncoder(), { size: 8 }),
+      ],
+      ['buybackBasisPoints', getU64Encoder()],
+      ['boostAuthority', getAddressEncoder()],
+      ['boostEnabled', getBooleanEncoder()],
+      ['creatorFeeConfigurable', getBooleanEncoder()],
+      ['maxConfigurableCreatorFeeBps', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: GLOBAL_CONFIG_DISCRIMINATOR })
   );
@@ -154,6 +175,12 @@ export function getGlobalConfigDecoder(): FixedSizeDecoder<GlobalConfig> {
       getArrayDecoder(getAddressDecoder(), { size: 7 }),
     ],
     ['isCashbackEnabled', getBooleanDecoder()],
+    ['buybackFeeRecipients', getArrayDecoder(getAddressDecoder(), { size: 8 })],
+    ['buybackBasisPoints', getU64Decoder()],
+    ['boostAuthority', getAddressDecoder()],
+    ['boostEnabled', getBooleanDecoder()],
+    ['creatorFeeConfigurable', getBooleanDecoder()],
+    ['maxConfigurableCreatorFeeBps', getU64Decoder()],
   ]);
 }
 
@@ -218,5 +245,5 @@ export async function fetchAllMaybeGlobalConfig(
 }
 
 export function getGlobalConfigSize(): number {
-  return 643;
+  return 949;
 }

@@ -112,7 +112,7 @@ export const PUMP_ERROR__CREATE_V2_DISABLED = 0x179e; // 6046
 export const PUMP_ERROR__CPITIALIZE_MAYHEM_FAILED = 0x179f; // 6047
 /** MayhemModeDisabled:  */
 export const PUMP_ERROR__MAYHEM_MODE_DISABLED = 0x17a0; // 6048
-/** CreatorMigratedToSharingConfig: creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead */
+/** CreatorMigratedToSharingConfig: creator has been migrated to sharing config */
 export const PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG = 0x17a1; // 6049
 /** UnableToDistributeCreatorVaultMigratedToSharingConfig: creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead */
 export const PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG = 0x17a2; // 6050
@@ -128,24 +128,114 @@ export const PUMP_ERROR__SHAREHOLDERS_AND_REMAINING_ACCOUNTS_MISMATCH = 0x17a6; 
 export const PUMP_ERROR__INVALID_SHARE_BPS = 0x17a7; // 6055
 /** CashbackNotEnabled: Cashback is not enabled */
 export const PUMP_ERROR__CASHBACK_NOT_ENABLED = 0x17a8; // 6056
+/** BuybackFeeRecipientNotAuthorized: Buyback fee recipient not authorized */
+export const PUMP_ERROR__BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED = 0x17a9; // 6057
+/** AllBuybackFeeRecipientsShouldBeNonZero:  */
+export const PUMP_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO = 0x17aa; // 6058
+/** NotUniqueBuybackFeeRecipients:  */
+export const PUMP_ERROR__NOT_UNIQUE_BUYBACK_FEE_RECIPIENTS = 0x17ab; // 6059
+/** BuybackBasisPointsOutOfRange: buyback_basis_points must be <= 10_000 */
+export const PUMP_ERROR__BUYBACK_BASIS_POINTS_OUT_OF_RANGE = 0x17ac; // 6060
+/** WrongBuybackFeeRecipientsCount: buyback fee recipients require exactly 8 remaining accounts (or none) */
+export const PUMP_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT = 0x17ad; // 6061
+/** BuybackFeeRecipientMissing:  */
+export const PUMP_ERROR__BUYBACK_FEE_RECIPIENT_MISSING = 0x17ae; // 6062
+/** UnsupportedQuoteMint: Unsupported quote mint */
+export const PUMP_ERROR__UNSUPPORTED_QUOTE_MINT = 0x17af; // 6063
+/** InvalidQuoteTokenProgram: Create v2: quote token program must be SPL Token or Token-2022 */
+export const PUMP_ERROR__INVALID_QUOTE_TOKEN_PROGRAM = 0x17b0; // 6064
+/** InvalidAssociatedQuoteBondingCurve: Create v2: associated quote bonding curve address does not match derivation */
+export const PUMP_ERROR__INVALID_ASSOCIATED_QUOTE_BONDING_CURVE = 0x17b1; // 6065
+/** QuoteMintWhitelistFull: Quote mint whitelist is full */
+export const PUMP_ERROR__QUOTE_MINT_WHITELIST_FULL = 0x17b2; // 6066
+/** QuoteMintAlreadyWhitelisted: Quote mint is already whitelisted */
+export const PUMP_ERROR__QUOTE_MINT_ALREADY_WHITELISTED = 0x17b3; // 6067
+/** QuoteMintNotWhitelisted: Quote mint is not in the whitelist */
+export const PUMP_ERROR__QUOTE_MINT_NOT_WHITELISTED = 0x17b4; // 6068
+/** QuoteMintNotEligibleForWhitelist: Quote mint cannot be added or removed via whitelist (default or native SOL mint) */
+export const PUMP_ERROR__QUOTE_MINT_NOT_ELIGIBLE_FOR_WHITELIST = 0x17b5; // 6069
+/** UnableToDistributeCreatorFeesToUninitializedAccount: Unable to distribute creator fees to uninitialized account */
+export const PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_UNINITIALIZED_ACCOUNT = 0x17b6; // 6070
+/** MayhemModeQuoteMintNotAllowed: Mayhem mode quote mint not allowed */
+export const PUMP_ERROR__MAYHEM_MODE_QUOTE_MINT_NOT_ALLOWED = 0x17b7; // 6071
+/** MissingCashbackAccounts: Cashback trade is missing the required remaining accounts */
+export const PUMP_ERROR__MISSING_CASHBACK_ACCOUNTS = 0x17b8; // 6072
+/** InvalidCashbackAccumulator: Cashback user_volume_accumulator account is invalid */
+export const PUMP_ERROR__INVALID_CASHBACK_ACCUMULATOR = 0x17b9; // 6073
+/** InvalidBondingCurveV2: bonding_curve_v2 remaining account is missing or invalid */
+export const PUMP_ERROR__INVALID_BONDING_CURVE_V2 = 0x17ba; // 6074
+/** InvalidQuoteControl: quote_control remaining account does not match derivation or is uninitialized */
+export const PUMP_ERROR__INVALID_QUOTE_CONTROL = 0x17bb; // 6075
+/** InvalidCashbackRecipient: Cashback recipient token account is not owned by user */
+export const PUMP_ERROR__INVALID_CASHBACK_RECIPIENT = 0x17bc; // 6076
+/** CreatorFeeNotConfigurable: Configurable creator fees are disabled */
+export const PUMP_ERROR__CREATOR_FEE_NOT_CONFIGURABLE = 0x17bd; // 6077
+/** CreatorFeeBpsOutOfRange: Creator fee basis points must be between 1 and the configured maximum */
+export const PUMP_ERROR__CREATOR_FEE_BPS_OUT_OF_RANGE = 0x17be; // 6078
+/** CreatorFeeNotEditable: Creator fee is not editable for this bonding curve */
+export const PUMP_ERROR__CREATOR_FEE_NOT_EDITABLE = 0x17bf; // 6079
+/** CreatorFeeNotAllowedForCashbackCoin: Creator fee cannot be configured for a cashback coin */
+export const PUMP_ERROR__CREATOR_FEE_NOT_ALLOWED_FOR_CASHBACK_COIN = 0x17c0; // 6080
+/** BondingCurveAlreadyMigrated: Bonding curve has already migrated */
+export const PUMP_ERROR__BONDING_CURVE_ALREADY_MIGRATED = 0x17c1; // 6081
+/** CashbackDeprecated: Cashback coins can no longer be created */
+export const PUMP_ERROR__CASHBACK_DEPRECATED = 0x17c2; // 6082
+/** HolderRewardCreatorImmutable: The creator of a holder-reward coin cannot be changed */
+export const PUMP_ERROR__HOLDER_REWARD_CREATOR_IMMUTABLE = 0x17c3; // 6083
+/** HolderRewardDisabled: Holder-reward coins are disabled */
+export const PUMP_ERROR__HOLDER_REWARD_DISABLED = 0x17c4; // 6084
+/** HolderRewardRecipientsMismatch: Holder-reward amounts and recipient accounts do not match */
+export const PUMP_ERROR__HOLDER_REWARD_RECIPIENTS_MISMATCH = 0x17c5; // 6085
+/** HolderRewardsRentFloor: The holder-rewards PDA cannot be left below its rent-exempt minimum */
+export const PUMP_ERROR__HOLDER_REWARDS_RENT_FLOOR = 0x17c6; // 6086
+/** HolderRewardTokenAccountMissing: A holder-rewards token account is required on a token quote */
+export const PUMP_ERROR__HOLDER_REWARD_TOKEN_ACCOUNT_MISSING = 0x17c7; // 6087
+/** CtoNotAllowedForMayhemCoin: CTO is not allowed on a mayhem-mode coin */
+export const PUMP_ERROR__CTO_NOT_ALLOWED_FOR_MAYHEM_COIN = 0x17c8; // 6088
+/** CtoNewCreatorRequired: new_creator is required unless converting to holder rewards */
+export const PUMP_ERROR__CTO_NEW_CREATOR_REQUIRED = 0x17c9; // 6089
+/** CtoNewCreatorNotAllowed: new_creator must be omitted when converting to holder rewards */
+export const PUMP_ERROR__CTO_NEW_CREATOR_NOT_ALLOWED = 0x17ca; // 6090
+/** CreatorFeeNotConfigurableForQuote: Creator fee is not configurable on a SOL or whitelisted quote; the fee schedule applies */
+export const PUMP_ERROR__CREATOR_FEE_NOT_CONFIGURABLE_FOR_QUOTE = 0x17cb; // 6091
+/** CtoCreatorAccountNotWritable: current_creator must be passed writable so the outgoing creator can be paid */
+export const PUMP_ERROR__CTO_CREATOR_ACCOUNT_NOT_WRITABLE = 0x17cc; // 6092
+/** CtoSharedVaultFrozen: A frozen sharing-config vault account holds a balance; thaw it before the holder conversion */
+export const PUMP_ERROR__CTO_SHARED_VAULT_FROZEN = 0x17cd; // 6093
 
 export type PumpError =
   | typeof PUMP_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED
+  | typeof PUMP_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
   | typeof PUMP_ERROR__ALL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO
   | typeof PUMP_ERROR__ALL_ZEROS_WITHDRAW_AUTHORITY
   | typeof PUMP_ERROR__ALREADY_INITIALIZED
+  | typeof PUMP_ERROR__BONDING_CURVE_ALREADY_MIGRATED
   | typeof PUMP_ERROR__BONDING_CURVE_AND_SHARING_CONFIG_CREATOR_MISMATCH
   | typeof PUMP_ERROR__BONDING_CURVE_COMPLETE
   | typeof PUMP_ERROR__BONDING_CURVE_NOT_COMPLETE
+  | typeof PUMP_ERROR__BUYBACK_BASIS_POINTS_OUT_OF_RANGE
+  | typeof PUMP_ERROR__BUYBACK_FEE_RECIPIENT_MISSING
+  | typeof PUMP_ERROR__BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED
   | typeof PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES
   | typeof PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT
   | typeof PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT
   | typeof PUMP_ERROR__BUY_ZERO_AMOUNT
+  | typeof PUMP_ERROR__CASHBACK_DEPRECATED
   | typeof PUMP_ERROR__CASHBACK_NOT_ENABLED
   | typeof PUMP_ERROR__CPITIALIZE_MAYHEM_FAILED
   | typeof PUMP_ERROR__CREATE_V2_DISABLED
+  | typeof PUMP_ERROR__CREATOR_FEE_BPS_OUT_OF_RANGE
+  | typeof PUMP_ERROR__CREATOR_FEE_NOT_ALLOWED_FOR_CASHBACK_COIN
+  | typeof PUMP_ERROR__CREATOR_FEE_NOT_CONFIGURABLE
+  | typeof PUMP_ERROR__CREATOR_FEE_NOT_CONFIGURABLE_FOR_QUOTE
+  | typeof PUMP_ERROR__CREATOR_FEE_NOT_EDITABLE
   | typeof PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG
   | typeof PUMP_ERROR__CREATOR_SHOULD_NOT_BE_ZERO
+  | typeof PUMP_ERROR__CTO_CREATOR_ACCOUNT_NOT_WRITABLE
+  | typeof PUMP_ERROR__CTO_NEW_CREATOR_NOT_ALLOWED
+  | typeof PUMP_ERROR__CTO_NEW_CREATOR_REQUIRED
+  | typeof PUMP_ERROR__CTO_NOT_ALLOWED_FOR_MAYHEM_COIN
+  | typeof PUMP_ERROR__CTO_SHARED_VAULT_FROZEN
   | typeof PUMP_ERROR__DAY_IN_ACTIVE_RANGE
   | typeof PUMP_ERROR__DAY_INDEX_AFTER_END_INDEX
   | typeof PUMP_ERROR__DISABLED_MIGRATE
@@ -155,13 +245,26 @@ export type PumpError =
   | typeof PUMP_ERROR__END_TIME_BEFORE_START_TIME
   | typeof PUMP_ERROR__END_TIME_IN_THE_PAST
   | typeof PUMP_ERROR__FEE_BASIS_POINTS_GREATER_THAN_MAXIMUM
+  | typeof PUMP_ERROR__HOLDER_REWARD_CREATOR_IMMUTABLE
+  | typeof PUMP_ERROR__HOLDER_REWARD_DISABLED
+  | typeof PUMP_ERROR__HOLDER_REWARD_RECIPIENTS_MISMATCH
+  | typeof PUMP_ERROR__HOLDER_REWARDS_RENT_FLOOR
+  | typeof PUMP_ERROR__HOLDER_REWARD_TOKEN_ACCOUNT_MISSING
   | typeof PUMP_ERROR__INITIAL_REAL_TOKEN_RESERVES_SHOULD_BE_LESS_THAN_TOKEN_TOTAL_SUPPLY
   | typeof PUMP_ERROR__INITIAL_VIRTUAL_TOKEN_RESERVES_SHOULD_BE_GREATER_THAN_INITIAL_REAL_TOKEN_RESERVES
+  | typeof PUMP_ERROR__INVALID_ASSOCIATED_QUOTE_BONDING_CURVE
+  | typeof PUMP_ERROR__INVALID_BONDING_CURVE_V2
+  | typeof PUMP_ERROR__INVALID_CASHBACK_ACCUMULATOR
+  | typeof PUMP_ERROR__INVALID_CASHBACK_RECIPIENT
   | typeof PUMP_ERROR__INVALID_CREATOR
   | typeof PUMP_ERROR__INVALID_INCENTIVE_MINT
+  | typeof PUMP_ERROR__INVALID_QUOTE_CONTROL
+  | typeof PUMP_ERROR__INVALID_QUOTE_TOKEN_PROGRAM
   | typeof PUMP_ERROR__INVALID_SHARE_BPS
   | typeof PUMP_ERROR__MAYHEM_MODE_DISABLED
+  | typeof PUMP_ERROR__MAYHEM_MODE_QUOTE_MINT_NOT_ALLOWED
   | typeof PUMP_ERROR__MINT_DOES_NOT_MATCH_BONDING_CURVE
+  | typeof PUMP_ERROR__MISSING_CASHBACK_ACCOUNTS
   | typeof PUMP_ERROR__NAME_TOO_LONG
   | typeof PUMP_ERROR__NEW_SIZE_SHOULD_BE_GREATER_THAN_CURRENT_SIZE
   | typeof PUMP_ERROR__NOT_AUTHORIZED
@@ -169,9 +272,14 @@ export type PumpError =
   | typeof PUMP_ERROR__NOT_ENOUGH_TOKENS_TO_BUY
   | typeof PUMP_ERROR__NOT_ENOUGH_TOKENS_TO_SELL
   | typeof PUMP_ERROR__NOT_INITIALIZED
+  | typeof PUMP_ERROR__NOT_UNIQUE_BUYBACK_FEE_RECIPIENTS
   | typeof PUMP_ERROR__OVERFLOW
   | typeof PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_GREATER_THAN_CREATOR_FEE_PLUS_MAX_MIGRATE_FEES
   | typeof PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_LESS_THAN_FINAL_REAL_SOL_RESERVES
+  | typeof PUMP_ERROR__QUOTE_MINT_ALREADY_WHITELISTED
+  | typeof PUMP_ERROR__QUOTE_MINT_NOT_ELIGIBLE_FOR_WHITELIST
+  | typeof PUMP_ERROR__QUOTE_MINT_NOT_WHITELISTED
+  | typeof PUMP_ERROR__QUOTE_MINT_WHITELIST_FULL
   | typeof PUMP_ERROR__SELL_ZERO_AMOUNT
   | typeof PUMP_ERROR__SHAREHOLDERS_AND_REMAINING_ACCOUNTS_MISMATCH
   | typeof PUMP_ERROR__SHARING_CONFIG_NOT_ACTIVE
@@ -183,30 +291,49 @@ export type PumpError =
   | typeof PUMP_ERROR__TOO_MUCH_SOL_REQUIRED
   | typeof PUMP_ERROR__TRUNCATION
   | typeof PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_EXECUTABLE_RECIPIENT
+  | typeof PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_UNINITIALIZED_ACCOUNT
   | typeof PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG
   | typeof PUMP_ERROR__UNSORTED_NOT_UNIQUE_FEE_RECIPIENTS
+  | typeof PUMP_ERROR__UNSUPPORTED_QUOTE_MINT
   | typeof PUMP_ERROR__URI_TOO_LONG
-  | typeof PUMP_ERROR__WITHDRAW_TOO_FREQUENT;
+  | typeof PUMP_ERROR__WITHDRAW_TOO_FREQUENT
+  | typeof PUMP_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT;
 
 let pumpErrorMessages: Record<PumpError, string> | undefined;
 if (process.env.NODE_ENV !== 'production') {
   pumpErrorMessages = {
     [PUMP_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED]: `Account type not supported`,
+    [PUMP_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
     [PUMP_ERROR__ALL_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: `All fee recipients should be non-zero`,
     [PUMP_ERROR__ALL_ZEROS_WITHDRAW_AUTHORITY]: `Withdraw authority cannot be set to System Program ID`,
     [PUMP_ERROR__ALREADY_INITIALIZED]: `The program is already initialized.`,
+    [PUMP_ERROR__BONDING_CURVE_ALREADY_MIGRATED]: `Bonding curve has already migrated`,
     [PUMP_ERROR__BONDING_CURVE_AND_SHARING_CONFIG_CREATOR_MISMATCH]: `Bonding curve creator does not match sharing config`,
     [PUMP_ERROR__BONDING_CURVE_COMPLETE]: `The bonding curve has completed and liquidity migrated to raydium.`,
     [PUMP_ERROR__BONDING_CURVE_NOT_COMPLETE]: `The bonding curve has not completed.`,
+    [PUMP_ERROR__BUYBACK_BASIS_POINTS_OUT_OF_RANGE]: `buyback_basis_points must be <= 10_000`,
+    [PUMP_ERROR__BUYBACK_FEE_RECIPIENT_MISSING]: ``,
+    [PUMP_ERROR__BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED]: `Buyback fee recipient not authorized`,
     [PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_FEES]: `Buy: Not enough SOL to cover for fees.`,
     [PUMP_ERROR__BUY_NOT_ENOUGH_SOL_TO_COVER_RENT]: `Buy: Not enough SOL to cover for rent exemption.`,
     [PUMP_ERROR__BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT]: `Slippage: Would buy less tokens than expected min_tokens_out`,
     [PUMP_ERROR__BUY_ZERO_AMOUNT]: `Buy zero amount`,
+    [PUMP_ERROR__CASHBACK_DEPRECATED]: `Cashback coins can no longer be created`,
     [PUMP_ERROR__CASHBACK_NOT_ENABLED]: `Cashback is not enabled`,
     [PUMP_ERROR__CPITIALIZE_MAYHEM_FAILED]: ``,
     [PUMP_ERROR__CREATE_V2_DISABLED]: ``,
-    [PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG]: `creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead`,
+    [PUMP_ERROR__CREATOR_FEE_BPS_OUT_OF_RANGE]: `Creator fee basis points must be between 1 and the configured maximum`,
+    [PUMP_ERROR__CREATOR_FEE_NOT_ALLOWED_FOR_CASHBACK_COIN]: `Creator fee cannot be configured for a cashback coin`,
+    [PUMP_ERROR__CREATOR_FEE_NOT_CONFIGURABLE]: `Configurable creator fees are disabled`,
+    [PUMP_ERROR__CREATOR_FEE_NOT_CONFIGURABLE_FOR_QUOTE]: `Creator fee is not configurable on a SOL or whitelisted quote; the fee schedule applies`,
+    [PUMP_ERROR__CREATOR_FEE_NOT_EDITABLE]: `Creator fee is not editable for this bonding curve`,
+    [PUMP_ERROR__CREATOR_MIGRATED_TO_SHARING_CONFIG]: `creator has been migrated to sharing config`,
     [PUMP_ERROR__CREATOR_SHOULD_NOT_BE_ZERO]: `Creator should not be zero`,
+    [PUMP_ERROR__CTO_CREATOR_ACCOUNT_NOT_WRITABLE]: `current_creator must be passed writable so the outgoing creator can be paid`,
+    [PUMP_ERROR__CTO_NEW_CREATOR_NOT_ALLOWED]: `new_creator must be omitted when converting to holder rewards`,
+    [PUMP_ERROR__CTO_NEW_CREATOR_REQUIRED]: `new_creator is required unless converting to holder rewards`,
+    [PUMP_ERROR__CTO_NOT_ALLOWED_FOR_MAYHEM_COIN]: `CTO is not allowed on a mayhem-mode coin`,
+    [PUMP_ERROR__CTO_SHARED_VAULT_FROZEN]: `A frozen sharing-config vault account holds a balance; thaw it before the holder conversion`,
     [PUMP_ERROR__DAY_IN_ACTIVE_RANGE]: ``,
     [PUMP_ERROR__DAY_INDEX_AFTER_END_INDEX]: ``,
     [PUMP_ERROR__DISABLED_MIGRATE]: `Migrate instruction is disabled`,
@@ -216,13 +343,26 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__END_TIME_BEFORE_START_TIME]: ``,
     [PUMP_ERROR__END_TIME_IN_THE_PAST]: ``,
     [PUMP_ERROR__FEE_BASIS_POINTS_GREATER_THAN_MAXIMUM]: `fee_basis_points greater than maximum`,
+    [PUMP_ERROR__HOLDER_REWARD_CREATOR_IMMUTABLE]: `The creator of a holder-reward coin cannot be changed`,
+    [PUMP_ERROR__HOLDER_REWARD_DISABLED]: `Holder-reward coins are disabled`,
+    [PUMP_ERROR__HOLDER_REWARD_RECIPIENTS_MISMATCH]: `Holder-reward amounts and recipient accounts do not match`,
+    [PUMP_ERROR__HOLDER_REWARDS_RENT_FLOOR]: `The holder-rewards PDA cannot be left below its rent-exempt minimum`,
+    [PUMP_ERROR__HOLDER_REWARD_TOKEN_ACCOUNT_MISSING]: `A holder-rewards token account is required on a token quote`,
     [PUMP_ERROR__INITIAL_REAL_TOKEN_RESERVES_SHOULD_BE_LESS_THAN_TOKEN_TOTAL_SUPPLY]: `initial_real_token_reserves should be less than token_total_supply`,
     [PUMP_ERROR__INITIAL_VIRTUAL_TOKEN_RESERVES_SHOULD_BE_GREATER_THAN_INITIAL_REAL_TOKEN_RESERVES]: `initial_virtual_token_reserves should be greater than initial_real_token_reserves`,
+    [PUMP_ERROR__INVALID_ASSOCIATED_QUOTE_BONDING_CURVE]: `Create v2: associated quote bonding curve address does not match derivation`,
+    [PUMP_ERROR__INVALID_BONDING_CURVE_V2]: `bonding_curve_v2 remaining account is missing or invalid`,
+    [PUMP_ERROR__INVALID_CASHBACK_ACCUMULATOR]: `Cashback user_volume_accumulator account is invalid`,
+    [PUMP_ERROR__INVALID_CASHBACK_RECIPIENT]: `Cashback recipient token account is not owned by user`,
     [PUMP_ERROR__INVALID_CREATOR]: `Invalid creator pubkey`,
     [PUMP_ERROR__INVALID_INCENTIVE_MINT]: ``,
+    [PUMP_ERROR__INVALID_QUOTE_CONTROL]: `quote_control remaining account does not match derivation or is uninitialized`,
+    [PUMP_ERROR__INVALID_QUOTE_TOKEN_PROGRAM]: `Create v2: quote token program must be SPL Token or Token-2022`,
     [PUMP_ERROR__INVALID_SHARE_BPS]: `Share bps must be greater than 0`,
     [PUMP_ERROR__MAYHEM_MODE_DISABLED]: ``,
+    [PUMP_ERROR__MAYHEM_MODE_QUOTE_MINT_NOT_ALLOWED]: `Mayhem mode quote mint not allowed`,
     [PUMP_ERROR__MINT_DOES_NOT_MATCH_BONDING_CURVE]: `The mint does not match the bonding curve.`,
+    [PUMP_ERROR__MISSING_CASHBACK_ACCOUNTS]: `Cashback trade is missing the required remaining accounts`,
     [PUMP_ERROR__NAME_TOO_LONG]: ``,
     [PUMP_ERROR__NEW_SIZE_SHOULD_BE_GREATER_THAN_CURRENT_SIZE]: `new_size should be > current_size`,
     [PUMP_ERROR__NOT_AUTHORIZED]: `The given account is not authorized to execute this instruction.`,
@@ -230,9 +370,14 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__NOT_ENOUGH_TOKENS_TO_BUY]: `Not enough tokens to buy`,
     [PUMP_ERROR__NOT_ENOUGH_TOKENS_TO_SELL]: `Not enough tokens to sell`,
     [PUMP_ERROR__NOT_INITIALIZED]: `The program is not initialized.`,
+    [PUMP_ERROR__NOT_UNIQUE_BUYBACK_FEE_RECIPIENTS]: ``,
     [PUMP_ERROR__OVERFLOW]: `Overflow`,
     [PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_GREATER_THAN_CREATOR_FEE_PLUS_MAX_MIGRATE_FEES]: `pool_migration_fee should be greater than creator_fee + MAX_MIGRATE_FEES`,
     [PUMP_ERROR__POOL_MIGRATION_FEE_SHOULD_BE_LESS_THAN_FINAL_REAL_SOL_RESERVES]: `pool_migration_fee should be less than final_real_sol_reserves`,
+    [PUMP_ERROR__QUOTE_MINT_ALREADY_WHITELISTED]: `Quote mint is already whitelisted`,
+    [PUMP_ERROR__QUOTE_MINT_NOT_ELIGIBLE_FOR_WHITELIST]: `Quote mint cannot be added or removed via whitelist (default or native SOL mint)`,
+    [PUMP_ERROR__QUOTE_MINT_NOT_WHITELISTED]: `Quote mint is not in the whitelist`,
+    [PUMP_ERROR__QUOTE_MINT_WHITELIST_FULL]: `Quote mint whitelist is full`,
     [PUMP_ERROR__SELL_ZERO_AMOUNT]: `Sell zero amount`,
     [PUMP_ERROR__SHAREHOLDERS_AND_REMAINING_ACCOUNTS_MISMATCH]: `Remaining accounts do not match shareholders, make sure to pass exactly the same pubkeys in the same order`,
     [PUMP_ERROR__SHARING_CONFIG_NOT_ACTIVE]: `Sharing config is not active`,
@@ -244,10 +389,13 @@ if (process.env.NODE_ENV !== 'production') {
     [PUMP_ERROR__TOO_MUCH_SOL_REQUIRED]: `slippage: Too much SOL required to buy the given amount of tokens.`,
     [PUMP_ERROR__TRUNCATION]: `Truncation`,
     [PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_EXECUTABLE_RECIPIENT]: `The recipient account is executable, so it cannot receive lamports, remove it from the team first`,
+    [PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_FEES_TO_UNINITIALIZED_ACCOUNT]: `Unable to distribute creator fees to uninitialized account`,
     [PUMP_ERROR__UNABLE_TO_DISTRIBUTE_CREATOR_VAULT_MIGRATED_TO_SHARING_CONFIG]: `creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead`,
     [PUMP_ERROR__UNSORTED_NOT_UNIQUE_FEE_RECIPIENTS]: `Unsorted or not unique fee recipients`,
+    [PUMP_ERROR__UNSUPPORTED_QUOTE_MINT]: `Unsupported quote mint`,
     [PUMP_ERROR__URI_TOO_LONG]: ``,
     [PUMP_ERROR__WITHDRAW_TOO_FREQUENT]: `Withdraw too frequent`,
+    [PUMP_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT]: `buyback fee recipients require exactly 8 remaining accounts (or none)`,
   };
 }
 

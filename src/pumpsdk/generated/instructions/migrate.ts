@@ -27,10 +27,10 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
-  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
+  type WritableSignerAccount,
 } from '@solana/kit';
 import { PUMP_PROGRAM_ADDRESS } from '../programs';
 import {
@@ -88,7 +88,12 @@ export type MigrateInstruction<
     | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
   TAccountPumpAmmEventAuthority extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
-  TAccountProgram extends string | AccountMeta<string> = string,
+  TAccountProgram extends
+    | string
+    | AccountMeta<string> = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  TAccountRent extends
+    | string
+    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -110,7 +115,7 @@ export type MigrateInstruction<
         ? WritableAccount<TAccountAssociatedBondingCurve>
         : TAccountAssociatedBondingCurve,
       TAccountUser extends string
-        ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+        ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
         : TAccountUser,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
@@ -166,6 +171,9 @@ export type MigrateInstruction<
       TAccountProgram extends string
         ? ReadonlyAccount<TAccountProgram>
         : TAccountProgram,
+      TAccountRent extends string
+        ? ReadonlyAccount<TAccountRent>
+        : TAccountRent,
       ...TRemainingAccounts,
     ]
   >;
@@ -222,6 +230,7 @@ export type MigrateAsyncInput<
   TAccountPumpAmmEventAuthority extends string = string,
   TAccountEventAuthority extends string = string,
   TAccountProgram extends string = string,
+  TAccountRent extends string = string,
 > = {
   global?: Address<TAccountGlobal>;
   withdrawAuthority: Address<TAccountWithdrawAuthority>;
@@ -246,7 +255,8 @@ export type MigrateAsyncInput<
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   pumpAmmEventAuthority?: Address<TAccountPumpAmmEventAuthority>;
   eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  program?: Address<TAccountProgram>;
+  rent?: Address<TAccountRent>;
 };
 
 export async function getMigrateInstructionAsync<
@@ -274,6 +284,7 @@ export async function getMigrateInstructionAsync<
   TAccountPumpAmmEventAuthority extends string,
   TAccountEventAuthority extends string,
   TAccountProgram extends string,
+  TAccountRent extends string,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: MigrateAsyncInput<
@@ -300,7 +311,8 @@ export async function getMigrateInstructionAsync<
     TAccountAssociatedTokenProgram,
     TAccountPumpAmmEventAuthority,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountRent
   >,
   config?: { programAddress?: TProgramAddress }
 ): Promise<
@@ -329,7 +341,8 @@ export async function getMigrateInstructionAsync<
     TAccountAssociatedTokenProgram,
     TAccountPumpAmmEventAuthority,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountRent
   >
 > {
   // Program address.
@@ -348,7 +361,7 @@ export async function getMigrateInstructionAsync<
       value: input.associatedBondingCurve ?? null,
       isWritable: true,
     },
-    user: { value: input.user ?? null, isWritable: false },
+    user: { value: input.user ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
     pumpAmm: { value: input.pumpAmm ?? null, isWritable: false },
@@ -394,6 +407,7 @@ export async function getMigrateInstructionAsync<
     },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
+    rent: { value: input.rent ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -594,6 +608,14 @@ export async function getMigrateInstructionAsync<
       ],
     });
   }
+  if (!accounts.program.value) {
+    accounts.program.value =
+      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+  }
+  if (!accounts.rent.value) {
+    accounts.rent.value =
+      'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
@@ -622,6 +644,7 @@ export async function getMigrateInstructionAsync<
       getAccountMeta(accounts.pumpAmmEventAuthority),
       getAccountMeta(accounts.eventAuthority),
       getAccountMeta(accounts.program),
+      getAccountMeta(accounts.rent),
     ],
     data: getMigrateInstructionDataEncoder().encode({}),
     programAddress,
@@ -650,7 +673,8 @@ export async function getMigrateInstructionAsync<
     TAccountAssociatedTokenProgram,
     TAccountPumpAmmEventAuthority,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountRent
   >);
 }
 
@@ -679,6 +703,7 @@ export type MigrateInput<
   TAccountPumpAmmEventAuthority extends string = string,
   TAccountEventAuthority extends string = string,
   TAccountProgram extends string = string,
+  TAccountRent extends string = string,
 > = {
   global: Address<TAccountGlobal>;
   withdrawAuthority: Address<TAccountWithdrawAuthority>;
@@ -703,7 +728,8 @@ export type MigrateInput<
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   pumpAmmEventAuthority: Address<TAccountPumpAmmEventAuthority>;
   eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  program?: Address<TAccountProgram>;
+  rent?: Address<TAccountRent>;
 };
 
 export function getMigrateInstruction<
@@ -731,6 +757,7 @@ export function getMigrateInstruction<
   TAccountPumpAmmEventAuthority extends string,
   TAccountEventAuthority extends string,
   TAccountProgram extends string,
+  TAccountRent extends string,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: MigrateInput<
@@ -757,7 +784,8 @@ export function getMigrateInstruction<
     TAccountAssociatedTokenProgram,
     TAccountPumpAmmEventAuthority,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountRent
   >,
   config?: { programAddress?: TProgramAddress }
 ): MigrateInstruction<
@@ -785,7 +813,8 @@ export function getMigrateInstruction<
   TAccountAssociatedTokenProgram,
   TAccountPumpAmmEventAuthority,
   TAccountEventAuthority,
-  TAccountProgram
+  TAccountProgram,
+  TAccountRent
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
@@ -803,7 +832,7 @@ export function getMigrateInstruction<
       value: input.associatedBondingCurve ?? null,
       isWritable: true,
     },
-    user: { value: input.user ?? null, isWritable: false },
+    user: { value: input.user ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
     pumpAmm: { value: input.pumpAmm ?? null, isWritable: false },
@@ -849,6 +878,7 @@ export function getMigrateInstruction<
     },
     eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
     program: { value: input.program ?? null, isWritable: false },
+    rent: { value: input.rent ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -880,6 +910,14 @@ export function getMigrateInstruction<
     accounts.associatedTokenProgram.value =
       'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
   }
+  if (!accounts.program.value) {
+    accounts.program.value =
+      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+  }
+  if (!accounts.rent.value) {
+    accounts.rent.value =
+      'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
@@ -908,6 +946,7 @@ export function getMigrateInstruction<
       getAccountMeta(accounts.pumpAmmEventAuthority),
       getAccountMeta(accounts.eventAuthority),
       getAccountMeta(accounts.program),
+      getAccountMeta(accounts.rent),
     ],
     data: getMigrateInstructionDataEncoder().encode({}),
     programAddress,
@@ -936,7 +975,8 @@ export function getMigrateInstruction<
     TAccountAssociatedTokenProgram,
     TAccountPumpAmmEventAuthority,
     TAccountEventAuthority,
-    TAccountProgram
+    TAccountProgram,
+    TAccountRent
   >);
 }
 
@@ -970,6 +1010,7 @@ export type ParsedMigrateInstruction<
     pumpAmmEventAuthority: TAccountMetas[21];
     eventAuthority: TAccountMetas[22];
     program: TAccountMetas[23];
+    rent: TAccountMetas[24];
   };
   data: MigrateInstructionData;
 };
@@ -982,7 +1023,7 @@ export function parseMigrateInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedMigrateInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 24) {
+  if (instruction.accounts.length < 25) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -1019,6 +1060,7 @@ export function parseMigrateInstruction<
       pumpAmmEventAuthority: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
+      rent: getNextAccount(),
     },
     data: getMigrateInstructionDataDecoder().decode(instruction.data),
   };

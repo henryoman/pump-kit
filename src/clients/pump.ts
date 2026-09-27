@@ -5,27 +5,21 @@
 
 import type { Address, TransactionSigner } from "@solana/kit";
 import { address as getAddress } from "@solana/kit";
-import { findAssociatedTokenPda } from "../pda/ata";
+import { buyV2, sellV2 } from "./trade_v2";
+import { fetchGlobal } from "../pumpsdk/generated/accounts/global";
 
 import {
   PUMP_PROGRAM_ID,
   SYSTEM_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  FEE_PROGRAM_ID,
 } from "../config/addresses";
 import {
   globalPda,
   bondingCurvePda,
   associatedBondingCurveAta,
-  creatorVaultPda,
-  globalVolumeAccumulatorPda,
-  userVolumeAccumulatorPda,
   eventAuthorityPda,
-  feeConfigPda,
 } from "../pda/pump";
 import {
-  getBuyInstruction,
-  getSellInstruction,
   getCreateInstruction,
 } from "../pumpsdk/generated/instructions";
 import { fetchBondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
@@ -60,85 +54,8 @@ export interface BuyParams {
  * Build a buy instruction for purchasing tokens from the bonding curve.
  */
 export async function buy(params: BuyParams) {
-  const {
-    user,
-    mint: mintStr,
-    tokenAmount,
-    maxSolCostLamports,
-    feeRecipient,
-    trackVolume = true,
-    bondingCurveCreator,
-    rpc,
-    commitment = getDefaultCommitment(),
-  } = params;
-
-  const mint = getAddress(mintStr);
-  const userAddr = user.address;
-  const bondingCurve = await bondingCurvePda(mint);
-
-  const feeConfigPromise = feeConfigPda();
-  const globalPromise = globalPda();
-  const eventAuthorityPromise = eventAuthorityPda();
-  const globalVolumeAccumulatorPromise = globalVolumeAccumulatorPda();
-  const userVolumeAccumulatorPromise = userVolumeAccumulatorPda(userAddr);
-
-  // Derive PDAs (all async)
-  const associatedBondingCurvePromise = associatedBondingCurveAta(bondingCurve, mint);
-  const associatedUserPromise = findAssociatedTokenPda({
-    owner: userAddr,
-    mint,
-    tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-  });
-
-  const creatorAddress = await resolveCreatorAddress({
-    bondingCurve,
-    providedCreator: bondingCurveCreator,
-    rpc,
-    commitment,
-  });
-
-  const [
-    global,
-    associatedBondingCurve,
-    [associatedUser],
-    creatorVault,
-    eventAuthority,
-    globalVolumeAccumulator,
-    userVolumeAccumulator,
-    feeConfig,
-  ] = await Promise.all([
-    globalPromise,
-    associatedBondingCurvePromise,
-    associatedUserPromise,
-    creatorVaultPda(creatorAddress),
-    eventAuthorityPromise,
-    globalVolumeAccumulatorPromise,
-    userVolumeAccumulatorPromise,
-    feeConfigPromise,
-  ]);
-
-  // Derive PDAs (all async)
-  return getBuyInstruction({
-    global,
-    feeRecipient: getAddress(feeRecipient),
-    mint,
-    bondingCurve,
-    associatedBondingCurve,
-    associatedUser,
-    user,
-    systemProgram: getAddress(SYSTEM_PROGRAM_ID),
-    tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-    creatorVault,
-    eventAuthority,
-    program: getAddress(PUMP_PROGRAM_ID),
-    globalVolumeAccumulator,
-    userVolumeAccumulator,
-    feeConfig,
-    feeProgram: getAddress(FEE_PROGRAM_ID),
-    amount: tokenAmount,
-    maxSolCost: maxSolCostLamports,
-    trackVolume: [trackVolume] as readonly [boolean],
-  });
+  const resolved = await resolveTradeParams(params);
+  return buyV2({ ...resolved, tokenAmountRaw: params.tokenAmount, maxQuoteInputRaw: params.maxSolCostLamports });
 }
 
 export interface SellParams {
@@ -164,73 +81,8 @@ export interface SellParams {
  * Build a sell instruction for selling tokens back to the bonding curve.
  */
 export async function sell(params: SellParams) {
-  const {
-    user,
-    mint: mintStr,
-    tokenAmount,
-    minSolOutputLamports,
-    feeRecipient,
-    bondingCurveCreator,
-    rpc,
-    commitment = getDefaultCommitment(),
-  } = params;
-
-  const mint = getAddress(mintStr);
-  const userAddr = user.address;
-  const bondingCurve = await bondingCurvePda(mint);
-
-  const globalPromise = globalPda();
-  const associatedBondingCurvePromise = associatedBondingCurveAta(bondingCurve, mint);
-  const associatedUserPromise = findAssociatedTokenPda({
-    owner: userAddr,
-    mint,
-    tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-  });
-  const feeConfigPromise = feeConfigPda();
-  const eventAuthorityPromise = eventAuthorityPda();
-
-  const creatorAddress = await resolveCreatorAddress({
-    bondingCurve,
-    providedCreator: bondingCurveCreator,
-    rpc,
-    commitment,
-  });
-
-  const [
-    global,
-    associatedBondingCurve,
-    [associatedUser],
-    creatorVault,
-    eventAuthority,
-    feeConfig,
-  ] = await Promise.all([
-    globalPromise,
-    associatedBondingCurvePromise,
-    associatedUserPromise,
-    creatorVaultPda(creatorAddress),
-    eventAuthorityPromise,
-    feeConfigPromise,
-  ]);
-
-  // Derive PDAs (all async)
-  return getSellInstruction({
-    global,
-    feeRecipient: getAddress(feeRecipient),
-    mint,
-    bondingCurve,
-    associatedBondingCurve,
-    associatedUser,
-    user,
-    systemProgram: getAddress(SYSTEM_PROGRAM_ID),
-    creatorVault,
-    tokenProgram: getAddress(TOKEN_PROGRAM_ID),
-    eventAuthority,
-    program: getAddress(PUMP_PROGRAM_ID),
-    feeConfig,
-    feeProgram: getAddress(FEE_PROGRAM_ID),
-    amount: tokenAmount,
-    minSolOutput: minSolOutputLamports,
-  });
+  const resolved = await resolveTradeParams(params);
+  return sellV2({ ...resolved, tokenAmountRaw: params.tokenAmount, minQuoteOutputRaw: params.minSolOutputLamports });
 }
 
 export interface CreateParams {
@@ -325,4 +177,12 @@ async function resolveCreatorAddress(args: {
       { cause: error }
     );
   }
+}
+
+async function resolveTradeParams(params: BuyParams | SellParams) {
+  const creator = await resolveCreatorAddress({ bondingCurve: await bondingCurvePda(params.mint),
+    providedCreator: params.bondingCurveCreator, rpc: params.rpc, commitment: params.commitment ?? getDefaultCommitment() });
+  const global = (await fetchGlobal(params.rpc, await globalPda(), { commitment: params.commitment ?? getDefaultCommitment() })).data;
+  return { user: params.user, mint: params.mint, rpc: params.rpc, bondingCurveCreator: creator,
+    feeRecipient: params.feeRecipient, buybackFeeRecipient: global.buybackFeeRecipients[0]! };
 }

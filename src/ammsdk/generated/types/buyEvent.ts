@@ -14,6 +14,8 @@ import {
   getAddressEncoder,
   getBooleanDecoder,
   getBooleanEncoder,
+  getI128Decoder,
+  getI128Encoder,
   getI64Decoder,
   getI64Encoder,
   getStructDecoder,
@@ -64,6 +66,13 @@ export type BuyEvent = {
   ixName: string;
   cashbackFeeBasisPoints: bigint;
   cashback: bigint;
+  buybackFeeBasisPoints: bigint;
+  buybackFee: bigint;
+  virtualQuoteReserves: bigint;
+  canBoost: boolean;
+  baseSupply: bigint;
+  holderRewardsBps: bigint;
+  holderRewards: bigint;
 };
 
 export type BuyEventArgs = {
@@ -99,6 +108,13 @@ export type BuyEventArgs = {
   ixName: string;
   cashbackFeeBasisPoints: number | bigint;
   cashback: number | bigint;
+  buybackFeeBasisPoints: number | bigint;
+  buybackFee: number | bigint;
+  virtualQuoteReserves: number | bigint;
+  canBoost: boolean;
+  baseSupply: number | bigint;
+  holderRewardsBps: number | bigint;
+  holderRewards: number | bigint;
 };
 
 export function getBuyEventEncoder(): Encoder<BuyEventArgs> {
@@ -135,6 +151,13 @@ export function getBuyEventEncoder(): Encoder<BuyEventArgs> {
     ['ixName', addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
     ['cashbackFeeBasisPoints', getU64Encoder()],
     ['cashback', getU64Encoder()],
+    ['buybackFeeBasisPoints', getU64Encoder()],
+    ['buybackFee', getU64Encoder()],
+    ['virtualQuoteReserves', getI128Encoder()],
+    ['canBoost', getBooleanEncoder()],
+    ['baseSupply', getU64Encoder()],
+    ['holderRewardsBps', getU64Encoder()],
+    ['holderRewards', getU64Encoder()],
   ]);
 }
 
@@ -172,6 +195,13 @@ export function getBuyEventDecoder(): Decoder<BuyEvent> {
     ['ixName', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ['cashbackFeeBasisPoints', getU64Decoder()],
     ['cashback', getU64Decoder()],
+    ['buybackFeeBasisPoints', getU64Decoder()],
+    ['buybackFee', getU64Decoder()],
+    ['virtualQuoteReserves', getI128Decoder()],
+    ['canBoost', getBooleanDecoder()],
+    ['baseSupply', getU64Decoder()],
+    ['holderRewardsBps', getU64Decoder()],
+    ['holderRewards', getU64Decoder()],
   ]);
 }
 

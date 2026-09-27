@@ -144,7 +144,7 @@ export type ClaimCashbackAsyncInput<
   quoteMint: Address<TAccountQuoteMint>;
   quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
   userVolumeAccumulatorWsolTokenAccount?: Address<TAccountUserVolumeAccumulatorWsolTokenAccount>;
-  userWsolTokenAccount?: Address<TAccountUserWsolTokenAccount>;
+  userWsolTokenAccount: Address<TAccountUserWsolTokenAccount>;
   systemProgram?: Address<TAccountSystemProgram>;
   eventAuthority?: Address<TAccountEventAuthority>;
   program?: Address<TAccountProgram>;
@@ -250,19 +250,6 @@ export async function getClaimCashbackInstructionAsync<
           getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
         ],
       });
-  }
-  if (!accounts.userWsolTokenAccount.value) {
-    accounts.userWsolTokenAccount.value = await getProgramDerivedAddress({
-      programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-      seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-        getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
-        ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-      ],
-    });
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =

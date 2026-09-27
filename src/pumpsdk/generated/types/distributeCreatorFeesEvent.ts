@@ -38,6 +38,7 @@ export type DistributeCreatorFeesEvent = {
   admin: Address;
   shareholders: Array<Shareholder>;
   distributed: bigint;
+  quoteMint: Address;
 };
 
 export type DistributeCreatorFeesEventArgs = {
@@ -48,6 +49,7 @@ export type DistributeCreatorFeesEventArgs = {
   admin: Address;
   shareholders: Array<ShareholderArgs>;
   distributed: number | bigint;
+  quoteMint: Address;
 };
 
 export function getDistributeCreatorFeesEventEncoder(): Encoder<DistributeCreatorFeesEventArgs> {
@@ -59,6 +61,7 @@ export function getDistributeCreatorFeesEventEncoder(): Encoder<DistributeCreato
     ['admin', getAddressEncoder()],
     ['shareholders', getArrayEncoder(getShareholderEncoder())],
     ['distributed', getU64Encoder()],
+    ['quoteMint', getAddressEncoder()],
   ]);
 }
 
@@ -71,6 +74,7 @@ export function getDistributeCreatorFeesEventDecoder(): Decoder<DistributeCreato
     ['admin', getAddressDecoder()],
     ['shareholders', getArrayDecoder(getShareholderDecoder())],
     ['distributed', getU64Decoder()],
+    ['quoteMint', getAddressDecoder()],
   ]);
 }
 

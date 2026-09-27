@@ -1,4 +1,5 @@
-import type { Instruction, TransactionSigner } from "@solana/kit";
+import { createLaunchLookupTable } from "../launch/lookup_table";
+import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { generateKeyPairSigner } from "@solana/signers";
 
 import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
@@ -23,13 +24,15 @@ export interface TokenMetadata {
 export interface CreateAndBuyOptions {
   creator: TransactionSigner;
   metadata: TokenMetadata;
-  firstBuyTokenAmount: bigint;
-  estimatedFirstBuyCost: bigint;
+  firstBuyAmountSol?: string;
+  firstBuyTokenAmount?: bigint;
+  estimatedFirstBuyCost?: bigint;
   slippageBps?: number;
   feeRecipient?: string;
   bondingCurveCreator?: string;
   mintAuthority?: string;
   mint?: TransactionSigner;
+  addressLookupTables?: Record<string, readonly Address[]>;
   priorityFees?: PriorityFeeOptions;
   prependInstructions?: readonly Instruction[];
   appendInstructions?: readonly Instruction[];
@@ -50,6 +53,7 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
   const {
     creator,
     metadata,
+    firstBuyAmountSol,
     firstBuyTokenAmount,
     estimatedFirstBuyCost,
     slippageBps,
@@ -72,10 +76,11 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
   const mintParams: MintWithFirstBuyParams = {
     user: creator,
     mint: mintSigner,
-    mintAuthority: mintAuthority ?? creator.address,
+    mintAuthority,
     name: metadata.name,
     symbol: metadata.symbol,
     uri: metadata.uri,
+    firstBuyAmountSol,
     firstBuyTokenAmount,
     estimatedFirstBuyCost,
     slippageBps,
@@ -85,10 +90,17 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
     commitment,
   };
 
-  const { createInstruction, buyInstruction } = await mintWithFirstBuy(mintParams);
+  const { createInstruction, buyInstruction, instructions } = await mintWithFirstBuy(mintParams);
 
+  const tables = options.addressLookupTables ?? {};
+  if (!Object.keys(tables).length) {
+    const table = await createLaunchLookupTable({ instructions, signer: creator, rpc, rpcSubscriptions });
+    tables[table.address] = table.addresses;
+  }
   const result = await sendAndConfirmTransaction({
-    instructions: [createInstruction, buyInstruction],
+    version: 0,
+    addressLookupTables: tables,
+    instructions,
     payer: creator,
     commitment,
     priorityFees,

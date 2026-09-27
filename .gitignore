@@ -47,3 +47,8 @@ temp/
 
 # Test swap script keypair (NEVER commit private keys!)
 test-swap/keypair.json
+# Local validator ledger and downloaded public fixtures
+.validator/
+
+# Local package caches
+.npm-cache/

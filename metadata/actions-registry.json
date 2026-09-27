@@ -130,7 +130,7 @@
         "poolIndex",
         "poolAddress",
         "poolCreator",
-        "minLpTokensOut",
+        "lpTokenAmountOut",
         "tokenProgram",
         "token2022Program"
       ],

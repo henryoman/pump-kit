@@ -1,3 +1,5 @@
+import { loadAmmSnapshot, type AmmTradingContext } from "./snapshot";
+import type { SwapPlan } from "./plan";
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import { address as toAddress } from "@solana/kit";
 
@@ -5,25 +7,23 @@ import {
   ammBuy as buildAmmBuy,
   ammSell as buildAmmSell,
 } from "../clients/amm";
-import { bondingCurvePda } from "../pda/pump";
-import { fetchBondingCurve } from "../pumpsdk/generated/accounts/bondingCurve";
+import { canonicalPoolCreator } from "./venue";
 import type { RpcClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
-import { solToLamports, tokensToRaw } from "../utils/amounts";
+import { positiveAmountToRaw } from "../utils/amounts";
 import {
   DEFAULT_SLIPPAGE_BPS,
   addSlippage,
   subSlippage,
   validateSlippage,
 } from "../utils/slippage";
-import { WSOL_ADDRESS } from "../utils/wsol";
-import { poolPda, poolTokenAta, globalConfigPda } from "../pda/pumpAmm";
-import { fetchPool } from "../ammsdk/generated/accounts/pool";
-import { fetchGlobalConfig } from "../ammsdk/generated/accounts/globalConfig";
-import { PUMP_AMM_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
+import { WSOL_ADDRESS, buildWrapSolInstructions, buildUnwrapSolInstructions } from "../utils/wsol";
+import { poolPda } from "../pda/pumpAmm";
+import { fetchPool, type Pool } from "../ammsdk/generated/accounts/pool";
+import { PUMP_AMM_PROGRAM_ID } from "../config/addresses";
 import { findAssociatedTokenPda } from "../pda/ata";
 import { buildCreateAtaInstruction } from "../utils/ata";
-import type { Base58EncodedBytes } from "@solana/rpc-types";
+import { quoteAmmBuyBudget, quoteAmmBuyCost, quoteAmmSell } from "../ammsdk/amm_math";
 
 export type CommitmentLevel = "processed" | "confirmed" | "finalized";
 
@@ -32,23 +32,42 @@ type AmmBaseParams = {
   mint: Address | string;
   rpc: RpcClient;
   commitment?: CommitmentLevel;
+  /** Retained pool and vault addresses; each plan refreshes their mutable state together. */
+  tradingContext?: AmmTradingContext;
   poolAddress?: Address | string;
+  poolStateOverride?: Pool;
   poolCreator?: Address | string;
   poolIndex?: number;
   quoteMint?: Address | string;
+  baseTokenProgram?: Address | string;
+  quoteTokenProgram?: Address | string;
   allowTrackVolume?: boolean;
+  /** Inline wraps/closes WSOL; persistent leaves the quote ATA open. Defaults to persistent. */
+  wsolStrategy?: "inline" | "persistent";
 };
 
 export type AmmBuyParams = AmmBaseParams & {
   /** SOL budget (before slippage), expressed in SOL. */
-  solAmount: number;
+  solAmount?: number | string;
+  /** Swap budget in lamports (mutually exclusive with solAmount). */
+  amountIn?: bigint;
+  kind?: "exactIn" | "exactOut";
+  /** Fixed token base-unit target for exactOut buys. */
+  amountOut?: bigint;
+  /** Explicit lamport spending cap; replaces slippageBps. */
+  maxAmountIn?: bigint;
+  minAmountOut?: bigint;
   /** Optional slippage tolerance applied to the SOL budget (default 0.5%). */
   slippageBps?: number;
 };
 
 export type AmmSellParams = AmmBaseParams & {
   /** Human-readable token amount to sell. */
-  tokenAmount?: number;
+  tokenAmount?: number | string;
+  /** Token base units (mutually exclusive with tokenAmount and percentage mode). */
+  amountIn?: bigint;
+  /** Explicit quote output floor; replaces slippageBps. */
+  minAmountOut?: bigint;
   /** Optional decimals for the token (defaults to 6). */
   tokenDecimals?: number;
   /** Optional slippage tolerance applied to the SOL output floor (default 0.5%). */
@@ -59,21 +78,29 @@ export type AmmSellParams = AmmBaseParams & {
   walletPercentage?: number;
 };
 
-const TOKEN_PROGRAM_ADDRESS = toAddress(TOKEN_PROGRAM_ID);
-const BPS_DENOMINATOR = 10_000n;
 const PERCENTAGE_SCALE = 10_000n;
 
-const ensurePositiveNumber = (value: number, field: string) => {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`${field} must be a positive number`);
-  }
-};
+
 
 const resolveQuoteMint = (quoteMint?: Address | string): Address =>
   toAddress(quoteMint ?? WSOL_ADDRESS);
 
-export async function ammBuy(params: AmmBuyParams): Promise<Instruction> {
-  ensurePositiveNumber(params.solAmount, "solAmount");
+export async function ammBuy(params: AmmBuyParams): Promise<SwapPlan> {
+  const explicitOutput = params.amountOut !== undefined;
+  if (explicitOutput) {
+    if (params.kind !== "exactOut" || params.amountIn !== undefined || params.solAmount !== undefined || params.minAmountOut !== undefined) {
+      throw new Error("amountOut requires exactOut and cannot be mixed with input budgets or output floors");
+    }
+    if (typeof params.amountOut !== "bigint" || params.amountOut <= 0n) throw new Error("amountOut must be a positive bigint");
+  } else if ((params.amountIn === undefined) === (params.solAmount === undefined)) {
+    throw new Error("Supply exactly one of amountIn or solAmount");
+  }
+  if (params.maxAmountIn !== undefined && (params.kind !== "exactOut" || params.slippageBps !== undefined)) {
+    throw new Error("maxAmountIn requires exactOut and cannot be mixed with slippageBps");
+  }
+  if (params.maxAmountIn !== undefined && (typeof params.maxAmountIn !== "bigint" || params.maxAmountIn <= 0n)) throw new Error("maxAmountIn must be a positive bigint");
+  const solBudgetLamports = explicitOutput ? 0n : params.amountIn ?? positiveAmountToRaw(params.solAmount!, 9, "solAmount");
+  if (!explicitOutput && (typeof solBudgetLamports !== "bigint" || solBudgetLamports <= 0n)) throw new Error("amountIn must be a positive bigint");
 
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
@@ -82,51 +109,39 @@ export async function ammBuy(params: AmmBuyParams): Promise<Instruction> {
   const quoteMint = resolveQuoteMint(params.quoteMint);
   const mintAddress = toAddress(params.mint);
 
-  const solBudgetLamports = solToLamports(params.solAmount);
 
   const context = await resolvePoolContext({
     rpc: params.rpc,
     mint: mintAddress,
     quoteMint,
     commitment,
+    tradingContext: params.tradingContext,
     poolAddress: params.poolAddress,
+    poolStateOverride: params.poolStateOverride,
     poolCreator: params.poolCreator,
     poolIndex: params.poolIndex,
+    baseTokenProgram: params.baseTokenProgram,
+    quoteTokenProgram: params.quoteTokenProgram,
   });
 
-  const totalFeeBps = computeTotalFeeBps(context.globalConfigData);
-  const netQuoteIn = applyInputFees(solBudgetLamports, totalFeeBps);
-  if (netQuoteIn <= 0n) {
-    throw new Error("Effective quote input after fees is zero");
-  }
+  const fees = context.fees;
+  const { tokenAmountOut, quoteRequired } = explicitOutput
+    ? { tokenAmountOut: params.amountOut!, quoteRequired: quoteAmmBuyCost(params.amountOut!, context.baseReserve, context.quoteReserve, fees) }
+    : quoteAmmBuyBudget(solBudgetLamports, context.baseReserve, context.quoteReserve, fees);
 
-  let tokenAmountOut = computeTokensOut(netQuoteIn, context.baseReserve, context.quoteReserve);
-  if (tokenAmountOut <= 0n) {
-    throw new Error("SOL amount is too small to purchase any tokens from the AMM");
+  const exactIn = params.kind !== "exactOut";
+  if (params.minAmountOut !== undefined && (!exactIn || params.slippageBps !== undefined)) {
+    throw new Error("Do not mix minAmountOut with exactOut or slippageBps");
   }
-  if (tokenAmountOut >= context.baseReserve) {
-    tokenAmountOut = context.baseReserve - 1n;
-  }
-  if (tokenAmountOut <= 0n) {
-    throw new Error("AMM pool does not have enough base liquidity for this trade");
-  }
-
-  let quoteRequired = computeQuoteForTokens(tokenAmountOut, context.quoteReserve, context.baseReserve, totalFeeBps);
-  while (quoteRequired > solBudgetLamports && tokenAmountOut > 0n) {
-    tokenAmountOut -= 1n;
-    quoteRequired = computeQuoteForTokens(tokenAmountOut, context.quoteReserve, context.baseReserve, totalFeeBps);
-  }
-
-  if (tokenAmountOut <= 0n || quoteRequired <= 0n) {
-    throw new Error("Unable to satisfy AMM buy with the provided SOL budget");
-  }
-
-  const maxQuoteIn = addSlippage(quoteRequired, slippageBps);
+  const minAmountOut = params.minAmountOut ?? subSlippage(tokenAmountOut, slippageBps);
+  if (exactIn && (typeof minAmountOut !== "bigint" || minAmountOut <= 0n)) throw new Error("minAmountOut must be positive");
+  const maxQuoteIn = exactIn ? solBudgetLamports : params.maxAmountIn ?? addSlippage(quoteRequired, slippageBps);
 
   const { createInstruction } = await ensureUserAta({
     rpc: params.rpc,
     owner: params.user,
     mint: mintAddress,
+    tokenProgram: context.baseTokenProgram,
   });
 
   const instruction = await buildAmmBuy({
@@ -134,30 +149,35 @@ export async function ammBuy(params: AmmBuyParams): Promise<Instruction> {
     baseMint: mintAddress,
     quoteMint,
     tokenAmountOut,
+    exactQuoteIn: exactIn ? { amountIn: solBudgetLamports, minAmountOut } : undefined,
     maxQuoteIn,
+    resolvedState: { poolAddress: context.poolAddress, poolData: context.poolData, globalConfigData: context.globalConfigData },
     poolAddress: context.poolAddress,
     poolCreator: context.poolCreator,
     index: Number(context.poolData.index),
     allowTrackVolume: params.allowTrackVolume,
+    baseTokenProgram: context.baseTokenProgram,
+    quoteTokenProgram: context.quoteTokenProgram,
     rpc: params.rpc,
     commitment,
   });
 
-  if (createInstruction) {
-    const instructionWithPrepend = Object.assign({}, instruction) as Instruction & {
-      prepend?: Instruction[];
-    };
-    instructionWithPrepend.prepend = [
-      createInstruction,
-      ...(instructionWithPrepend.prepend ?? []),
-    ];
-    return instructionWithPrepend;
+  const prepend: Instruction[] = createInstruction ? [createInstruction] : [];
+  const append: Instruction[] = [];
+  if (quoteMint === toAddress(WSOL_ADDRESS)) {
+    const wrap = await buildWrapSolInstructions({ owner: params.user, amount: maxQuoteIn, autoClose: params.wsolStrategy === "inline" });
+    prepend.push(...wrap.prepend);
+    append.push(...wrap.append);
   }
-
-  return instruction;
+  return { venue: "amm", contextSlot: context.contextSlot, instructions: [...prepend, instruction, ...append],
+    quote: exactIn
+      ? { kind: "exactIn", amountIn: solBudgetLamports, expectedAmountOut: tokenAmountOut, minAmountOut }
+      : { kind: "exactOut", amountOut: tokenAmountOut, expectedAmountIn: quoteRequired, maxAmountIn: maxQuoteIn } };
 }
 
-export async function ammSell(params: AmmSellParams): Promise<Instruction> {
+export async function ammSell(params: AmmSellParams): Promise<SwapPlan> {
+  if (params.minAmountOut !== undefined && params.slippageBps !== undefined) throw new Error("Do not mix minAmountOut with slippageBps");
+  if (params.minAmountOut !== undefined && (typeof params.minAmountOut !== "bigint" || params.minAmountOut <= 0n)) throw new Error("minAmountOut must be a positive bigint");
   const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   validateSlippage(slippageBps);
 
@@ -170,356 +190,115 @@ export async function ammSell(params: AmmSellParams): Promise<Instruction> {
     mint: mintAddress,
     quoteMint,
     commitment,
+    tradingContext: params.tradingContext,
     poolAddress: params.poolAddress,
+    poolStateOverride: params.poolStateOverride,
     poolCreator: params.poolCreator,
     poolIndex: params.poolIndex,
+    baseTokenProgram: params.baseTokenProgram,
+    quoteTokenProgram: params.quoteTokenProgram,
   });
 
   const tokenAmountRaw = await resolveTokenAmountRaw({
     params,
     rpc: params.rpc,
     mint: mintAddress,
+    tokenProgram: context.baseTokenProgram,
+    decimals: context.baseMint.decimals,
   });
 
   if (tokenAmountRaw <= 0n) {
     throw new Error("Token amount must be positive");
   }
-  if (tokenAmountRaw >= context.baseReserve) {
-    throw new Error("Token amount exceeds available AMM base liquidity");
-  }
+  const fees = context.fees;
+  const quoteOut = quoteAmmSell(tokenAmountRaw, context.baseReserve, context.quoteReserve, context.realQuoteReserve, fees);
 
-  const totalFeeBps = computeTotalFeeBps(context.globalConfigData);
-  const netBaseIn = applyInputFees(tokenAmountRaw, totalFeeBps);
-  if (netBaseIn <= 0n) {
-    throw new Error("Effective base input after fees is zero");
-  }
-
-  const quoteOut = computeQuoteOut(netBaseIn, context.baseReserve, context.quoteReserve);
-  if (quoteOut <= 0n) {
-    throw new Error("AMM pool produced zero quote output");
-  }
-
-  const minQuoteOut = subSlippage(quoteOut, slippageBps);
+  const minQuoteOut = params.minAmountOut ?? subSlippage(quoteOut, slippageBps);
   if (minQuoteOut <= 0n) {
     throw new Error("Slippage settings would result in zero SOL output");
   }
 
-  return buildAmmSell({
+  const instruction = await buildAmmSell({
     user: params.user,
     baseMint: mintAddress,
     quoteMint,
     tokenAmountIn: tokenAmountRaw,
     minQuoteOut,
+    resolvedState: { poolAddress: context.poolAddress, poolData: context.poolData, globalConfigData: context.globalConfigData },
     poolAddress: context.poolAddress,
     poolCreator: context.poolCreator,
     index: Number(context.poolData.index),
     allowTrackVolume: params.allowTrackVolume,
+    baseTokenProgram: context.baseTokenProgram,
+    quoteTokenProgram: context.quoteTokenProgram,
     rpc: params.rpc,
     commitment,
   });
+  const { createInstruction } = await ensureUserAta({ rpc: params.rpc, owner: params.user, mint: quoteMint, tokenProgram: context.quoteTokenProgram });
+  const append = quoteMint === toAddress(WSOL_ADDRESS) && params.wsolStrategy === "inline"
+    ? await buildUnwrapSolInstructions(params.user) : [];
+  return { venue: "amm", contextSlot: context.contextSlot,
+    instructions: [...(createInstruction ? [createInstruction] : []), instruction, ...append],
+    quote: { kind: "exactIn", amountIn: tokenAmountRaw, expectedAmountOut: quoteOut, minAmountOut: minQuoteOut } };
+
 }
 
-type PoolContext = Awaited<ReturnType<typeof resolvePoolState>> & {
-  baseReserve: bigint;
-  quoteReserve: bigint;
+type ResolveAmmContextParams = {
+  rpc: RpcClient;
+  mint: Address;
+  quoteMint: Address;
+  commitment: CommitmentLevel;
+  poolAddress?: Address | string;
+  poolStateOverride?: Pool;
+  poolCreator?: Address | string;
+  poolIndex?: number;
 };
 
-const DEFAULT_POOL_SCAN_LIMIT = 8;
-
-async function resolvePoolContext(params: {
-  rpc: RpcClient;
-  mint: Address;
-  quoteMint: Address;
-  commitment: CommitmentLevel;
-  poolAddress?: Address | string;
-  poolCreator?: Address | string;
-  poolIndex?: number;
-}): Promise<PoolContext> {
-  const { poolAccount, globalConfigAccount, poolAddress, poolCreator, coinCreator } =
-    await loadPoolAccounts(params);
-  const [baseAta, quoteAta] = await Promise.all([
-    poolTokenAta(poolAddress, params.mint, TOKEN_PROGRAM_ADDRESS),
-    poolTokenAta(poolAddress, params.quoteMint, TOKEN_PROGRAM_ADDRESS),
-  ]);
-
-  const reserves = await fetchPoolReserves(params.rpc, baseAta, quoteAta);
-
-  return {
-    poolAddress,
-    poolCreator,
-    coinCreator,
-    poolData: poolAccount.data,
-    globalConfigData: globalConfigAccount.data,
-    baseReserve: reserves.baseReserve,
-    quoteReserve: reserves.quoteReserve,
-  };
+/** Resolve once and retain the result for repeated quotes of the same pair. */
+export async function resolveAmmTradingContext(params: ResolveAmmContextParams): Promise<AmmTradingContext> {
+  const creator = params.poolCreator ? toAddress(params.poolCreator) : await canonicalPoolCreator(params.mint);
+  const poolAddress = params.poolAddress ? toAddress(params.poolAddress)
+    : await poolPda(params.poolIndex ?? 0, creator, params.mint, params.quoteMint);
+  const account = params.poolStateOverride ? undefined : await fetchPool(params.rpc, poolAddress, { commitment: params.commitment });
+  if (account && account.programAddress !== toAddress(PUMP_AMM_PROGRAM_ID)) throw new Error("Invalid AMM pool owner");
+  const pool = params.poolStateOverride ?? account!.data;
+  if (pool.baseMint !== params.mint || pool.quoteMint !== params.quoteMint) throw new Error("AMM pool does not match requested mint pair");
+  if (!params.poolAddress && (pool.creator !== creator || pool.index !== (params.poolIndex ?? 0))) throw new Error("AMM pool does not match requested creator or index");
+  return { poolAddress, baseMint: pool.baseMint, quoteMint: pool.quoteMint,
+    baseVault: pool.poolBaseTokenAccount, quoteVault: pool.poolQuoteTokenAccount };
 }
 
-async function resolvePoolState(params: {
-  rpc: RpcClient;
-  mint: Address;
-  quoteMint: Address;
-  commitment: CommitmentLevel;
-  poolAddress?: Address | string;
-  poolCreator?: Address | string;
-  poolIndex?: number;
+async function resolvePoolContext(params: ResolveAmmContextParams & {
+  tradingContext?: AmmTradingContext;
+  baseTokenProgram?: Address | string;
+  quoteTokenProgram?: Address | string;
 }) {
-  const { poolAccount, globalConfigAccount, poolAddress, poolCreator, coinCreator } =
-    await loadPoolAccounts(params);
-
-  return {
-    poolAddress,
-    poolCreator,
-    coinCreator,
-    poolData: poolAccount.data,
-    globalConfigData: globalConfigAccount.data,
-  } as const;
-}
-
-const POOL_BASE_MINT_OFFSET = 8 + 1 + 2 + 32; // discriminator + bump + index + creator
-const POOL_QUOTE_MINT_OFFSET = POOL_BASE_MINT_OFFSET + 32;
-
-const toBase58Bytes = (value: Address | string): Base58EncodedBytes =>
-  toAddress(value) as unknown as Base58EncodedBytes;
-
-async function loadPoolAccounts(params: {
-  rpc: RpcClient;
-  mint: Address;
-  quoteMint: Address;
-  commitment: CommitmentLevel;
-  poolAddress?: Address | string;
-  poolCreator?: Address | string;
-  poolIndex?: number;
-}) {
-  const { rpc, mint, quoteMint, commitment, poolAddress, poolCreator, poolIndex } = params;
-
-  let resolvedPoolAddress = poolAddress ? toAddress(poolAddress) : undefined;
-  let resolvedPoolCreator = poolCreator ? toAddress(poolCreator) : undefined;
-  let coinCreator: Address | undefined;
-
-  try {
-    const curveAddress = await bondingCurvePda(mint);
-    const curveAccount = await fetchBondingCurve(rpc, curveAddress, { commitment });
-    coinCreator = curveAccount.data.creator;
-  } catch {
-    coinCreator = undefined;
-  }
-
-  const globalConfigAddress = await globalConfigPda();
-
-  const tryFetchPool = async (address: Address) => {
-    try {
-      return await fetchPool(rpc, address, { commitment });
-    } catch (error) {
-      if (isAccountNotFoundError(error)) {
-        return null;
-      }
-      throw error;
-    }
-  };
-
-  let poolAccount: Awaited<ReturnType<typeof fetchPool>> | null = null;
-
-  if (resolvedPoolAddress) {
-    poolAccount = await tryFetchPool(resolvedPoolAddress);
-  }
-
-  if (!poolAccount && resolvedPoolCreator) {
-    const indices = poolIndex !== undefined
-      ? [poolIndex]
-      : Array.from({ length: DEFAULT_POOL_SCAN_LIMIT }, (_, i) => i);
-
-    for (const index of indices) {
-      const candidateAddress = await poolPda(index, resolvedPoolCreator, mint, quoteMint);
-      const candidateAccount = await tryFetchPool(candidateAddress);
-      if (candidateAccount) {
-        resolvedPoolAddress = candidateAddress;
-        poolAccount = candidateAccount;
-        break;
-      }
-    }
-  }
-
-  if (!poolAccount) {
-    const filters = [
-      {
-        memcmp: {
-          offset: BigInt(POOL_BASE_MINT_OFFSET),
-          bytes: toBase58Bytes(mint),
-          encoding: "base58" as const,
-        },
-      },
-      {
-        memcmp: {
-          offset: BigInt(POOL_QUOTE_MINT_OFFSET),
-          bytes: toBase58Bytes(quoteMint),
-          encoding: "base58" as const,
-        },
-      },
-    ];
-
-    const response = await rpc
-      .getProgramAccounts(toAddress(PUMP_AMM_PROGRAM_ID), {
-        commitment,
-        encoding: "base64",
-        filters,
-      })
-      .send();
-
-    const matches = response ?? [];
-
-    for (const account of matches) {
-      const candidateAddress = toAddress(account.pubkey);
-      const candidateAccount = await tryFetchPool(candidateAddress);
-      if (!candidateAccount) continue;
-
-      resolvedPoolAddress = candidateAddress;
-      resolvedPoolCreator = candidateAccount.data.creator;
-      poolAccount = candidateAccount;
-      break;
-    }
-  }
-
-  if (!poolAccount || !resolvedPoolAddress) {
-    throw new Error(
-      `Unable to locate AMM pool for mint ${mint}. Provide poolAddress or poolIndex explicitly.`
-    );
-  }
-
-  const globalConfigAccount = await fetchGlobalConfig(rpc, globalConfigAddress, { commitment });
-
-  if (!resolvedPoolCreator) {
-    resolvedPoolCreator = poolAccount.data.creator;
-  }
-
-  if (!coinCreator) {
-    coinCreator = poolAccount.data.creator;
-  }
-
-  return {
-    poolAccount,
-    globalConfigAccount,
-    poolAddress: resolvedPoolAddress,
-    poolCreator: resolvedPoolCreator,
-    coinCreator,
-  } as const;
-}
-
-function isAccountNotFoundError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  const message = error.message.toLowerCase();
-  if (message.includes("account not found")) {
-    return true;
-  }
-  const contextCode = (error as any)?.context?.__code;
-  return contextCode === 4100;
-}
-
-async function fetchPoolReserves(rpc: RpcClient, baseAccount: Address, quoteAccount: Address) {
-  const [baseBalance, quoteBalance] = await Promise.all([
-    rpc.getTokenAccountBalance(baseAccount).send(),
-    rpc.getTokenAccountBalance(quoteAccount).send(),
-  ]);
-
-  return {
-    baseReserve: BigInt(baseBalance.value.amount),
-    quoteReserve: BigInt(quoteBalance.value.amount),
-  } as const;
-}
-
-function computeTotalFeeBps(globalConfig: Awaited<ReturnType<typeof fetchGlobalConfig>>["data"]) {
-  return (
-    BigInt(globalConfig.lpFeeBasisPoints ?? 0n) +
-    BigInt(globalConfig.protocolFeeBasisPoints ?? 0n)
-  );
-}
-
-function applyInputFees(amount: bigint, totalFeeBps: bigint): bigint {
-  const feeDenominator = BPS_DENOMINATOR - totalFeeBps;
-  if (feeDenominator <= 0n) {
-    return 0n;
-  }
-  return (amount * feeDenominator) / BPS_DENOMINATOR;
-}
-
-function computeTokensOut(netQuoteIn: bigint, baseReserve: bigint, quoteReserve: bigint): bigint {
-  const denominator = quoteReserve + netQuoteIn;
-  if (denominator <= 0n) {
-    throw new Error("Invalid AMM reserves (denominator is zero)");
-  }
-  return (netQuoteIn * baseReserve) / denominator;
-}
-
-function computeQuoteForTokens(
-  tokenAmountOut: bigint,
-  quoteReserve: bigint,
-  baseReserve: bigint,
-  totalFeeBps: bigint
-): bigint {
-  if (tokenAmountOut <= 0n) {
-    return 0n;
-  }
-  if (tokenAmountOut >= baseReserve) {
-    throw new Error("Requested token amount exceeds pool reserves");
-  }
-
-  const netQuoteIn = (tokenAmountOut * quoteReserve) / (baseReserve - tokenAmountOut);
-  if (netQuoteIn <= 0n) {
-    return 0n;
-  }
-
-  const feeDenominator = BPS_DENOMINATOR - totalFeeBps;
-  if (feeDenominator <= 0n) {
-    throw new Error("Invalid AMM fee configuration");
-  }
-
-  return (netQuoteIn * BPS_DENOMINATOR + (feeDenominator - 1n)) / feeDenominator;
-}
-
-function computeQuoteOut(netBaseIn: bigint, baseReserve: bigint, quoteReserve: bigint): bigint {
-  const denominator = baseReserve + netBaseIn;
-  if (denominator <= 0n) {
-    throw new Error("Invalid AMM reserves (denominator is zero)");
-  }
-  return (netBaseIn * quoteReserve) / denominator;
+  const context = params.tradingContext ?? await resolveAmmTradingContext(params);
+  if (context.baseMint !== params.mint || context.quoteMint !== params.quoteMint ||
+      (params.poolAddress && context.poolAddress !== toAddress(params.poolAddress))) throw new Error("Retained context does not match requested pool or mint pair");
+  const snapshot = await loadAmmSnapshot({ rpc: params.rpc, context, commitment: params.commitment });
+  if ((params.baseTokenProgram && toAddress(params.baseTokenProgram) !== snapshot.baseTokenProgram) ||
+      (params.quoteTokenProgram && toAddress(params.quoteTokenProgram) !== snapshot.quoteTokenProgram)) throw new Error("Token program hint does not match snapshot mint owner");
+  return snapshot;
 }
 
 async function ensureUserAta({
-  rpc,
   owner,
   mint,
+  tokenProgram,
 }: {
   rpc: RpcClient;
   owner: TransactionSigner;
   mint: Address;
+  tokenProgram: Address;
 }) {
   const [userAta] = await findAssociatedTokenPda({
     owner: toAddress(owner.address),
     mint,
-    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    tokenProgram,
   });
 
-  let createInstruction: Instruction | undefined;
-  try {
-    const accountInfo = await rpc
-      .getAccountInfo(userAta, { encoding: "base64" })
-      .send();
-    if (!accountInfo.value) {
-      createInstruction = buildCreateAtaInstruction({
-        payer: owner,
-        owner,
-        mint,
-      });
-    }
-  } catch {
-    createInstruction = buildCreateAtaInstruction({
-      payer: owner,
-      owner,
-      mint,
-    });
-  }
+  const createInstruction = await buildCreateAtaInstruction({ payer: owner, owner, mint, tokenProgram });
 
   return { userAta, createInstruction } as const;
 }
@@ -528,26 +307,35 @@ async function resolveTokenAmountRaw({
   params,
   rpc,
   mint,
+  tokenProgram,
+  decimals,
 }: {
   params: AmmSellParams;
+  decimals: number;
   rpc: RpcClient;
   mint: Address;
+  tokenProgram: Address;
 }) {
   const useWalletPercentage = params.useWalletPercentage ?? false;
-  const decimals = params.tokenDecimals ?? 6;
+  if (params.tokenDecimals !== undefined && params.tokenDecimals !== decimals) throw new Error("tokenDecimals does not match snapshot mint");
 
+  if (params.amountIn !== undefined) {
+    if (params.tokenAmount !== undefined || useWalletPercentage) throw new Error("Do not mix raw, decimal, and percentage amounts");
+    if (typeof params.amountIn !== "bigint" || params.amountIn <= 0n) throw new Error("amountIn must be a positive bigint");
+    return params.amountIn;
+  }
   if (useWalletPercentage) {
     const percentage = params.walletPercentage ?? 100;
     const scaled = percentageToScaled(percentage);
 
-    const balance = await fetchUserTokenBalance(rpc, params.user, mint);
+    const balance = await fetchUserTokenBalance(rpc, params.user, mint, tokenProgram);
     if (balance === 0n) {
       throw new Error("Wallet token balance is zero; nothing to sell");
     }
 
-    let amount = (balance * scaled) / PERCENTAGE_SCALE;
+    const amount = (balance * scaled) / PERCENTAGE_SCALE;
     if (amount <= 0n) {
-      amount = 1n;
+      throw new Error("Percentage sell rounds to zero token units");
     }
     return amount;
   }
@@ -555,19 +343,19 @@ async function resolveTokenAmountRaw({
   if (params.tokenAmount === undefined) {
     throw new Error("tokenAmount is required when useWalletPercentage is false");
   }
-  ensurePositiveNumber(params.tokenAmount, "tokenAmount");
-  return tokensToRaw(params.tokenAmount, decimals);
+  return positiveAmountToRaw(params.tokenAmount, decimals, "tokenAmount");
 }
 
 async function fetchUserTokenBalance(
   rpc: RpcClient,
   user: TransactionSigner,
-  mint: Address
+  mint: Address,
+  tokenProgram: Address
 ): Promise<bigint> {
   const [userAta] = await findAssociatedTokenPda({
     owner: toAddress(user.address),
     mint,
-    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    tokenProgram,
   });
 
   const accountInfo = await rpc.getTokenAccountBalance(userAta).send();

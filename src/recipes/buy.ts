@@ -83,7 +83,7 @@ export interface SimpleBuyParams {
   tokenAmount: bigint;
   /** Maximum SOL budget expressed in SOL units. */
   maxSolCostSol?: number;
-  /** Optional lamport-denominated SOL budget. Takes precedence when provided. */
+  /** Optional lamport-denominated SOL budget; do not combine with maxSolCostSol. */
   maxSolCostLamports?: bigint;
   feeRecipient?: Address | string;
   trackVolume?: boolean;
@@ -93,6 +93,9 @@ export interface SimpleBuyParams {
 }
 
 export async function buySimple(params: SimpleBuyParams): Promise<Instruction> {
+  if (params.maxSolCostLamports !== undefined && params.maxSolCostSol !== undefined) {
+    throw new Error("Provide exactly one SOL spending limit");
+  }
   const {
     user,
     mint,

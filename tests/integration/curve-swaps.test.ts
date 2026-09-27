@@ -1,161 +1,106 @@
-import { describe, test, expect, beforeAll } from "bun:test";
-import { curveBuy, curveSell } from "../../src/swap";
-import {
-  quoteBuyWithSolAmount,
-  quoteSellForTokenAmount,
-  type BondingCurveState,
-  type FeeStructure,
-} from "../../src/ammsdk/bondingCurveMath";
+import { expect, test } from "bun:test";
+import { address, generateKeyPairSigner } from "@solana/kit";
+import { curveBuy, curveSell } from "../../src/swap/curve";
+import { quoteBuyWithSolAmount, quoteSellForTokenAmount } from "../../src/ammsdk/bondingCurveMath";
+import { getBuyExactQuoteInV2InstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/buyExactQuoteInV2";
+import { getBuyV2InstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/buyV2";
+import { getSellV2InstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/sellV2";
 import { addSlippage, subSlippage } from "../../src/utils/slippage";
-import { solToLamports, tokensToRaw } from "../../src/utils/amounts";
-import type { TransactionSigner } from "@solana/kit";
-import { createTestWallet, getTestRpc } from "../setup";
-import { DEFAULT_FEE_RECIPIENT } from "../../src/config/constants";
-import { getBuyInstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/buy";
-import { getSellInstructionDataDecoder } from "../../src/pumpsdk/generated/instructions/sell";
-import { address as toAddress } from "@solana/kit";
-import {
-  bondingCurvePda,
-  associatedBondingCurveAta,
-  globalPda,
-  creatorVaultPda,
-  globalVolumeAccumulatorPda,
-  userVolumeAccumulatorPda,
-  feeConfigPda,
-  eventAuthorityPda,
-} from "../../src/pda/pump";
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "../../src/config/addresses";
 import { findAssociatedTokenPda } from "../../src/pda/ata";
-import {
-  PUMP_PROGRAM_ID,
-  SYSTEM_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  FEE_PROGRAM_ID,
-} from "../../src/config/addresses";
 
-describe("Curve swap helpers", () => {
-  let testWallet: TransactionSigner;
-  let rpc: ReturnType<typeof getTestRpc>;
-  const mintAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+async function fixture() {
+  const user = await generateKeyPairSigner();
+  const mint = (await generateKeyPairSigner()).address;
+  const curveStateOverride = { virtualTokenReserves: 50000000000n, virtualQuoteReserves: 5000000000n,
+    realTokenReserves: 25000000000n, realQuoteReserves: 1000000000n, creator: user.address, complete: false };
+  const feeStructureOverride = { lpFeeBps: 0n, protocolFeeBps: 75n, creatorFeeBps: 25n };
+  const rpc = { getAccountInfo: () => ({ send: async () => ({ value: null }) }) } as any;
+  return { user, mint, rpc, curveStateOverride, feeStructureOverride, bondingCurveCreator: user.address,
+    feeRecipient: user.address, buybackFeeRecipient: user.address,
+    contextSlot: 100n, baseTokenProgram: TOKEN_2022_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID };
+}
 
-  const mockCurve = (creator: string): BondingCurveState => ({
-    virtualTokenReserves: 50_000_000_000n,
-    virtualSolReserves: 5_000_000_000n,
-    realTokenReserves: 25_000_000_000n,
-    realSolReserves: 1_000_000_000n,
-    creator: toAddress(creator),
-    complete: false,
-  });
-
-  const mockFees: FeeStructure = {
-    lpFeeBps: 50n,
-    protocolFeeBps: 25n,
-    creatorFeeBps: 25n,
-  };
-
-  beforeAll(async () => {
-    rpc = getTestRpc();
-    testWallet = await createTestWallet();
-  });
-
-  test("curveBuy derives token amount and max SOL cost from SOL budget", async () => {
-    const slippageBps = 75;
-    const solBudgetSol = 0.8;
-    const solBudgetLamports = solToLamports(solBudgetSol);
-    const curveState = mockCurve(testWallet.address);
-    const quote = quoteBuyWithSolAmount(curveState, mockFees, solBudgetLamports);
-    const expectedMaxCost = addSlippage(quote.totalSolCostLamports, slippageBps) * 2n;
-
-    const instruction = await curveBuy({
-      user: testWallet,
-      mint: mintAddress,
-      solAmount: solBudgetSol,
-      slippageBps,
-      feeRecipient: DEFAULT_FEE_RECIPIENT,
-      bondingCurveCreator: testWallet.address,
-      curveStateOverride: curveState,
-      feeStructureOverride: mockFees,
-      rpc,
-    });
-
-    const decoded = getBuyInstructionDataDecoder().decode(instruction.data);
-    expect(decoded.amount).toBe(quote.tokenAmount);
-    expect(decoded.maxSolCost).toBe(expectedMaxCost);
-  });
-
-  test("curveBuy wires expected accounts", async () => {
-    const curveState = mockCurve(testWallet.address);
-    const instruction = await curveBuy({
-      user: testWallet,
-      mint: mintAddress,
-      solAmount: 0.4,
-      bondingCurveCreator: testWallet.address,
-      feeRecipient: DEFAULT_FEE_RECIPIENT,
-      curveStateOverride: curveState,
-      feeStructureOverride: mockFees,
-      rpc,
-    });
-
-    const bondingCurve = await bondingCurvePda(mintAddress);
-    const associatedBondingCurve = await associatedBondingCurveAta(bondingCurve, mintAddress);
-    const [associatedUser] = await findAssociatedTokenPda({
-      owner: testWallet.address,
-      mint: toAddress(mintAddress),
-      tokenProgram: toAddress(TOKEN_PROGRAM_ID),
-    });
-    const creatorVault = await creatorVaultPda(testWallet.address);
-    const global = await globalPda();
-    const globalVolumeAccumulator = await globalVolumeAccumulatorPda();
-    const userVolumeAccumulator = await userVolumeAccumulatorPda(testWallet.address);
-    const feeConfig = await feeConfigPda();
-
-    const expectedAccounts = [
-      global,
-      DEFAULT_FEE_RECIPIENT,
-      toAddress(mintAddress),
-      bondingCurve,
-      associatedBondingCurve,
-      associatedUser,
-      testWallet.address,
-      toAddress(SYSTEM_PROGRAM_ID),
-      toAddress(TOKEN_PROGRAM_ID),
-      creatorVault,
-      await eventAuthorityPda(),
-      toAddress(PUMP_PROGRAM_ID),
-      globalVolumeAccumulator,
-      userVolumeAccumulator,
-      feeConfig,
-      toAddress(FEE_PROGRAM_ID),
-    ];
-
-    const accountAddresses = instruction.accounts.map((meta) => meta.address);
-    expect(accountAddresses).toEqual(expectedAccounts.map(toAddress));
-  });
-
-  test("curveSell derives min SOL output from slippage guard for fixed token amount", async () => {
-    const tokenAmountHuman = 0.75;
-    const decimals = 6;
-    const tokenAmountRaw = tokensToRaw(tokenAmountHuman, decimals);
-    const slippageBps = 100;
-    const curveState = mockCurve(testWallet.address);
-    const quote = quoteSellForTokenAmount(curveState, mockFees, tokenAmountRaw);
-    const expectedMinOut = subSlippage(quote.solOutputLamports, slippageBps);
-
-    const instruction = await curveSell({
-      user: testWallet,
-      mint: mintAddress,
-      tokenAmount: tokenAmountHuman,
-      tokenDecimals: decimals,
-      slippageBps,
-      feeRecipient: DEFAULT_FEE_RECIPIENT,
-      bondingCurveCreator: testWallet.address,
-      curveStateOverride: curveState,
-      feeStructureOverride: mockFees,
-      rpc,
-    });
-
-    const decoded = getSellInstructionDataDecoder().decode(instruction.data);
-    expect(decoded.minSolOutput).toBe(expectedMinOut);
-    expect(decoded.amount).toBe(tokenAmountRaw);
-  });
+test("curve buy preserves its budget and slippage cap using unified v2 accounts", async () => {
+  const params = await fixture();
+  const quote = quoteBuyWithSolAmount(params.curveStateOverride, params.feeStructureOverride, 800000000n);
+  const plan = await curveBuy({ ...params, solAmount: "0.8", kind: "exactOut", slippageBps: 75 });
+  const instruction = plan.instructions.at(-1)!;
+  const decoded = getBuyV2InstructionDataDecoder().decode(instruction.data);
+  expect(decoded.amount).toBe(quote.tokenAmount);
+  expect(decoded.maxSolCost).toBe(addSlippage(quote.totalSolCostLamports, 75));
+  expect(decoded.maxSolCost).toBeLessThanOrEqual(addSlippage(800000000n, 75));
+  expect(plan.venue).toBe("curve");
+  expect(plan.contextSlot).toBe(100n);
+  expect(plan.quote.kind).toBe("exactOut");
+  expect(plan.instructions).toHaveLength(2);
+  expect(plan.instructions.every(ix => !("prepend" in ix) && !("append" in ix))).toBe(true);
+  expect(instruction.accounts).toHaveLength(27);
+  expect(instruction.accounts[3].address).toBe(address(TOKEN_2022_PROGRAM_ID));
+  expect(instruction.accounts[4].address).toBe(address(TOKEN_PROGRAM_ID));
+  const [ata] = await findAssociatedTokenPda({ owner: params.user.address, mint: params.mint, tokenProgram: address(TOKEN_2022_PROGRAM_ID) });
+  expect(instruction.accounts[14].address).toBe(ata);
+  expect(plan.instructions[0].accounts[5].address).toBe(address(TOKEN_2022_PROGRAM_ID));
 });
 
+test("curve sell preserves its output floor with a Token-2022 base mint", async () => {
+  const params = await fixture();
+  const quote = quoteSellForTokenAmount(params.curveStateOverride, params.feeStructureOverride, 750000n);
+  const plan = await curveSell({ ...params, tokenAmount: "0.75", slippageBps: 100 });
+  const instruction = plan.instructions.at(-1)!;
+  const decoded = getSellV2InstructionDataDecoder().decode(instruction.data);
+  expect(decoded.amount).toBe(750000n);
+  expect(decoded.minSolOutput).toBe(subSlippage(quote.solOutputLamports, 100));
+  expect(instruction.accounts[3].address).toBe(address(TOKEN_2022_PROGRAM_ID));
+});
+
+test("curve setup uses idempotent ATA creation without reading account readiness", async () => {
+  const params = await fixture();
+  params.rpc = { getAccountInfo: () => { throw new Error("RPC unavailable"); } } as any;
+  const plan = await curveBuy({ ...params, solAmount: "0.01" });
+  expect(plan.instructions[0].data).toEqual(new Uint8Array([1]));
+});
+
+test("curve percentage sells reject amounts below one raw unit", async () => {
+  const params = await fixture();
+  params.rpc = { getTokenAccountBalance: () => ({ send: async () => ({ value: { amount: "1" } }) }) } as any;
+  await expect(curveSell({ ...params, useWalletPercentage: true, walletPercentage: 1 }))
+    .rejects.toThrow("Percentage sell rounds to zero token units");
+});
+
+
+test("raw swap amounts remain integer base units and reject mixed modes", async () => {
+  const params = await fixture();
+  const plan = await curveSell({ ...params, amountIn: 750000n });
+  expect(plan.quote.kind).toBe("exactIn");
+  expect(plan.quote.kind === "exactIn" && plan.quote.amountIn).toBe(750000n);
+  await expect(curveBuy({ ...params, amountIn: 1000000n, solAmount: "0.001" })).rejects.toThrow("exactly one");
+  await expect(curveSell({ ...params, amountIn: 1n, tokenAmount: "1" })).rejects.toThrow("Do not mix");
+});
+
+
+test("exact-input curve buys preserve the lamport budget and protect token output", async () => {
+  const params = await fixture();
+  const plan = await curveBuy({ ...params, amountIn: 800000000n, slippageBps: 75 });
+  const expected = quoteBuyWithSolAmount(params.curveStateOverride, params.feeStructureOverride, 800000000n);
+  const data = getBuyExactQuoteInV2InstructionDataDecoder().decode(plan.instructions.at(-1)!.data!);
+  expect(data.spendableQuoteIn).toBe(800000000n);
+  expect(data.minTokensOut).toBe(subSlippage(expected.tokenAmount, 75));
+  expect(plan.quote).toEqual({ kind: "exactIn", amountIn: 800000000n,
+    expectedAmountOut: expected.tokenAmount, minAmountOut: data.minTokensOut });
+  const explicit = await curveBuy({ ...params, amountIn: 800000000n, minAmountOut: 123n });
+  expect(getBuyExactQuoteInV2InstructionDataDecoder().decode(explicit.instructions.at(-1)!.data!).minTokensOut).toBe(123n);
+  await expect(curveBuy({ ...params, amountIn: 800000000n, minAmountOut: 123n, slippageBps: 50 }))
+    .rejects.toThrow("Do not mix");
+});
+
+test("exact-output curve buys encode the supplied token target and hard lamport cap", async () => {
+  const params = await fixture();
+  const plan = await curveBuy({ ...params, kind: "exactOut", amountOut: 750000n, maxAmountIn: 1000000n });
+  const data = getBuyV2InstructionDataDecoder().decode(plan.instructions.at(-1)!.data!);
+  expect(data.amount).toBe(750000n);
+  expect(data.maxSolCost).toBe(1000000n);
+  expect(plan.quote.kind === "exactOut" && plan.quote.amountOut).toBe(750000n);
+  await expect(curveBuy({ ...params, kind: "exactOut", amountOut: 750000n, amountIn: 1000000n })).rejects.toThrow("cannot be mixed");
+  await expect(curveBuy({ ...params, kind: "exactOut", amountOut: 750000n, maxAmountIn: 1000000n, slippageBps: 50 })).rejects.toThrow("cannot be mixed");
+});

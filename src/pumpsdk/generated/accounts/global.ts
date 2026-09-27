@@ -74,6 +74,14 @@ export type Global = {
   mayhemModeEnabled: boolean;
   reservedFeeRecipients: Array<Address>;
   isCashbackEnabled: boolean;
+  buybackFeeRecipients: Array<Address>;
+  buybackBasisPoints: bigint;
+  initialVirtualQuoteReserves: bigint;
+  whitelistedQuoteMints: Array<Address>;
+  creatorFeeConfigurable: boolean;
+  maxConfigurableCreatorFeeBps: bigint;
+  holderRewardClaimAuthority: Address;
+  isHolderRewardEnabled: boolean;
 };
 
 export type GlobalArgs = {
@@ -100,6 +108,14 @@ export type GlobalArgs = {
   mayhemModeEnabled: boolean;
   reservedFeeRecipients: Array<Address>;
   isCashbackEnabled: boolean;
+  buybackFeeRecipients: Array<Address>;
+  buybackBasisPoints: number | bigint;
+  initialVirtualQuoteReserves: number | bigint;
+  whitelistedQuoteMints: Array<Address>;
+  creatorFeeConfigurable: boolean;
+  maxConfigurableCreatorFeeBps: number | bigint;
+  holderRewardClaimAuthority: Address;
+  isHolderRewardEnabled: boolean;
 };
 
 export function getGlobalEncoder(): FixedSizeEncoder<GlobalArgs> {
@@ -130,6 +146,20 @@ export function getGlobalEncoder(): FixedSizeEncoder<GlobalArgs> {
         getArrayEncoder(getAddressEncoder(), { size: 7 }),
       ],
       ['isCashbackEnabled', getBooleanEncoder()],
+      [
+        'buybackFeeRecipients',
+        getArrayEncoder(getAddressEncoder(), { size: 8 }),
+      ],
+      ['buybackBasisPoints', getU64Encoder()],
+      ['initialVirtualQuoteReserves', getU64Encoder()],
+      [
+        'whitelistedQuoteMints',
+        getArrayEncoder(getAddressEncoder(), { size: 1 }),
+      ],
+      ['creatorFeeConfigurable', getBooleanEncoder()],
+      ['maxConfigurableCreatorFeeBps', getU64Encoder()],
+      ['holderRewardClaimAuthority', getAddressEncoder()],
+      ['isHolderRewardEnabled', getBooleanEncoder()],
     ]),
     (value) => ({ ...value, discriminator: GLOBAL_DISCRIMINATOR })
   );
@@ -162,6 +192,17 @@ export function getGlobalDecoder(): FixedSizeDecoder<Global> {
       getArrayDecoder(getAddressDecoder(), { size: 7 }),
     ],
     ['isCashbackEnabled', getBooleanDecoder()],
+    ['buybackFeeRecipients', getArrayDecoder(getAddressDecoder(), { size: 8 })],
+    ['buybackBasisPoints', getU64Decoder()],
+    ['initialVirtualQuoteReserves', getU64Decoder()],
+    [
+      'whitelistedQuoteMints',
+      getArrayDecoder(getAddressDecoder(), { size: 1 }),
+    ],
+    ['creatorFeeConfigurable', getBooleanDecoder()],
+    ['maxConfigurableCreatorFeeBps', getU64Decoder()],
+    ['holderRewardClaimAuthority', getAddressDecoder()],
+    ['isHolderRewardEnabled', getBooleanDecoder()],
   ]);
 }
 
@@ -223,5 +264,5 @@ export async function fetchAllMaybeGlobal(
 }
 
 export function getGlobalSize(): number {
-  return 741;
+  return 1087;
 }

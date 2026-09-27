@@ -50,6 +50,9 @@ export type CreatePoolEvent = {
   userQuoteTokenAccount: Address;
   coinCreator: Address;
   isMayhemMode: boolean;
+  creatorFeeBps: bigint;
+  canEditCreatorFee: boolean;
+  isHolderReward: boolean;
 };
 
 export type CreatePoolEventArgs = {
@@ -74,6 +77,9 @@ export type CreatePoolEventArgs = {
   userQuoteTokenAccount: Address;
   coinCreator: Address;
   isMayhemMode: boolean;
+  creatorFeeBps: number | bigint;
+  canEditCreatorFee: boolean;
+  isHolderReward: boolean;
 };
 
 export function getCreatePoolEventEncoder(): FixedSizeEncoder<CreatePoolEventArgs> {
@@ -99,6 +105,9 @@ export function getCreatePoolEventEncoder(): FixedSizeEncoder<CreatePoolEventArg
     ['userQuoteTokenAccount', getAddressEncoder()],
     ['coinCreator', getAddressEncoder()],
     ['isMayhemMode', getBooleanEncoder()],
+    ['creatorFeeBps', getU64Encoder()],
+    ['canEditCreatorFee', getBooleanEncoder()],
+    ['isHolderReward', getBooleanEncoder()],
   ]);
 }
 
@@ -125,6 +134,9 @@ export function getCreatePoolEventDecoder(): FixedSizeDecoder<CreatePoolEvent> {
     ['userQuoteTokenAccount', getAddressDecoder()],
     ['coinCreator', getAddressDecoder()],
     ['isMayhemMode', getBooleanDecoder()],
+    ['creatorFeeBps', getU64Decoder()],
+    ['canEditCreatorFee', getBooleanDecoder()],
+    ['isHolderReward', getBooleanDecoder()],
   ]);
 }
 
