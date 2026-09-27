@@ -2,7 +2,7 @@
 
 Source: https://github.com/pump-fun/pump-public-docs/tree/81091419e4457566469d4e2a27f64ed84d42419c
 
-The checked-in IDLs are exact upstream files. Generated TypeScript uses the existing Codama toolchain.
+The checked-in IDLs are exact upstream files. Generated TypeScript for Pump and PumpSwap uses the existing Codama toolchain. The fees IDL is pinned for layout verification; the SDK does not build fee-program instructions.
 
 ## pump
 
@@ -107,3 +107,11 @@ The raw fixed-layout codecs continue to describe the current IDL wire layout.
 References at the pinned revision:
 - `docs/PUMP_PROGRAM_README.md`, Bonding curve appended-field defaults.
 - `docs/PUMP_SWAP_README.md`, Pool appended-field defaults.
+
+## pump_fees
+
+`idl/pumpfees.idl.json` is the exact upstream `idl/pump_fees.json` at the pinned
+revision. SHA-256: `d87b52305fd6b2ec487d4ba1e08a49990c23fa9b8b76092b2097df0164fa3859`.
+The Pump and PumpSwap IDLs embed the same `FeeConfig` account discriminator and
+`FeeConfig`, `FeeTier`, and `Fees` field layouts. `tests/unit/fee_idl.test.ts`
+checks that match and both generated fee decoders.

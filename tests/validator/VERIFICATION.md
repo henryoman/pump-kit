@@ -45,7 +45,7 @@ rerun successfully after these changes.
 
 The signed checks exposed and fixed compute-budget encoding, missing migration
 boost accounts, missing AMM pool-v2/buyback accounts, and WSOL instruction order.
-AMM trades wrap/unwrap SOL inline by default; persistent WSOL is optional.
+At the time of this run, AMM trades wrapped/unwrapped SOL inline by default. The current swap API defaults to persistent WSOL and offers inline wrapping explicitly.
 
 Remaining boundary: this is local execution against downloaded devnet programs,
 not proof of the mainnet deployment or a live launch. The snapshot disables
@@ -58,3 +58,9 @@ First-buy budgets exclude rent, fees, and lookup-table setup costs.
 A separately authorized live launch is still required before calling this
 package launch-ready. Its network, token metadata, recipient/permanent choices,
 wallet, and total spend limit must be previewed before submission.
+
+On 2026-09-27, the signed source verifier was rerun against the same locally
+loaded devnet program binaries after the swap snapshot and persistent-WSOL
+changes. It passed create-only, atomic first buy, curve buy/sell, curve
+completion, migration, AMM buy/sell, and mixed-program deposit/withdrawal.
+This remains a local-validator check, not a mainnet or unattended-bot run.
