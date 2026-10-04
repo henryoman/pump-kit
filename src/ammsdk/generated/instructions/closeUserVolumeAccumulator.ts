@@ -10,12 +10,12 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -28,24 +28,27 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda, findUserVolumeAccumulatorPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const CLOSE_USER_VOLUME_ACCUMULATOR_DISCRIMINATOR = new Uint8Array([
-  249, 69, 164, 218, 150, 103, 84, 138,
-]);
+export const CLOSE_USER_VOLUME_ACCUMULATOR_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138]);
 
-export function getCloseUserVolumeAccumulatorDiscriminatorBytes() {
+export function getCloseUserVolumeAccumulatorDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CLOSE_USER_VOLUME_ACCUMULATOR_DISCRIMINATOR
+    CLOSE_USER_VOLUME_ACCUMULATOR_DISCRIMINATOR,
   );
 }
 
@@ -84,17 +87,17 @@ export type CloseUserVolumeAccumulatorInstructionDataArgs = {};
 
 export function getCloseUserVolumeAccumulatorInstructionDataEncoder(): FixedSizeEncoder<CloseUserVolumeAccumulatorInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: CLOSE_USER_VOLUME_ACCUMULATOR_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getCloseUserVolumeAccumulatorInstructionDataDecoder(): FixedSizeDecoder<CloseUserVolumeAccumulatorInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -104,27 +107,29 @@ export function getCloseUserVolumeAccumulatorInstructionDataCodec(): FixedSizeCo
 > {
   return combineCodec(
     getCloseUserVolumeAccumulatorInstructionDataEncoder(),
-    getCloseUserVolumeAccumulatorInstructionDataDecoder()
+    getCloseUserVolumeAccumulatorInstructionDataDecoder(),
   );
 }
 
 export type CloseUserVolumeAccumulatorAsyncInput<
-  TAccountUser extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  user: TransactionSigner<TAccountUser>;
-  userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  user: TAccountUser;
+  userVolumeAccumulator?: TAccountUserVolumeAccumulator;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export async function getCloseUserVolumeAccumulatorInstructionAsync<
-  TAccountUser extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountUser extends InstructionSignerInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: CloseUserVolumeAccumulatorAsyncInput<
@@ -133,99 +138,125 @@ export async function getCloseUserVolumeAccumulatorInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   CloseUserVolumeAccumulatorInstruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserVolumeAccumulator,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: true, isWritable: true },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.userVolumeAccumulator.value) {
-    accounts.userVolumeAccumulator.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            117, 115, 101, 114, 95, 118, 111, 108, 117, 109, 101, 95, 97, 99,
-            99, 117, 109, 117, 108, 97, 116, 111, 114,
-          ])
+    accounts.userVolumeAccumulator.value = await findUserVolumeAccumulatorPda(
+      {
+        user: getAddressFromResolvedInstructionAccount(
+          "user",
+          accounts.user.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getCloseUserVolumeAccumulatorInstructionDataEncoder().encode({}),
     programAddress,
   } as CloseUserVolumeAccumulatorInstruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserVolumeAccumulator,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type CloseUserVolumeAccumulatorInput<
-  TAccountUser extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  user: TransactionSigner<TAccountUser>;
-  userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  user: TAccountUser;
+  userVolumeAccumulator: TAccountUserVolumeAccumulator;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export function getCloseUserVolumeAccumulatorInstruction<
-  TAccountUser extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountUser extends InstructionSignerInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: CloseUserVolumeAccumulatorInput<
@@ -234,48 +265,83 @@ export function getCloseUserVolumeAccumulatorInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): CloseUserVolumeAccumulatorInstruction<
   TProgramAddress,
-  TAccountUser,
-  TAccountUserVolumeAccumulator,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountUser,
+    InstructionAccountInputAddress<TAccountUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: true, isWritable: true },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getCloseUserVolumeAccumulatorInstructionDataEncoder().encode({}),
     programAddress,
   } as CloseUserVolumeAccumulatorInstruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserVolumeAccumulator,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -299,11 +365,16 @@ export function parseCloseUserVolumeAccumulatorInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCloseUserVolumeAccumulatorInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 4,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -320,7 +391,7 @@ export function parseCloseUserVolumeAccumulatorInstruction<
       program: getNextAccount(),
     },
     data: getCloseUserVolumeAccumulatorInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

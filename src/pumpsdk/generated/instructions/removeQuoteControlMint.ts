@@ -14,9 +14,10 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -29,20 +30,30 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findEventAuthorityPda,
+  findGlobalPda,
+  findQuoteControlPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const REMOVE_QUOTE_CONTROL_MINT_DISCRIMINATOR = new Uint8Array([
-  223, 7, 253, 26, 81, 165, 218, 166,
-]);
+export const REMOVE_QUOTE_CONTROL_MINT_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([223, 7, 253, 26, 81, 165, 218, 166]);
 
-export function getRemoveQuoteControlMintDiscriminatorBytes() {
+export function getRemoveQuoteControlMintDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    REMOVE_QUOTE_CONTROL_MINT_DISCRIMINATOR
+    REMOVE_QUOTE_CONTROL_MINT_DISCRIMINATOR,
   );
 }
 
@@ -51,9 +62,8 @@ export type RemoveQuoteControlMintInstruction<
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountGlobal extends string | AccountMeta<string> = string,
   TAccountQuoteControl extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -94,20 +104,20 @@ export type RemoveQuoteControlMintInstructionDataArgs = { quoteMint: Address };
 export function getRemoveQuoteControlMintInstructionDataEncoder(): FixedSizeEncoder<RemoveQuoteControlMintInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['quoteMint', getAddressEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["quoteMint", getAddressEncoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: REMOVE_QUOTE_CONTROL_MINT_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getRemoveQuoteControlMintInstructionDataDecoder(): FixedSizeDecoder<RemoveQuoteControlMintInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['quoteMint', getAddressDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["quoteMint", getAddressDecoder()],
   ]);
 }
 
@@ -117,34 +127,37 @@ export function getRemoveQuoteControlMintInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getRemoveQuoteControlMintInstructionDataEncoder(),
-    getRemoveQuoteControlMintInstructionDataDecoder()
+    getRemoveQuoteControlMintInstructionDataDecoder(),
   );
 }
 
 export type RemoveQuoteControlMintAsyncInput<
-  TAccountAuthority extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountQuoteControl extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteControl extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
-  global?: Address<TAccountGlobal>;
-  quoteControl?: Address<TAccountQuoteControl>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  quoteMint: RemoveQuoteControlMintInstructionDataArgs['quoteMint'];
+  authority: TAccountAuthority;
+  global?: TAccountGlobal;
+  quoteControl?: TAccountQuoteControl;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  quoteMint: RemoveQuoteControlMintInstructionDataArgs["quoteMint"];
 };
 
 export async function getRemoveQuoteControlMintInstructionAsync<
-  TAccountAuthority extends string,
-  TAccountGlobal extends string,
-  TAccountQuoteControl extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountQuoteControl extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: RemoveQuoteControlMintAsyncInput<
@@ -155,33 +168,74 @@ export async function getRemoveQuoteControlMintInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   RemoveQuoteControlMintInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountGlobal,
-    TAccountQuoteControl,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteControl,
+      InstructionAccountInputAddress<TAccountQuoteControl>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: true },
-    global: { value: input.global ?? null, isWritable: false },
-    quoteControl: { value: input.quoteControl ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    quoteControl: {
+      value: input.quoteControl ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -189,92 +243,90 @@ export async function getRemoveQuoteControlMintInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.quoteControl.value) {
-    accounts.quoteControl.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            113, 117, 111, 116, 101, 45, 99, 111, 110, 116, 114, 111, 108,
-          ])
-        ),
-      ],
-    });
+    accounts.quoteControl.value = await findQuoteControlPda({ programAddress });
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.quoteControl),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("quoteControl", accounts.quoteControl),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getRemoveQuoteControlMintInstructionDataEncoder().encode(
-      args as RemoveQuoteControlMintInstructionDataArgs
+      args as RemoveQuoteControlMintInstructionDataArgs,
     ),
     programAddress,
   } as RemoveQuoteControlMintInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountGlobal,
-    TAccountQuoteControl,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteControl,
+      InstructionAccountInputAddress<TAccountQuoteControl>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type RemoveQuoteControlMintInput<
-  TAccountAuthority extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountQuoteControl extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteControl extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
-  global: Address<TAccountGlobal>;
-  quoteControl: Address<TAccountQuoteControl>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  quoteMint: RemoveQuoteControlMintInstructionDataArgs['quoteMint'];
+  authority: TAccountAuthority;
+  global: TAccountGlobal;
+  quoteControl: TAccountQuoteControl;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  quoteMint: RemoveQuoteControlMintInstructionDataArgs["quoteMint"];
 };
 
 export function getRemoveQuoteControlMintInstruction<
-  TAccountAuthority extends string,
-  TAccountGlobal extends string,
-  TAccountQuoteControl extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountQuoteControl extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: RemoveQuoteControlMintInput<
@@ -285,31 +337,72 @@ export function getRemoveQuoteControlMintInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): RemoveQuoteControlMintInstruction<
   TProgramAddress,
-  TAccountAuthority,
-  TAccountGlobal,
-  TAccountQuoteControl,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountAuthority,
+    InstructionAccountInputAddress<TAccountAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteControl,
+    InstructionAccountInputAddress<TAccountQuoteControl>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: true },
-    global: { value: input.global ?? null, isWritable: false },
-    quoteControl: { value: input.quoteControl ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    quoteControl: {
+      value: input.quoteControl ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -318,31 +411,48 @@ export function getRemoveQuoteControlMintInstruction<
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.quoteControl),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("quoteControl", accounts.quoteControl),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getRemoveQuoteControlMintInstructionDataEncoder().encode(
-      args as RemoveQuoteControlMintInstructionDataArgs
+      args as RemoveQuoteControlMintInstructionDataArgs,
     ),
     programAddress,
   } as RemoveQuoteControlMintInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountGlobal,
-    TAccountQuoteControl,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteControl,
+      InstructionAccountInputAddress<TAccountQuoteControl>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -368,11 +478,16 @@ export function parseRemoveQuoteControlMintInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRemoveQuoteControlMintInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 6) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 6,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -391,7 +506,7 @@ export function parseRemoveQuoteControlMintInstruction<
       program: getNextAccount(),
     },
     data: getRemoveQuoteControlMintInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

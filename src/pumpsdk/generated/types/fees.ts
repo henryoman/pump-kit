@@ -15,7 +15,7 @@ import {
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
-} from '@solana/kit';
+} from "@solana/kit";
 
 export type Fees = {
   lpFeeBps: bigint;
@@ -31,17 +31,17 @@ export type FeesArgs = {
 
 export function getFeesEncoder(): FixedSizeEncoder<FeesArgs> {
   return getStructEncoder([
-    ['lpFeeBps', getU64Encoder()],
-    ['protocolFeeBps', getU64Encoder()],
-    ['creatorFeeBps', getU64Encoder()],
+    ["lpFeeBps", getU64Encoder()],
+    ["protocolFeeBps", getU64Encoder()],
+    ["creatorFeeBps", getU64Encoder()],
   ]);
 }
 
 export function getFeesDecoder(): FixedSizeDecoder<Fees> {
   return getStructDecoder([
-    ['lpFeeBps', getU64Decoder()],
-    ['protocolFeeBps', getU64Decoder()],
-    ['creatorFeeBps', getU64Decoder()],
+    ["lpFeeBps", getU64Decoder()],
+    ["protocolFeeBps", getU64Decoder()],
+    ["creatorFeeBps", getU64Decoder()],
   ]);
 }
 

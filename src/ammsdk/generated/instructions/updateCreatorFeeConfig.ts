@@ -14,11 +14,12 @@ import {
   getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -31,20 +32,26 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const UPDATE_CREATOR_FEE_CONFIG_DISCRIMINATOR = new Uint8Array([
-  61, 175, 160, 249, 66, 66, 136, 175,
-]);
+export const UPDATE_CREATOR_FEE_CONFIG_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175]);
 
-export function getUpdateCreatorFeeConfigDiscriminatorBytes() {
+export function getUpdateCreatorFeeConfigDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    UPDATE_CREATOR_FEE_CONFIG_DISCRIMINATOR
+    UPDATE_CREATOR_FEE_CONFIG_DISCRIMINATOR,
   );
 }
 
@@ -52,9 +59,8 @@ export type UpdateCreatorFeeConfigInstruction<
   TProgram extends string = typeof PUMP_AMM_PROGRAM_ADDRESS,
   TAccountAdmin extends string | AccountMeta<string> = string,
   TAccountGlobalConfig extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -96,22 +102,22 @@ export type UpdateCreatorFeeConfigInstructionDataArgs = {
 export function getUpdateCreatorFeeConfigInstructionDataEncoder(): FixedSizeEncoder<UpdateCreatorFeeConfigInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['creatorFeeConfigurable', getBooleanEncoder()],
-      ['maxConfigurableCreatorFeeBps', getU64Encoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["creatorFeeConfigurable", getBooleanEncoder()],
+      ["maxConfigurableCreatorFeeBps", getU64Encoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: UPDATE_CREATOR_FEE_CONFIG_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getUpdateCreatorFeeConfigInstructionDataDecoder(): FixedSizeDecoder<UpdateCreatorFeeConfigInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['creatorFeeConfigurable', getBooleanDecoder()],
-    ['maxConfigurableCreatorFeeBps', getU64Decoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["creatorFeeConfigurable", getBooleanDecoder()],
+    ["maxConfigurableCreatorFeeBps", getU64Decoder()],
   ]);
 }
 
@@ -121,32 +127,35 @@ export function getUpdateCreatorFeeConfigInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getUpdateCreatorFeeConfigInstructionDataEncoder(),
-    getUpdateCreatorFeeConfigInstructionDataDecoder()
+    getUpdateCreatorFeeConfigInstructionDataDecoder(),
   );
 }
 
 export type UpdateCreatorFeeConfigAsyncInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  admin: TransactionSigner<TAccountAdmin>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  creatorFeeConfigurable: UpdateCreatorFeeConfigInstructionDataArgs['creatorFeeConfigurable'];
-  maxConfigurableCreatorFeeBps: UpdateCreatorFeeConfigInstructionDataArgs['maxConfigurableCreatorFeeBps'];
+  admin: TAccountAdmin;
+  globalConfig: TAccountGlobalConfig;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  creatorFeeConfigurable: UpdateCreatorFeeConfigInstructionDataArgs["creatorFeeConfigurable"];
+  maxConfigurableCreatorFeeBps: UpdateCreatorFeeConfigInstructionDataArgs["maxConfigurableCreatorFeeBps"];
 };
 
 export async function getUpdateCreatorFeeConfigInstructionAsync<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAdmin extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: UpdateCreatorFeeConfigAsyncInput<
@@ -156,31 +165,65 @@ export async function getUpdateCreatorFeeConfigInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   UpdateCreatorFeeConfigInstruction<
     TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    admin: { value: input.admin ?? null, isSigner: true, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -189,67 +232,76 @@ export async function getUpdateCreatorFeeConfigInstructionAsync<
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getUpdateCreatorFeeConfigInstructionDataEncoder().encode(
-      args as UpdateCreatorFeeConfigInstructionDataArgs
+      args as UpdateCreatorFeeConfigInstructionDataArgs,
     ),
     programAddress,
   } as UpdateCreatorFeeConfigInstruction<
     TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type UpdateCreatorFeeConfigInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  admin: TransactionSigner<TAccountAdmin>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  creatorFeeConfigurable: UpdateCreatorFeeConfigInstructionDataArgs['creatorFeeConfigurable'];
-  maxConfigurableCreatorFeeBps: UpdateCreatorFeeConfigInstructionDataArgs['maxConfigurableCreatorFeeBps'];
+  admin: TAccountAdmin;
+  globalConfig: TAccountGlobalConfig;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  creatorFeeConfigurable: UpdateCreatorFeeConfigInstructionDataArgs["creatorFeeConfigurable"];
+  maxConfigurableCreatorFeeBps: UpdateCreatorFeeConfigInstructionDataArgs["maxConfigurableCreatorFeeBps"];
 };
 
 export function getUpdateCreatorFeeConfigInstruction<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAdmin extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: UpdateCreatorFeeConfigInput<
@@ -259,29 +311,63 @@ export function getUpdateCreatorFeeConfigInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): UpdateCreatorFeeConfigInstruction<
   TProgramAddress,
-  TAccountAdmin,
-  TAccountGlobalConfig,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountAdmin,
+    InstructionAccountInputAddress<TAccountAdmin>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    admin: { value: input.admin ?? null, isSigner: true, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -290,29 +376,43 @@ export function getUpdateCreatorFeeConfigInstruction<
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getUpdateCreatorFeeConfigInstructionDataEncoder().encode(
-      args as UpdateCreatorFeeConfigInstructionDataArgs
+      args as UpdateCreatorFeeConfigInstructionDataArgs,
     ),
     programAddress,
   } as UpdateCreatorFeeConfigInstruction<
     TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -337,11 +437,16 @@ export function parseUpdateCreatorFeeConfigInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedUpdateCreatorFeeConfigInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 5) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 5,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -359,7 +464,7 @@ export function parseUpdateCreatorFeeConfigInstruction<
       program: getNextAccount(),
     },
     data: getUpdateCreatorFeeConfigInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

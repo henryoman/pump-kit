@@ -16,6 +16,8 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -28,24 +30,31 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findEventAuthorityPda,
+  findGlobalVolumeAccumulatorPda,
+  findUserVolumeAccumulatorPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const CLAIM_TOKEN_INCENTIVES_DISCRIMINATOR = new Uint8Array([
-  16, 4, 71, 28, 204, 1, 40, 27,
-]);
+export const CLAIM_TOKEN_INCENTIVES_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27]);
 
-export function getClaimTokenIncentivesDiscriminatorBytes() {
+export function getClaimTokenIncentivesDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CLAIM_TOKEN_INCENTIVES_DISCRIMINATOR
+    CLAIM_TOKEN_INCENTIVES_DISCRIMINATOR,
   );
 }
 
@@ -54,24 +63,19 @@ export type ClaimTokenIncentivesInstruction<
   TAccountUser extends string | AccountMeta<string> = string,
   TAccountUserAta extends string | AccountMeta<string> = string,
   TAccountGlobalVolumeAccumulator extends string | AccountMeta<string> = string,
-  TAccountGlobalIncentiveTokenAccount extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountGlobalIncentiveTokenAccount extends string | AccountMeta<string> =
+    string,
   TAccountUserVolumeAccumulator extends string | AccountMeta<string> = string,
   TAccountMint extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends
-    | string
-    | AccountMeta<string> = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  TAccountTokenProgram extends string | AccountMeta<string> =
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
-  TAccountProgram extends
-    | string
-    | AccountMeta<string> = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  TAccountProgram extends string | AccountMeta<string> =
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
   TAccountPayer extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -127,17 +131,17 @@ export type ClaimTokenIncentivesInstructionDataArgs = {};
 
 export function getClaimTokenIncentivesInstructionDataEncoder(): FixedSizeEncoder<ClaimTokenIncentivesInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: CLAIM_TOKEN_INCENTIVES_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getClaimTokenIncentivesInstructionDataDecoder(): FixedSizeDecoder<ClaimTokenIncentivesInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -147,51 +151,58 @@ export function getClaimTokenIncentivesInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getClaimTokenIncentivesInstructionDataEncoder(),
-    getClaimTokenIncentivesInstructionDataDecoder()
+    getClaimTokenIncentivesInstructionDataDecoder(),
   );
 }
 
 export type ClaimTokenIncentivesAsyncInput<
-  TAccountUser extends string = string,
-  TAccountUserAta extends string = string,
-  TAccountGlobalVolumeAccumulator extends string = string,
-  TAccountGlobalIncentiveTokenAccount extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountMint extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-  TAccountPayer extends string = string,
+  TAccountUser extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserAta extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobalVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountGlobalIncentiveTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
 > = {
-  user: Address<TAccountUser>;
-  userAta?: Address<TAccountUserAta>;
-  globalVolumeAccumulator?: Address<TAccountGlobalVolumeAccumulator>;
-  globalIncentiveTokenAccount?: Address<TAccountGlobalIncentiveTokenAccount>;
-  userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
-  mint: Address<TAccountMint>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program?: Address<TAccountProgram>;
-  payer: TransactionSigner<TAccountPayer>;
+  user: TAccountUser;
+  userAta?: TAccountUserAta;
+  globalVolumeAccumulator?: TAccountGlobalVolumeAccumulator;
+  globalIncentiveTokenAccount?: TAccountGlobalIncentiveTokenAccount;
+  userVolumeAccumulator?: TAccountUserVolumeAccumulator;
+  mint: TAccountMint;
+  tokenProgram?: TAccountTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program?: TAccountProgram;
+  payer: TAccountPayer;
 };
 
 export async function getClaimTokenIncentivesInstructionAsync<
-  TAccountUser extends string,
-  TAccountUserAta extends string,
-  TAccountGlobalVolumeAccumulator extends string,
-  TAccountGlobalIncentiveTokenAccount extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountMint extends string,
-  TAccountTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TAccountPayer extends string,
+  TAccountUser extends InstructionAccountInput,
+  TAccountUserAta extends InstructionAccountInput,
+  TAccountGlobalVolumeAccumulator extends InstructionAccountInput,
+  TAccountGlobalIncentiveTokenAccount extends InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
+  TAccountPayer extends InstructionSignerInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: ClaimTokenIncentivesAsyncInput<
@@ -208,221 +219,332 @@ export async function getClaimTokenIncentivesInstructionAsync<
     TAccountProgram,
     TAccountPayer
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   ClaimTokenIncentivesInstruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserAta,
-    TAccountGlobalVolumeAccumulator,
-    TAccountGlobalIncentiveTokenAccount,
-    TAccountUserVolumeAccumulator,
-    TAccountMint,
-    TAccountTokenProgram,
-    TAccountSystemProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram,
-    TAccountPayer
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserAta,
+      InstructionAccountInputAddress<TAccountUserAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountGlobalVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalIncentiveTokenAccount,
+      InstructionAccountInputAddress<TAccountGlobalIncentiveTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPayer,
+      InstructionAccountInputAddress<TAccountPayer>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: false },
-    userAta: { value: input.userAta ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: false, isWritable: false },
+    userAta: {
+      value: input.userAta ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     globalVolumeAccumulator: {
       value: input.globalVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: false,
     },
     globalIncentiveTokenAccount: {
       value: input.globalIncentiveTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    mint: { value: input.mint ?? null, isWritable: false },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    associatedTokenProgram: {
-      value: input.associatedTokenProgram ?? null,
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-    payer: { value: input.payer ?? null, isWritable: true },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
   if (!accounts.userAta.value) {
     accounts.userAta.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-        getAddressEncoder().encode(expectAddress(accounts.tokenProgram.value)),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount("user", accounts.user.value),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "tokenProgram",
+            accounts.tokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount("mint", accounts.mint.value),
+        ),
       ],
     });
   }
   if (!accounts.globalVolumeAccumulator.value) {
-    accounts.globalVolumeAccumulator.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            103, 108, 111, 98, 97, 108, 95, 118, 111, 108, 117, 109, 101, 95,
-            97, 99, 99, 117, 109, 117, 108, 97, 116, 111, 114,
-          ])
-        ),
-      ],
-    });
+    accounts.globalVolumeAccumulator.value =
+      await findGlobalVolumeAccumulatorPda({ programAddress });
   }
   if (!accounts.globalIncentiveTokenAccount.value) {
     accounts.globalIncentiveTokenAccount.value = await getProgramDerivedAddress(
       {
         programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
         seeds: [
           getAddressEncoder().encode(
-            expectAddress(accounts.globalVolumeAccumulator.value)
+            getAddressFromResolvedInstructionAccount(
+              "globalVolumeAccumulator",
+              accounts.globalVolumeAccumulator.value,
+            ),
           ),
           getAddressEncoder().encode(
-            expectAddress(accounts.tokenProgram.value)
+            getAddressFromResolvedInstructionAccount(
+              "tokenProgram",
+              accounts.tokenProgram.value,
+            ),
           ),
-          getAddressEncoder().encode(expectAddress(accounts.mint.value)),
+          getAddressEncoder().encode(
+            getAddressFromResolvedInstructionAccount(
+              "mint",
+              accounts.mint.value,
+            ),
+          ),
         ],
-      }
+      },
     );
   }
   if (!accounts.userVolumeAccumulator.value) {
-    accounts.userVolumeAccumulator.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            117, 115, 101, 114, 95, 118, 111, 108, 117, 109, 101, 95, 97, 99,
-            99, 117, 109, 117, 108, 97, 116, 111, 114,
-          ])
+    accounts.userVolumeAccumulator.value = await findUserVolumeAccumulatorPda(
+      {
+        user: getAddressFromResolvedInstructionAccount(
+          "user",
+          accounts.user.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
   if (!accounts.program.value) {
     accounts.program.value =
-      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.userAta),
-      getAccountMeta(accounts.globalVolumeAccumulator),
-      getAccountMeta(accounts.globalIncentiveTokenAccount),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-      getAccountMeta(accounts.payer),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("userAta", accounts.userAta),
+      getAccountMeta(
+        "globalVolumeAccumulator",
+        accounts.globalVolumeAccumulator,
+      ),
+      getAccountMeta(
+        "globalIncentiveTokenAccount",
+        accounts.globalIncentiveTokenAccount,
+      ),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
+      getAccountMeta("payer", accounts.payer),
     ],
     data: getClaimTokenIncentivesInstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimTokenIncentivesInstruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserAta,
-    TAccountGlobalVolumeAccumulator,
-    TAccountGlobalIncentiveTokenAccount,
-    TAccountUserVolumeAccumulator,
-    TAccountMint,
-    TAccountTokenProgram,
-    TAccountSystemProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram,
-    TAccountPayer
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserAta,
+      InstructionAccountInputAddress<TAccountUserAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountGlobalVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalIncentiveTokenAccount,
+      InstructionAccountInputAddress<TAccountGlobalIncentiveTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPayer,
+      InstructionAccountInputAddress<TAccountPayer>
+    >
   >);
 }
 
 export type ClaimTokenIncentivesInput<
-  TAccountUser extends string = string,
-  TAccountUserAta extends string = string,
-  TAccountGlobalVolumeAccumulator extends string = string,
-  TAccountGlobalIncentiveTokenAccount extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountMint extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
-  TAccountPayer extends string = string,
+  TAccountUser extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserAta extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobalVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountGlobalIncentiveTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
 > = {
-  user: Address<TAccountUser>;
-  userAta: Address<TAccountUserAta>;
-  globalVolumeAccumulator: Address<TAccountGlobalVolumeAccumulator>;
-  globalIncentiveTokenAccount: Address<TAccountGlobalIncentiveTokenAccount>;
-  userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
-  mint: Address<TAccountMint>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program?: Address<TAccountProgram>;
-  payer: TransactionSigner<TAccountPayer>;
+  user: TAccountUser;
+  userAta: TAccountUserAta;
+  globalVolumeAccumulator: TAccountGlobalVolumeAccumulator;
+  globalIncentiveTokenAccount: TAccountGlobalIncentiveTokenAccount;
+  userVolumeAccumulator: TAccountUserVolumeAccumulator;
+  mint: TAccountMint;
+  tokenProgram?: TAccountTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  eventAuthority: TAccountEventAuthority;
+  program?: TAccountProgram;
+  payer: TAccountPayer;
 };
 
 export function getClaimTokenIncentivesInstruction<
-  TAccountUser extends string,
-  TAccountUserAta extends string,
-  TAccountGlobalVolumeAccumulator extends string,
-  TAccountGlobalIncentiveTokenAccount extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountMint extends string,
-  TAccountTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
-  TAccountPayer extends string,
+  TAccountUser extends InstructionAccountInput,
+  TAccountUserAta extends InstructionAccountInput,
+  TAccountGlobalVolumeAccumulator extends InstructionAccountInput,
+  TAccountGlobalIncentiveTokenAccount extends InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
+  TAccountPayer extends InstructionSignerInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: ClaimTokenIncentivesInput<
@@ -439,107 +561,211 @@ export function getClaimTokenIncentivesInstruction<
     TAccountProgram,
     TAccountPayer
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): ClaimTokenIncentivesInstruction<
   TProgramAddress,
-  TAccountUser,
-  TAccountUserAta,
-  TAccountGlobalVolumeAccumulator,
-  TAccountGlobalIncentiveTokenAccount,
-  TAccountUserVolumeAccumulator,
-  TAccountMint,
-  TAccountTokenProgram,
-  TAccountSystemProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountEventAuthority,
-  TAccountProgram,
-  TAccountPayer
+  ResolvedInstructionAccountMeta<
+    TAccountUser,
+    InstructionAccountInputAddress<TAccountUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserAta,
+    InstructionAccountInputAddress<TAccountUserAta>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountGlobalVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalIncentiveTokenAccount,
+    InstructionAccountInputAddress<TAccountGlobalIncentiveTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountMint,
+    InstructionAccountInputAddress<TAccountMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountTokenProgram,
+    InstructionAccountInputAddress<TAccountTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPayer,
+    InstructionAccountInputAddress<TAccountPayer>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: false },
-    userAta: { value: input.userAta ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: false, isWritable: false },
+    userAta: {
+      value: input.userAta ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     globalVolumeAccumulator: {
       value: input.globalVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: false,
     },
     globalIncentiveTokenAccount: {
       value: input.globalIncentiveTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    mint: { value: input.mint ?? null, isWritable: false },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    associatedTokenProgram: {
-      value: input.associatedTokenProgram ?? null,
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
-    payer: { value: input.payer ?? null, isWritable: true },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.program.value) {
     accounts.program.value =
-      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.userAta),
-      getAccountMeta(accounts.globalVolumeAccumulator),
-      getAccountMeta(accounts.globalIncentiveTokenAccount),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
-      getAccountMeta(accounts.payer),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("userAta", accounts.userAta),
+      getAccountMeta(
+        "globalVolumeAccumulator",
+        accounts.globalVolumeAccumulator,
+      ),
+      getAccountMeta(
+        "globalIncentiveTokenAccount",
+        accounts.globalIncentiveTokenAccount,
+      ),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
+      getAccountMeta("payer", accounts.payer),
     ],
     data: getClaimTokenIncentivesInstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimTokenIncentivesInstruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserAta,
-    TAccountGlobalVolumeAccumulator,
-    TAccountGlobalIncentiveTokenAccount,
-    TAccountUserVolumeAccumulator,
-    TAccountMint,
-    TAccountTokenProgram,
-    TAccountSystemProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram,
-    TAccountPayer
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserAta,
+      InstructionAccountInputAddress<TAccountUserAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountGlobalVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalIncentiveTokenAccount,
+      InstructionAccountInputAddress<TAccountGlobalIncentiveTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPayer,
+      InstructionAccountInputAddress<TAccountPayer>
+    >
   >);
 }
 
@@ -571,11 +797,16 @@ export function parseClaimTokenIncentivesInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimTokenIncentivesInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 12) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 12,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -600,7 +831,7 @@ export function parseClaimTokenIncentivesInstruction<
       payer: getNextAccount(),
     },
     data: getClaimTokenIncentivesInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

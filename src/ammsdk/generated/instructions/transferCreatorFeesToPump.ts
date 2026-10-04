@@ -16,6 +16,8 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -28,40 +30,42 @@ import {
   type ReadonlyAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findCoinCreatorVaultAuthorityPda,
+  findEventAuthorityPda,
+} from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const TRANSFER_CREATOR_FEES_TO_PUMP_DISCRIMINATOR = new Uint8Array([
-  139, 52, 134, 85, 228, 229, 108, 241,
-]);
+export const TRANSFER_CREATOR_FEES_TO_PUMP_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([139, 52, 134, 85, 228, 229, 108, 241]);
 
-export function getTransferCreatorFeesToPumpDiscriminatorBytes() {
+export function getTransferCreatorFeesToPumpDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    TRANSFER_CREATOR_FEES_TO_PUMP_DISCRIMINATOR
+    TRANSFER_CREATOR_FEES_TO_PUMP_DISCRIMINATOR,
   );
 }
 
 export type TransferCreatorFeesToPumpInstruction<
   TProgram extends string = typeof PUMP_AMM_PROGRAM_ADDRESS,
   TAccountWsolMint extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends
-    | string
-    | AccountMeta<string> = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  TAccountTokenProgram extends string | AccountMeta<string> =
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountCoinCreator extends string | AccountMeta<string> = string,
-  TAccountCoinCreatorVaultAuthority extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountCoinCreatorVaultAuthority extends string | AccountMeta<string> =
+    string,
   TAccountCoinCreatorVaultAta extends string | AccountMeta<string> = string,
   TAccountPumpCreatorVault extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
@@ -113,17 +117,17 @@ export type TransferCreatorFeesToPumpInstructionDataArgs = {};
 
 export function getTransferCreatorFeesToPumpInstructionDataEncoder(): FixedSizeEncoder<TransferCreatorFeesToPumpInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: TRANSFER_CREATOR_FEES_TO_PUMP_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getTransferCreatorFeesToPumpInstructionDataDecoder(): FixedSizeDecoder<TransferCreatorFeesToPumpInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -133,46 +137,53 @@ export function getTransferCreatorFeesToPumpInstructionDataCodec(): FixedSizeCod
 > {
   return combineCodec(
     getTransferCreatorFeesToPumpInstructionDataEncoder(),
-    getTransferCreatorFeesToPumpInstructionDataDecoder()
+    getTransferCreatorFeesToPumpInstructionDataDecoder(),
   );
 }
 
 export type TransferCreatorFeesToPumpAsyncInput<
-  TAccountWsolMint extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountCoinCreator extends string = string,
-  TAccountCoinCreatorVaultAuthority extends string = string,
-  TAccountCoinCreatorVaultAta extends string = string,
-  TAccountPumpCreatorVault extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountWsolMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreator extends InstructionAccountInput = InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPumpCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   /** Pump Canonical Pool are quoted in wSOL */
-  wsolMint: Address<TAccountWsolMint>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  coinCreator: Address<TAccountCoinCreator>;
-  coinCreatorVaultAuthority?: Address<TAccountCoinCreatorVaultAuthority>;
-  coinCreatorVaultAta?: Address<TAccountCoinCreatorVaultAta>;
-  pumpCreatorVault?: Address<TAccountPumpCreatorVault>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  wsolMint: TAccountWsolMint;
+  tokenProgram?: TAccountTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  coinCreator: TAccountCoinCreator;
+  coinCreatorVaultAuthority?: TAccountCoinCreatorVaultAuthority;
+  coinCreatorVaultAta?: TAccountCoinCreatorVaultAta;
+  pumpCreatorVault?: TAccountPumpCreatorVault;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export async function getTransferCreatorFeesToPumpInstructionAsync<
-  TAccountWsolMint extends string,
-  TAccountTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountCoinCreator extends string,
-  TAccountCoinCreatorVaultAuthority extends string,
-  TAccountCoinCreatorVaultAta extends string,
-  TAccountPumpCreatorVault extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountWsolMint extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountCoinCreator extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput,
+  TAccountPumpCreatorVault extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: TransferCreatorFeesToPumpAsyncInput<
@@ -187,189 +198,298 @@ export async function getTransferCreatorFeesToPumpInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   TransferCreatorFeesToPumpInstruction<
     TProgramAddress,
-    TAccountWsolMint,
-    TAccountTokenProgram,
-    TAccountSystemProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountCoinCreator,
-    TAccountCoinCreatorVaultAuthority,
-    TAccountCoinCreatorVaultAta,
-    TAccountPumpCreatorVault,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountWsolMint,
+      InstructionAccountInputAddress<TAccountWsolMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreator,
+      InstructionAccountInputAddress<TAccountCoinCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAuthority,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAta,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpCreatorVault,
+      InstructionAccountInputAddress<TAccountPumpCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    wsolMint: { value: input.wsolMint ?? null, isWritable: false },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    associatedTokenProgram: {
-      value: input.associatedTokenProgram ?? null,
+    wsolMint: {
+      value: input.wsolMint ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    coinCreator: { value: input.coinCreator ?? null, isWritable: false },
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    coinCreator: {
+      value: input.coinCreator ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     coinCreatorVaultAuthority: {
       value: input.coinCreatorVaultAuthority ?? null,
+      isSigner: false,
       isWritable: true,
     },
     coinCreatorVaultAta: {
       value: input.coinCreatorVaultAta ?? null,
+      isSigner: false,
       isWritable: true,
     },
     pumpCreatorVault: {
       value: input.pumpCreatorVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.coinCreatorVaultAuthority.value) {
-    accounts.coinCreatorVaultAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            99, 114, 101, 97, 116, 111, 114, 95, 118, 97, 117, 108, 116,
-          ])
-        ),
-        getAddressEncoder().encode(expectAddress(accounts.coinCreator.value)),
-      ],
-    });
+    accounts.coinCreatorVaultAuthority.value =
+      await findCoinCreatorVaultAuthorityPda(
+        {
+          coinCreator: getAddressFromResolvedInstructionAccount(
+            "coinCreator",
+            accounts.coinCreator.value,
+          ),
+        },
+        { programAddress },
+      );
   }
   if (!accounts.coinCreatorVaultAta.value) {
     accounts.coinCreatorVaultAta.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
         getAddressEncoder().encode(
-          expectAddress(accounts.coinCreatorVaultAuthority.value)
+          getAddressFromResolvedInstructionAccount(
+            "coinCreatorVaultAuthority",
+            accounts.coinCreatorVaultAuthority.value,
+          ),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.tokenProgram.value)),
-        getAddressEncoder().encode(expectAddress(accounts.wsolMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "tokenProgram",
+            accounts.tokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "wsolMint",
+            accounts.wsolMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.pumpCreatorVault.value) {
     accounts.pumpCreatorVault.value = await getProgramDerivedAddress({
       programAddress:
-        '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>,
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">,
       seeds: [
         getBytesEncoder().encode(
           new Uint8Array([
             99, 114, 101, 97, 116, 111, 114, 45, 118, 97, 117, 108, 116,
-          ])
+          ]),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.coinCreator.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "coinCreator",
+            accounts.coinCreator.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.wsolMint),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.coinCreator),
-      getAccountMeta(accounts.coinCreatorVaultAuthority),
-      getAccountMeta(accounts.coinCreatorVaultAta),
-      getAccountMeta(accounts.pumpCreatorVault),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("wsolMint", accounts.wsolMint),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("coinCreator", accounts.coinCreator),
+      getAccountMeta(
+        "coinCreatorVaultAuthority",
+        accounts.coinCreatorVaultAuthority,
+      ),
+      getAccountMeta("coinCreatorVaultAta", accounts.coinCreatorVaultAta),
+      getAccountMeta("pumpCreatorVault", accounts.pumpCreatorVault),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getTransferCreatorFeesToPumpInstructionDataEncoder().encode({}),
     programAddress,
   } as TransferCreatorFeesToPumpInstruction<
     TProgramAddress,
-    TAccountWsolMint,
-    TAccountTokenProgram,
-    TAccountSystemProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountCoinCreator,
-    TAccountCoinCreatorVaultAuthority,
-    TAccountCoinCreatorVaultAta,
-    TAccountPumpCreatorVault,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountWsolMint,
+      InstructionAccountInputAddress<TAccountWsolMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreator,
+      InstructionAccountInputAddress<TAccountCoinCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAuthority,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAta,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpCreatorVault,
+      InstructionAccountInputAddress<TAccountPumpCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type TransferCreatorFeesToPumpInput<
-  TAccountWsolMint extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountCoinCreator extends string = string,
-  TAccountCoinCreatorVaultAuthority extends string = string,
-  TAccountCoinCreatorVaultAta extends string = string,
-  TAccountPumpCreatorVault extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountWsolMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreator extends InstructionAccountInput = InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPumpCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   /** Pump Canonical Pool are quoted in wSOL */
-  wsolMint: Address<TAccountWsolMint>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  coinCreator: Address<TAccountCoinCreator>;
-  coinCreatorVaultAuthority: Address<TAccountCoinCreatorVaultAuthority>;
-  coinCreatorVaultAta: Address<TAccountCoinCreatorVaultAta>;
-  pumpCreatorVault: Address<TAccountPumpCreatorVault>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  wsolMint: TAccountWsolMint;
+  tokenProgram?: TAccountTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  coinCreator: TAccountCoinCreator;
+  coinCreatorVaultAuthority: TAccountCoinCreatorVaultAuthority;
+  coinCreatorVaultAta: TAccountCoinCreatorVaultAta;
+  pumpCreatorVault: TAccountPumpCreatorVault;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export function getTransferCreatorFeesToPumpInstruction<
-  TAccountWsolMint extends string,
-  TAccountTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountCoinCreator extends string,
-  TAccountCoinCreatorVaultAuthority extends string,
-  TAccountCoinCreatorVaultAta extends string,
-  TAccountPumpCreatorVault extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountWsolMint extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountCoinCreator extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput,
+  TAccountPumpCreatorVault extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: TransferCreatorFeesToPumpInput<
@@ -384,95 +504,188 @@ export function getTransferCreatorFeesToPumpInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): TransferCreatorFeesToPumpInstruction<
   TProgramAddress,
-  TAccountWsolMint,
-  TAccountTokenProgram,
-  TAccountSystemProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountCoinCreator,
-  TAccountCoinCreatorVaultAuthority,
-  TAccountCoinCreatorVaultAta,
-  TAccountPumpCreatorVault,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountWsolMint,
+    InstructionAccountInputAddress<TAccountWsolMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountTokenProgram,
+    InstructionAccountInputAddress<TAccountTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCoinCreator,
+    InstructionAccountInputAddress<TAccountCoinCreator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCoinCreatorVaultAuthority,
+    InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCoinCreatorVaultAta,
+    InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPumpCreatorVault,
+    InstructionAccountInputAddress<TAccountPumpCreatorVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    wsolMint: { value: input.wsolMint ?? null, isWritable: false },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    associatedTokenProgram: {
-      value: input.associatedTokenProgram ?? null,
+    wsolMint: {
+      value: input.wsolMint ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    coinCreator: { value: input.coinCreator ?? null, isWritable: false },
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    coinCreator: {
+      value: input.coinCreator ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     coinCreatorVaultAuthority: {
       value: input.coinCreatorVaultAuthority ?? null,
+      isSigner: false,
       isWritable: true,
     },
     coinCreatorVaultAta: {
       value: input.coinCreatorVaultAta ?? null,
+      isSigner: false,
       isWritable: true,
     },
     pumpCreatorVault: {
       value: input.pumpCreatorVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.wsolMint),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.coinCreator),
-      getAccountMeta(accounts.coinCreatorVaultAuthority),
-      getAccountMeta(accounts.coinCreatorVaultAta),
-      getAccountMeta(accounts.pumpCreatorVault),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("wsolMint", accounts.wsolMint),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("coinCreator", accounts.coinCreator),
+      getAccountMeta(
+        "coinCreatorVaultAuthority",
+        accounts.coinCreatorVaultAuthority,
+      ),
+      getAccountMeta("coinCreatorVaultAta", accounts.coinCreatorVaultAta),
+      getAccountMeta("pumpCreatorVault", accounts.pumpCreatorVault),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getTransferCreatorFeesToPumpInstructionDataEncoder().encode({}),
     programAddress,
   } as TransferCreatorFeesToPumpInstruction<
     TProgramAddress,
-    TAccountWsolMint,
-    TAccountTokenProgram,
-    TAccountSystemProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountCoinCreator,
-    TAccountCoinCreatorVaultAuthority,
-    TAccountCoinCreatorVaultAta,
-    TAccountPumpCreatorVault,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountWsolMint,
+      InstructionAccountInputAddress<TAccountWsolMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreator,
+      InstructionAccountInputAddress<TAccountCoinCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAuthority,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAta,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpCreatorVault,
+      InstructionAccountInputAddress<TAccountPumpCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -503,11 +716,16 @@ export function parseTransferCreatorFeesToPumpInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedTransferCreatorFeesToPumpInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 10) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 10,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -530,7 +748,7 @@ export function parseTransferCreatorFeesToPumpInstruction<
       program: getNextAccount(),
     },
     data: getTransferCreatorFeesToPumpInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

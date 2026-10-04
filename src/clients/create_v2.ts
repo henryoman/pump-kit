@@ -1,4 +1,4 @@
-import { address, getAddressEncoder, getProgramDerivedAddress } from "@solana/kit";
+import { address, getAddressEncoder, getProgramDerivedAddress, isTransactionSigner } from "@solana/kit";
 import type { Address, TransactionSigner } from "@solana/kit";
 import { getCreateV2Instruction } from "../pumpsdk/generated/instructions/createV2";
 import { bondingCurvePda, globalPda, eventAuthorityPda } from "../pda/pump";
@@ -18,6 +18,15 @@ export interface CreateV2Params {
   mayhemMode?: boolean;
   /** Cashback creation is deprecated by the program. */
   cashback?: false;
+}
+
+/** Launches must use a caller-owned mint; never substitute a newly generated CA. */
+export function assertMintSigner(mint: unknown): asserts mint is TransactionSigner {
+  if (!mint || typeof mint !== "object" || !("address" in mint)
+    || typeof mint.address !== "string" || !isTransactionSigner(mint as { address: Address })) {
+    throw new Error("A mint signer for your pre-generated token address is required");
+  }
+  address(mint.address);
 }
 
 export function validateCreateV2Params(params: Pick<CreateV2Params, "name" | "symbol" | "uri" | "creator" | "holderReward" | "mayhemMode" | "cashback">): void {
@@ -51,6 +60,7 @@ export async function mintAuthorityPda(): Promise<Address> {
 
 /** Create a SOL-paired Token-2022 coin with all required protocol accounts. */
 export async function createV2(params: CreateV2Params) {
+  assertMintSigner(params.mint);
   validateCreateV2Params(params);
   const creator = address(params.creator ?? params.user.address);
   if (creator === address("11111111111111111111111111111111")) throw new Error("Creator must not be the default public key");

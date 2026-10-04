@@ -132,8 +132,9 @@ export { createV2, mintAuthorityPda, validateCreateV2Params, type CreateV2Params
 export { resolveTokenProgram, validateTokenProgram, resolveMintContext, type MintContext } from "./utils/token_program";
 export { buyV2, sellV2, buyExactQuoteInV2, type CurveTradeV2Params } from "./clients/trade_v2";
 export { validateLaunchConfig, type LaunchConfig } from "./launch/config";
-export { createPump, type LaunchRecord, type PrepareLaunchOptions } from "./launch/session";
+export { createPump, type CreatePumpOptions, type LaunchSession, type LaunchRecord, type PrepareLaunchOptions } from "./launch/session";
 export { reconcileLaunchRecord } from "./launch/reconcile";
+export { holderRewardsPda } from "./pda/pump";
 
 export { createLaunchLookupTable, loadLookupTable } from "./launch/lookup_table";
 export { migrateV2 } from "./clients/migrate_v2";

@@ -12,9 +12,10 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -27,17 +28,23 @@ import {
   type ReadonlyAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const MIGRATE_POOL_COIN_CREATOR_DISCRIMINATOR = new Uint8Array([
-  208, 8, 159, 4, 74, 175, 16, 58,
-]);
+export const MIGRATE_POOL_COIN_CREATOR_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([208, 8, 159, 4, 74, 175, 16, 58]);
 
-export function getMigratePoolCoinCreatorDiscriminatorBytes() {
+export function getMigratePoolCoinCreatorDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    MIGRATE_POOL_COIN_CREATOR_DISCRIMINATOR
+    MIGRATE_POOL_COIN_CREATOR_DISCRIMINATOR,
   );
 }
 
@@ -76,17 +83,17 @@ export type MigratePoolCoinCreatorInstructionDataArgs = {};
 
 export function getMigratePoolCoinCreatorInstructionDataEncoder(): FixedSizeEncoder<MigratePoolCoinCreatorInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: MIGRATE_POOL_COIN_CREATOR_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getMigratePoolCoinCreatorInstructionDataDecoder(): FixedSizeDecoder<MigratePoolCoinCreatorInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -96,27 +103,29 @@ export function getMigratePoolCoinCreatorInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getMigratePoolCoinCreatorInstructionDataEncoder(),
-    getMigratePoolCoinCreatorInstructionDataDecoder()
+    getMigratePoolCoinCreatorInstructionDataDecoder(),
   );
 }
 
 export type MigratePoolCoinCreatorAsyncInput<
-  TAccountPool extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  sharingConfig: Address<TAccountSharingConfig>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  pool: TAccountPool;
+  sharingConfig: TAccountSharingConfig;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export async function getMigratePoolCoinCreatorInstructionAsync<
-  TAccountPool extends string,
-  TAccountSharingConfig extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: MigratePoolCoinCreatorAsyncInput<
@@ -125,82 +134,114 @@ export async function getMigratePoolCoinCreatorInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   MigratePoolCoinCreatorInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountSharingConfig,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getMigratePoolCoinCreatorInstructionDataEncoder().encode({}),
     programAddress,
   } as MigratePoolCoinCreatorInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountSharingConfig,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type MigratePoolCoinCreatorInput<
-  TAccountPool extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  sharingConfig: Address<TAccountSharingConfig>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  pool: TAccountPool;
+  sharingConfig: TAccountSharingConfig;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export function getMigratePoolCoinCreatorInstruction<
-  TAccountPool extends string,
-  TAccountSharingConfig extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: MigratePoolCoinCreatorInput<
@@ -209,45 +250,83 @@ export function getMigratePoolCoinCreatorInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): MigratePoolCoinCreatorInstruction<
   TProgramAddress,
-  TAccountPool,
-  TAccountSharingConfig,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountPool,
+    InstructionAccountInputAddress<TAccountPool>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSharingConfig,
+    InstructionAccountInputAddress<TAccountSharingConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getMigratePoolCoinCreatorInstructionDataEncoder().encode({}),
     programAddress,
   } as MigratePoolCoinCreatorInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountSharingConfig,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -271,11 +350,16 @@ export function parseMigratePoolCoinCreatorInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMigratePoolCoinCreatorInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 4,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -292,7 +376,7 @@ export function parseMigratePoolCoinCreatorInstruction<
       program: getNextAccount(),
     },
     data: getMigratePoolCoinCreatorInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

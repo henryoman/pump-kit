@@ -16,9 +16,10 @@ import {
   getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -31,20 +32,26 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda, findGlobalPda } from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const UPDATE_HOLDER_REWARD_CONFIG_DISCRIMINATOR = new Uint8Array([
-  225, 252, 66, 4, 199, 35, 236, 16,
-]);
+export const UPDATE_HOLDER_REWARD_CONFIG_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([225, 252, 66, 4, 199, 35, 236, 16]);
 
-export function getUpdateHolderRewardConfigDiscriminatorBytes() {
+export function getUpdateHolderRewardConfigDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    UPDATE_HOLDER_REWARD_CONFIG_DISCRIMINATOR
+    UPDATE_HOLDER_REWARD_CONFIG_DISCRIMINATOR,
   );
 }
 
@@ -90,22 +97,22 @@ export type UpdateHolderRewardConfigInstructionDataArgs = {
 export function getUpdateHolderRewardConfigInstructionDataEncoder(): FixedSizeEncoder<UpdateHolderRewardConfigInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['isHolderRewardEnabled', getBooleanEncoder()],
-      ['holderRewardClaimAuthority', getAddressEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["isHolderRewardEnabled", getBooleanEncoder()],
+      ["holderRewardClaimAuthority", getAddressEncoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: UPDATE_HOLDER_REWARD_CONFIG_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getUpdateHolderRewardConfigInstructionDataDecoder(): FixedSizeDecoder<UpdateHolderRewardConfigInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['isHolderRewardEnabled', getBooleanDecoder()],
-    ['holderRewardClaimAuthority', getAddressDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["isHolderRewardEnabled", getBooleanDecoder()],
+    ["holderRewardClaimAuthority", getAddressDecoder()],
   ]);
 }
 
@@ -115,29 +122,30 @@ export function getUpdateHolderRewardConfigInstructionDataCodec(): FixedSizeCode
 > {
   return combineCodec(
     getUpdateHolderRewardConfigInstructionDataEncoder(),
-    getUpdateHolderRewardConfigInstructionDataDecoder()
+    getUpdateHolderRewardConfigInstructionDataDecoder(),
   );
 }
 
 export type UpdateHolderRewardConfigAsyncInput<
-  TAccountGlobal extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global?: Address<TAccountGlobal>;
-  authority: TransactionSigner<TAccountAuthority>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  isHolderRewardEnabled: UpdateHolderRewardConfigInstructionDataArgs['isHolderRewardEnabled'];
-  holderRewardClaimAuthority: UpdateHolderRewardConfigInstructionDataArgs['holderRewardClaimAuthority'];
+  global?: TAccountGlobal;
+  authority: TAccountAuthority;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  isHolderRewardEnabled: UpdateHolderRewardConfigInstructionDataArgs["isHolderRewardEnabled"];
+  holderRewardClaimAuthority: UpdateHolderRewardConfigInstructionDataArgs["holderRewardClaimAuthority"];
 };
 
 export async function getUpdateHolderRewardConfigInstructionAsync<
-  TAccountGlobal extends string,
-  TAccountAuthority extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: UpdateHolderRewardConfigAsyncInput<
@@ -146,29 +154,56 @@ export async function getUpdateHolderRewardConfigInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   UpdateHolderRewardConfigInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: true },
-    authority: { value: input.authority ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: true },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -176,67 +211,66 @@ export async function getUpdateHolderRewardConfigInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getUpdateHolderRewardConfigInstructionDataEncoder().encode(
-      args as UpdateHolderRewardConfigInstructionDataArgs
+      args as UpdateHolderRewardConfigInstructionDataArgs,
     ),
     programAddress,
   } as UpdateHolderRewardConfigInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type UpdateHolderRewardConfigInput<
-  TAccountGlobal extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global: Address<TAccountGlobal>;
-  authority: TransactionSigner<TAccountAuthority>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  isHolderRewardEnabled: UpdateHolderRewardConfigInstructionDataArgs['isHolderRewardEnabled'];
-  holderRewardClaimAuthority: UpdateHolderRewardConfigInstructionDataArgs['holderRewardClaimAuthority'];
+  global: TAccountGlobal;
+  authority: TAccountAuthority;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  isHolderRewardEnabled: UpdateHolderRewardConfigInstructionDataArgs["isHolderRewardEnabled"];
+  holderRewardClaimAuthority: UpdateHolderRewardConfigInstructionDataArgs["holderRewardClaimAuthority"];
 };
 
 export function getUpdateHolderRewardConfigInstruction<
-  TAccountGlobal extends string,
-  TAccountAuthority extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: UpdateHolderRewardConfigInput<
@@ -245,50 +279,88 @@ export function getUpdateHolderRewardConfigInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): UpdateHolderRewardConfigInstruction<
   TProgramAddress,
-  TAccountGlobal,
-  TAccountAuthority,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAuthority,
+    InstructionAccountInputAddress<TAccountAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: true },
-    authority: { value: input.authority ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: true },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getUpdateHolderRewardConfigInstructionDataEncoder().encode(
-      args as UpdateHolderRewardConfigInstructionDataArgs
+      args as UpdateHolderRewardConfigInstructionDataArgs,
     ),
     programAddress,
   } as UpdateHolderRewardConfigInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -312,11 +384,16 @@ export function parseUpdateHolderRewardConfigInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedUpdateHolderRewardConfigInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 4,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -333,7 +410,7 @@ export function parseUpdateHolderRewardConfigInstruction<
       program: getNextAccount(),
     },
     data: getUpdateHolderRewardConfigInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

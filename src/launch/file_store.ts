@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { address, signature } from "@solana/kit";
 import type { LaunchRecord } from "./session";
+export { readLaunchKeypair } from "./keypair";
 
 export function validateLaunchRecord(value: unknown): LaunchRecord {
   if (!value || typeof value !== "object") throw new Error("Invalid launch record");

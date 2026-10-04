@@ -12,9 +12,10 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -27,18 +28,25 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findGlobalPda } from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const INITIALIZE_DISCRIMINATOR = new Uint8Array([
+export const INITIALIZE_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   175, 175, 109, 31, 13, 152, 155, 237,
 ]);
 
-export function getInitializeDiscriminatorBytes() {
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(INITIALIZE_DISCRIMINATOR);
 }
 
@@ -46,9 +54,8 @@ export type InitializeInstruction<
   TProgram extends string = typeof PUMP_PROGRAM_ADDRESS,
   TAccountGlobal extends string | AccountMeta<string> = string,
   TAccountUser extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -73,14 +80,14 @@ export type InitializeInstructionDataArgs = {};
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR })
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
+    (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR }),
   );
 }
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -90,24 +97,25 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getInitializeInstructionDataEncoder(),
-    getInitializeInstructionDataDecoder()
+    getInitializeInstructionDataDecoder(),
   );
 }
 
 export type InitializeAsyncInput<
-  TAccountGlobal extends string = string,
-  TAccountUser extends string = string,
-  TAccountSystemProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
 > = {
-  global?: Address<TAccountGlobal>;
-  user: TransactionSigner<TAccountUser>;
-  systemProgram?: Address<TAccountSystemProgram>;
+  global?: TAccountGlobal;
+  user: TAccountUser;
+  systemProgram?: TAccountSystemProgram;
 };
 
 export async function getInitializeInstructionAsync<
-  TAccountGlobal extends string,
-  TAccountUser extends string,
-  TAccountSystemProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: InitializeAsyncInput<
@@ -115,118 +123,162 @@ export async function getInitializeInstructionAsync<
     TAccountUser,
     TAccountSystemProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   InitializeInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountUser,
-    TAccountSystemProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: true },
+    user: { value: input.user ?? null, isSigner: true, isWritable: true },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.systemProgram),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getInitializeInstructionDataEncoder().encode({}),
     programAddress,
   } as InitializeInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountUser,
-    TAccountSystemProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >
   >);
 }
 
 export type InitializeInput<
-  TAccountGlobal extends string = string,
-  TAccountUser extends string = string,
-  TAccountSystemProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
 > = {
-  global: Address<TAccountGlobal>;
-  user: TransactionSigner<TAccountUser>;
-  systemProgram?: Address<TAccountSystemProgram>;
+  global: TAccountGlobal;
+  user: TAccountUser;
+  systemProgram?: TAccountSystemProgram;
 };
 
 export function getInitializeInstruction<
-  TAccountGlobal extends string,
-  TAccountUser extends string,
-  TAccountSystemProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: InitializeInput<TAccountGlobal, TAccountUser, TAccountSystemProgram>,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
   TProgramAddress,
-  TAccountGlobal,
-  TAccountUser,
-  TAccountSystemProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUser,
+    InstructionAccountInputAddress<TAccountUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: true },
+    user: { value: input.user ?? null, isSigner: true, isWritable: true },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.systemProgram),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getInitializeInstructionDataEncoder().encode({}),
     programAddress,
   } as InitializeInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountUser,
-    TAccountSystemProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >
   >);
 }
 
@@ -249,11 +301,16 @@ export function parseInitializeInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 3) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 3,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

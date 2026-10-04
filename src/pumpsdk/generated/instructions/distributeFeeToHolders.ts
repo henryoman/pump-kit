@@ -10,16 +10,16 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressEncoder,
   getArrayDecoder,
   getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -32,46 +32,49 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findEventAuthorityPda,
+  findGlobalPda,
+  findHolderRewardsPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const DISTRIBUTE_FEE_TO_HOLDERS_DISCRIMINATOR = new Uint8Array([
-  98, 54, 145, 97, 2, 70, 173, 43,
-]);
+export const DISTRIBUTE_FEE_TO_HOLDERS_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([98, 54, 145, 97, 2, 70, 173, 43]);
 
-export function getDistributeFeeToHoldersDiscriminatorBytes() {
+export function getDistributeFeeToHoldersDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    DISTRIBUTE_FEE_TO_HOLDERS_DISCRIMINATOR
+    DISTRIBUTE_FEE_TO_HOLDERS_DISCRIMINATOR,
   );
 }
 
 export type DistributeFeeToHoldersInstruction<
   TProgram extends string = typeof PUMP_PROGRAM_ADDRESS,
   TAccountGlobal extends string | AccountMeta<string> = string,
-  TAccountHolderRewardClaimAuthority extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountHolderRewardClaimAuthority extends string | AccountMeta<string> =
+    string,
   TAccountMint extends string | AccountMeta<string> = string,
   TAccountHolderRewards extends string | AccountMeta<string> = string,
-  TAccountHolderRewardsTokenAccount extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountHolderRewardsTokenAccount extends string | AccountMeta<string> =
+    string,
   TAccountQuoteMint extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -129,20 +132,20 @@ export type DistributeFeeToHoldersInstructionDataArgs = {
 export function getDistributeFeeToHoldersInstructionDataEncoder(): Encoder<DistributeFeeToHoldersInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['amounts', getArrayEncoder(getU64Encoder())],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["amounts", getArrayEncoder(getU64Encoder())],
     ]),
     (value) => ({
       ...value,
       discriminator: DISTRIBUTE_FEE_TO_HOLDERS_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getDistributeFeeToHoldersInstructionDataDecoder(): Decoder<DistributeFeeToHoldersInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['amounts', getArrayDecoder(getU64Decoder())],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["amounts", getArrayDecoder(getU64Decoder())],
   ]);
 }
 
@@ -152,50 +155,57 @@ export function getDistributeFeeToHoldersInstructionDataCodec(): Codec<
 > {
   return combineCodec(
     getDistributeFeeToHoldersInstructionDataEncoder(),
-    getDistributeFeeToHoldersInstructionDataDecoder()
+    getDistributeFeeToHoldersInstructionDataDecoder(),
   );
 }
 
 export type DistributeFeeToHoldersAsyncInput<
-  TAccountGlobal extends string = string,
-  TAccountHolderRewardClaimAuthority extends string = string,
-  TAccountMint extends string = string,
-  TAccountHolderRewards extends string = string,
-  TAccountHolderRewardsTokenAccount extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountHolderRewardClaimAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountHolderRewards extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountHolderRewardsTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global?: Address<TAccountGlobal>;
-  holderRewardClaimAuthority: TransactionSigner<TAccountHolderRewardClaimAuthority>;
-  mint: Address<TAccountMint>;
+  global?: TAccountGlobal;
+  holderRewardClaimAuthority: TAccountHolderRewardClaimAuthority;
+  mint: TAccountMint;
   /** deliver the collected fees here (lamports on a SOL quote) */
-  holderRewards?: Address<TAccountHolderRewards>;
-  holderRewardsTokenAccount?: Address<TAccountHolderRewardsTokenAccount>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  amounts: DistributeFeeToHoldersInstructionDataArgs['amounts'];
+  holderRewards?: TAccountHolderRewards;
+  holderRewardsTokenAccount?: TAccountHolderRewardsTokenAccount;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  amounts: DistributeFeeToHoldersInstructionDataArgs["amounts"];
 };
 
 export async function getDistributeFeeToHoldersInstructionAsync<
-  TAccountGlobal extends string,
-  TAccountHolderRewardClaimAuthority extends string,
-  TAccountMint extends string,
-  TAccountHolderRewards extends string,
-  TAccountHolderRewardsTokenAccount extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountHolderRewardClaimAuthority extends InstructionSignerInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountHolderRewards extends InstructionAccountInput,
+  TAccountHolderRewardsTokenAccount extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: DistributeFeeToHoldersAsyncInput<
@@ -211,55 +221,115 @@ export async function getDistributeFeeToHoldersInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   DistributeFeeToHoldersInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountHolderRewardClaimAuthority,
-    TAccountMint,
-    TAccountHolderRewards,
-    TAccountHolderRewardsTokenAccount,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewardClaimAuthority,
+      InstructionAccountInputAddress<TAccountHolderRewardClaimAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewards,
+      InstructionAccountInputAddress<TAccountHolderRewards>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewardsTokenAccount,
+      InstructionAccountInputAddress<TAccountHolderRewardsTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
     holderRewardClaimAuthority: {
       value: input.holderRewardClaimAuthority ?? null,
+      isSigner: true,
       isWritable: true,
     },
-    mint: { value: input.mint ?? null, isWritable: false },
-    holderRewards: { value: input.holderRewards ?? null, isWritable: true },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    holderRewards: {
+      value: input.holderRewards ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     holderRewardsTokenAccount: {
       value: input.holderRewardsTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -267,123 +337,153 @@ export async function getDistributeFeeToHoldersInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.holderRewards.value) {
-    accounts.holderRewards.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            104, 111, 108, 100, 101, 114, 45, 114, 101, 119, 97, 114, 100, 115,
-          ])
+    accounts.holderRewards.value = await findHolderRewardsPda(
+      {
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.holderRewardClaimAuthority),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.holderRewards),
-      getAccountMeta(accounts.holderRewardsTokenAccount),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta(
+        "holderRewardClaimAuthority",
+        accounts.holderRewardClaimAuthority,
+      ),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("holderRewards", accounts.holderRewards),
+      getAccountMeta(
+        "holderRewardsTokenAccount",
+        accounts.holderRewardsTokenAccount,
+      ),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getDistributeFeeToHoldersInstructionDataEncoder().encode(
-      args as DistributeFeeToHoldersInstructionDataArgs
+      args as DistributeFeeToHoldersInstructionDataArgs,
     ),
     programAddress,
   } as DistributeFeeToHoldersInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountHolderRewardClaimAuthority,
-    TAccountMint,
-    TAccountHolderRewards,
-    TAccountHolderRewardsTokenAccount,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewardClaimAuthority,
+      InstructionAccountInputAddress<TAccountHolderRewardClaimAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewards,
+      InstructionAccountInputAddress<TAccountHolderRewards>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewardsTokenAccount,
+      InstructionAccountInputAddress<TAccountHolderRewardsTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type DistributeFeeToHoldersInput<
-  TAccountGlobal extends string = string,
-  TAccountHolderRewardClaimAuthority extends string = string,
-  TAccountMint extends string = string,
-  TAccountHolderRewards extends string = string,
-  TAccountHolderRewardsTokenAccount extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountHolderRewardClaimAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountHolderRewards extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountHolderRewardsTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global: Address<TAccountGlobal>;
-  holderRewardClaimAuthority: TransactionSigner<TAccountHolderRewardClaimAuthority>;
-  mint: Address<TAccountMint>;
+  global: TAccountGlobal;
+  holderRewardClaimAuthority: TAccountHolderRewardClaimAuthority;
+  mint: TAccountMint;
   /** deliver the collected fees here (lamports on a SOL quote) */
-  holderRewards: Address<TAccountHolderRewards>;
-  holderRewardsTokenAccount?: Address<TAccountHolderRewardsTokenAccount>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  amounts: DistributeFeeToHoldersInstructionDataArgs['amounts'];
+  holderRewards: TAccountHolderRewards;
+  holderRewardsTokenAccount?: TAccountHolderRewardsTokenAccount;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  amounts: DistributeFeeToHoldersInstructionDataArgs["amounts"];
 };
 
 export function getDistributeFeeToHoldersInstruction<
-  TAccountGlobal extends string,
-  TAccountHolderRewardClaimAuthority extends string,
-  TAccountMint extends string,
-  TAccountHolderRewards extends string,
-  TAccountHolderRewardsTokenAccount extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountHolderRewardClaimAuthority extends InstructionSignerInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountHolderRewards extends InstructionAccountInput,
+  TAccountHolderRewardsTokenAccount extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: DistributeFeeToHoldersInput<
@@ -399,53 +499,113 @@ export function getDistributeFeeToHoldersInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): DistributeFeeToHoldersInstruction<
   TProgramAddress,
-  TAccountGlobal,
-  TAccountHolderRewardClaimAuthority,
-  TAccountMint,
-  TAccountHolderRewards,
-  TAccountHolderRewardsTokenAccount,
-  TAccountQuoteMint,
-  TAccountQuoteTokenProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountHolderRewardClaimAuthority,
+    InstructionAccountInputAddress<TAccountHolderRewardClaimAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountMint,
+    InstructionAccountInputAddress<TAccountMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountHolderRewards,
+    InstructionAccountInputAddress<TAccountHolderRewards>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountHolderRewardsTokenAccount,
+    InstructionAccountInputAddress<TAccountHolderRewardsTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
     holderRewardClaimAuthority: {
       value: input.holderRewardClaimAuthority ?? null,
+      isSigner: true,
       isWritable: true,
     },
-    mint: { value: input.mint ?? null, isWritable: false },
-    holderRewards: { value: input.holderRewards ?? null, isWritable: true },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    holderRewards: {
+      value: input.holderRewards ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     holderRewardsTokenAccount: {
       value: input.holderRewardsTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -454,45 +614,83 @@ export function getDistributeFeeToHoldersInstruction<
   // Resolve default values.
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.holderRewardClaimAuthority),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.holderRewards),
-      getAccountMeta(accounts.holderRewardsTokenAccount),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta(
+        "holderRewardClaimAuthority",
+        accounts.holderRewardClaimAuthority,
+      ),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("holderRewards", accounts.holderRewards),
+      getAccountMeta(
+        "holderRewardsTokenAccount",
+        accounts.holderRewardsTokenAccount,
+      ),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getDistributeFeeToHoldersInstructionDataEncoder().encode(
-      args as DistributeFeeToHoldersInstructionDataArgs
+      args as DistributeFeeToHoldersInstructionDataArgs,
     ),
     programAddress,
   } as DistributeFeeToHoldersInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountHolderRewardClaimAuthority,
-    TAccountMint,
-    TAccountHolderRewards,
-    TAccountHolderRewardsTokenAccount,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewardClaimAuthority,
+      InstructionAccountInputAddress<TAccountHolderRewardClaimAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewards,
+      InstructionAccountInputAddress<TAccountHolderRewards>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderRewardsTokenAccount,
+      InstructionAccountInputAddress<TAccountHolderRewardsTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -524,11 +722,16 @@ export function parseDistributeFeeToHoldersInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDistributeFeeToHoldersInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 11) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 11,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -558,7 +761,7 @@ export function parseDistributeFeeToHoldersInstruction<
       program: getNextAccount(),
     },
     data: getDistributeFeeToHoldersInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

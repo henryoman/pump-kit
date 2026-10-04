@@ -4,7 +4,9 @@
     "noEmit": false,
     "declaration": true,
     "emitDeclarationOnly": true,
+    "rootDir": "src",
     "outDir": "dist/types"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/bin"]
 }

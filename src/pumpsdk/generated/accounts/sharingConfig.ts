@@ -39,7 +39,7 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 import {
   getConfigStatusDecoder,
   getConfigStatusEncoder,
@@ -49,15 +49,15 @@ import {
   type ConfigStatusArgs,
   type Shareholder,
   type ShareholderArgs,
-} from '../types';
+} from "../types";
 
-export const SHARING_CONFIG_DISCRIMINATOR = new Uint8Array([
+export const SHARING_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   216, 74, 9, 0, 56, 140, 93, 75,
 ]);
 
-export function getSharingConfigDiscriminatorBytes() {
+export function getSharingConfigDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    SHARING_CONFIG_DISCRIMINATOR
+    SHARING_CONFIG_DISCRIMINATOR,
   );
 }
 
@@ -82,35 +82,38 @@ export type SharingConfigArgs = {
   shareholders: Array<ShareholderArgs>;
 };
 
+/** Gets the encoder for {@link SharingConfigArgs} account data. */
 export function getSharingConfigEncoder(): Encoder<SharingConfigArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['bump', getU8Encoder()],
-      ['version', getU8Encoder()],
-      ['status', getConfigStatusEncoder()],
-      ['mint', getAddressEncoder()],
-      ['admin', getAddressEncoder()],
-      ['adminRevoked', getBooleanEncoder()],
-      ['shareholders', getArrayEncoder(getShareholderEncoder())],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["bump", getU8Encoder()],
+      ["version", getU8Encoder()],
+      ["status", getConfigStatusEncoder()],
+      ["mint", getAddressEncoder()],
+      ["admin", getAddressEncoder()],
+      ["adminRevoked", getBooleanEncoder()],
+      ["shareholders", getArrayEncoder(getShareholderEncoder())],
     ]),
-    (value) => ({ ...value, discriminator: SHARING_CONFIG_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: SHARING_CONFIG_DISCRIMINATOR }),
   );
 }
 
+/** Gets the decoder for {@link SharingConfig} account data. */
 export function getSharingConfigDecoder(): Decoder<SharingConfig> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['bump', getU8Decoder()],
-    ['version', getU8Decoder()],
-    ['status', getConfigStatusDecoder()],
-    ['mint', getAddressDecoder()],
-    ['admin', getAddressDecoder()],
-    ['adminRevoked', getBooleanDecoder()],
-    ['shareholders', getArrayDecoder(getShareholderDecoder())],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["bump", getU8Decoder()],
+    ["version", getU8Decoder()],
+    ["status", getConfigStatusDecoder()],
+    ["mint", getAddressDecoder()],
+    ["admin", getAddressDecoder()],
+    ["adminRevoked", getBooleanDecoder()],
+    ["shareholders", getArrayDecoder(getShareholderDecoder())],
   ]);
 }
 
+/** Gets the codec for {@link SharingConfig} account data. */
 export function getSharingConfigCodec(): Codec<
   SharingConfigArgs,
   SharingConfig
@@ -119,24 +122,24 @@ export function getSharingConfigCodec(): Codec<
 }
 
 export function decodeSharingConfig<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<SharingConfig, TAddress>;
 export function decodeSharingConfig<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<SharingConfig, TAddress>;
 export function decodeSharingConfig<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ): Account<SharingConfig, TAddress> | MaybeAccount<SharingConfig, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getSharingConfigDecoder()
+    getSharingConfigDecoder(),
   );
 }
 
 export async function fetchSharingConfig<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<SharingConfig, TAddress>> {
   const maybeAccount = await fetchMaybeSharingConfig(rpc, address, config);
   assertAccountExists(maybeAccount);
@@ -146,7 +149,7 @@ export async function fetchSharingConfig<TAddress extends string = string>(
 export async function fetchMaybeSharingConfig<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<SharingConfig, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeSharingConfig(maybeAccount);
@@ -155,12 +158,12 @@ export async function fetchMaybeSharingConfig<TAddress extends string = string>(
 export async function fetchAllSharingConfig(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<SharingConfig>[]> {
   const maybeAccounts = await fetchAllMaybeSharingConfig(
     rpc,
     addresses,
-    config
+    config,
   );
   assertAccountsExist(maybeAccounts);
   return maybeAccounts;
@@ -169,7 +172,7 @@ export async function fetchAllSharingConfig(
 export async function fetchAllMaybeSharingConfig(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<SharingConfig>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodeSharingConfig(maybeAccount));

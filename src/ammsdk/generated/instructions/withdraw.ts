@@ -12,11 +12,12 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -30,17 +31,24 @@ import {
   type ReadonlyAccount,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const WITHDRAW_DISCRIMINATOR = new Uint8Array([
+export const WITHDRAW_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   183, 18, 70, 156, 148, 109, 161, 34,
 ]);
 
-export function getWithdrawDiscriminatorBytes() {
+export function getWithdrawDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(WITHDRAW_DISCRIMINATOR);
 }
 
@@ -57,12 +65,10 @@ export type WithdrawInstruction<
   TAccountUserPoolTokenAccount extends string | AccountMeta<string> = string,
   TAccountPoolBaseTokenAccount extends string | AccountMeta<string> = string,
   TAccountPoolQuoteTokenAccount extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends
-    | string
-    | AccountMeta<string> = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-  TAccountToken2022Program extends
-    | string
-    | AccountMeta<string> = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  TAccountTokenProgram extends string | AccountMeta<string> =
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountToken2022Program extends string | AccountMeta<string> =
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -135,21 +141,21 @@ export type WithdrawInstructionDataArgs = {
 export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<WithdrawInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['lpTokenAmountIn', getU64Encoder()],
-      ['minBaseAmountOut', getU64Encoder()],
-      ['minQuoteAmountOut', getU64Encoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["lpTokenAmountIn", getU64Encoder()],
+      ["minBaseAmountOut", getU64Encoder()],
+      ["minQuoteAmountOut", getU64Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: WITHDRAW_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: WITHDRAW_DISCRIMINATOR }),
   );
 }
 
 export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<WithdrawInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['lpTokenAmountIn', getU64Decoder()],
-    ['minBaseAmountOut', getU64Decoder()],
-    ['minQuoteAmountOut', getU64Decoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["lpTokenAmountIn", getU64Decoder()],
+    ["minBaseAmountOut", getU64Decoder()],
+    ["minQuoteAmountOut", getU64Decoder()],
   ]);
 }
 
@@ -159,63 +165,72 @@ export function getWithdrawInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getWithdrawInstructionDataEncoder(),
-    getWithdrawInstructionDataDecoder()
+    getWithdrawInstructionDataDecoder(),
   );
 }
 
 export type WithdrawAsyncInput<
-  TAccountPool extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountUser extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountLpMint extends string = string,
-  TAccountUserBaseTokenAccount extends string = string,
-  TAccountUserQuoteTokenAccount extends string = string,
-  TAccountUserPoolTokenAccount extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountToken2022Program extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  user: TransactionSigner<TAccountUser>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  lpMint: Address<TAccountLpMint>;
-  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
-  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
-  userPoolTokenAccount: Address<TAccountUserPoolTokenAccount>;
-  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  token2022Program?: Address<TAccountToken2022Program>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  lpTokenAmountIn: WithdrawInstructionDataArgs['lpTokenAmountIn'];
-  minBaseAmountOut: WithdrawInstructionDataArgs['minBaseAmountOut'];
-  minQuoteAmountOut: WithdrawInstructionDataArgs['minQuoteAmountOut'];
+  pool: TAccountPool;
+  globalConfig: TAccountGlobalConfig;
+  user: TAccountUser;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  lpMint: TAccountLpMint;
+  userBaseTokenAccount: TAccountUserBaseTokenAccount;
+  userQuoteTokenAccount: TAccountUserQuoteTokenAccount;
+  userPoolTokenAccount: TAccountUserPoolTokenAccount;
+  poolBaseTokenAccount: TAccountPoolBaseTokenAccount;
+  poolQuoteTokenAccount: TAccountPoolQuoteTokenAccount;
+  tokenProgram?: TAccountTokenProgram;
+  token2022Program?: TAccountToken2022Program;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  lpTokenAmountIn: WithdrawInstructionDataArgs["lpTokenAmountIn"];
+  minBaseAmountOut: WithdrawInstructionDataArgs["minBaseAmountOut"];
+  minQuoteAmountOut: WithdrawInstructionDataArgs["minQuoteAmountOut"];
 };
 
 export async function getWithdrawInstructionAsync<
-  TAccountPool extends string,
-  TAccountGlobalConfig extends string,
-  TAccountUser extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountLpMint extends string,
-  TAccountUserBaseTokenAccount extends string,
-  TAccountUserQuoteTokenAccount extends string,
-  TAccountUserPoolTokenAccount extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountTokenProgram extends string,
-  TAccountToken2022Program extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: WithdrawAsyncInput<
@@ -235,69 +250,147 @@ export async function getWithdrawInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   WithdrawInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountUser,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountTokenProgram,
-    TAccountToken2022Program,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountLpMint,
+      InstructionAccountInputAddress<TAccountLpMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserPoolTokenAccount,
+      InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountToken2022Program,
+      InstructionAccountInputAddress<TAccountToken2022Program>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    user: { value: input.user ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: true },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    user: { value: input.user ?? null, isSigner: true, isWritable: false },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    lpMint: { value: input.lpMint ?? null, isSigner: false, isWritable: true },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userPoolTokenAccount: {
       value: input.userPoolTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    token2022Program: {
-      value: input.token2022Program ?? null,
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    token2022Program: {
+      value: input.token2022Program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -306,122 +399,167 @@ export async function getWithdrawInstructionAsync<
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
   if (!accounts.token2022Program.value) {
     accounts.token2022Program.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" as Address<"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.lpMint),
-      getAccountMeta(accounts.userBaseTokenAccount),
-      getAccountMeta(accounts.userQuoteTokenAccount),
-      getAccountMeta(accounts.userPoolTokenAccount),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.token2022Program),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("lpMint", accounts.lpMint),
+      getAccountMeta("userBaseTokenAccount", accounts.userBaseTokenAccount),
+      getAccountMeta("userQuoteTokenAccount", accounts.userQuoteTokenAccount),
+      getAccountMeta("userPoolTokenAccount", accounts.userPoolTokenAccount),
+      getAccountMeta("poolBaseTokenAccount", accounts.poolBaseTokenAccount),
+      getAccountMeta("poolQuoteTokenAccount", accounts.poolQuoteTokenAccount),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("token2022Program", accounts.token2022Program),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getWithdrawInstructionDataEncoder().encode(
-      args as WithdrawInstructionDataArgs
+      args as WithdrawInstructionDataArgs,
     ),
     programAddress,
   } as WithdrawInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountUser,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountTokenProgram,
-    TAccountToken2022Program,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountLpMint,
+      InstructionAccountInputAddress<TAccountLpMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserPoolTokenAccount,
+      InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountToken2022Program,
+      InstructionAccountInputAddress<TAccountToken2022Program>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type WithdrawInput<
-  TAccountPool extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountUser extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountLpMint extends string = string,
-  TAccountUserBaseTokenAccount extends string = string,
-  TAccountUserQuoteTokenAccount extends string = string,
-  TAccountUserPoolTokenAccount extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountToken2022Program extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  user: TransactionSigner<TAccountUser>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  lpMint: Address<TAccountLpMint>;
-  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
-  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
-  userPoolTokenAccount: Address<TAccountUserPoolTokenAccount>;
-  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  token2022Program?: Address<TAccountToken2022Program>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  lpTokenAmountIn: WithdrawInstructionDataArgs['lpTokenAmountIn'];
-  minBaseAmountOut: WithdrawInstructionDataArgs['minBaseAmountOut'];
-  minQuoteAmountOut: WithdrawInstructionDataArgs['minQuoteAmountOut'];
+  pool: TAccountPool;
+  globalConfig: TAccountGlobalConfig;
+  user: TAccountUser;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  lpMint: TAccountLpMint;
+  userBaseTokenAccount: TAccountUserBaseTokenAccount;
+  userQuoteTokenAccount: TAccountUserQuoteTokenAccount;
+  userPoolTokenAccount: TAccountUserPoolTokenAccount;
+  poolBaseTokenAccount: TAccountPoolBaseTokenAccount;
+  poolQuoteTokenAccount: TAccountPoolQuoteTokenAccount;
+  tokenProgram?: TAccountTokenProgram;
+  token2022Program?: TAccountToken2022Program;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  lpTokenAmountIn: WithdrawInstructionDataArgs["lpTokenAmountIn"];
+  minBaseAmountOut: WithdrawInstructionDataArgs["minBaseAmountOut"];
+  minQuoteAmountOut: WithdrawInstructionDataArgs["minQuoteAmountOut"];
 };
 
 export function getWithdrawInstruction<
-  TAccountPool extends string,
-  TAccountGlobalConfig extends string,
-  TAccountUser extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountLpMint extends string,
-  TAccountUserBaseTokenAccount extends string,
-  TAccountUserQuoteTokenAccount extends string,
-  TAccountUserPoolTokenAccount extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountTokenProgram extends string,
-  TAccountToken2022Program extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: WithdrawInput<
@@ -441,67 +579,145 @@ export function getWithdrawInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): WithdrawInstruction<
   TProgramAddress,
-  TAccountPool,
-  TAccountGlobalConfig,
-  TAccountUser,
-  TAccountBaseMint,
-  TAccountQuoteMint,
-  TAccountLpMint,
-  TAccountUserBaseTokenAccount,
-  TAccountUserQuoteTokenAccount,
-  TAccountUserPoolTokenAccount,
-  TAccountPoolBaseTokenAccount,
-  TAccountPoolQuoteTokenAccount,
-  TAccountTokenProgram,
-  TAccountToken2022Program,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountPool,
+    InstructionAccountInputAddress<TAccountPool>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUser,
+    InstructionAccountInputAddress<TAccountUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseMint,
+    InstructionAccountInputAddress<TAccountBaseMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountLpMint,
+    InstructionAccountInputAddress<TAccountLpMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserBaseTokenAccount,
+    InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserPoolTokenAccount,
+    InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolBaseTokenAccount,
+    InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountTokenProgram,
+    InstructionAccountInputAddress<TAccountTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountToken2022Program,
+    InstructionAccountInputAddress<TAccountToken2022Program>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    user: { value: input.user ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: true },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    user: { value: input.user ?? null, isSigner: true, isWritable: false },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    lpMint: { value: input.lpMint ?? null, isSigner: false, isWritable: true },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userPoolTokenAccount: {
       value: input.userPoolTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    token2022Program: {
-      value: input.token2022Program ?? null,
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    token2022Program: {
+      value: input.token2022Program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -510,53 +726,97 @@ export function getWithdrawInstruction<
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address<'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'>;
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
   if (!accounts.token2022Program.value) {
     accounts.token2022Program.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" as Address<"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.lpMint),
-      getAccountMeta(accounts.userBaseTokenAccount),
-      getAccountMeta(accounts.userQuoteTokenAccount),
-      getAccountMeta(accounts.userPoolTokenAccount),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.token2022Program),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("lpMint", accounts.lpMint),
+      getAccountMeta("userBaseTokenAccount", accounts.userBaseTokenAccount),
+      getAccountMeta("userQuoteTokenAccount", accounts.userQuoteTokenAccount),
+      getAccountMeta("userPoolTokenAccount", accounts.userPoolTokenAccount),
+      getAccountMeta("poolBaseTokenAccount", accounts.poolBaseTokenAccount),
+      getAccountMeta("poolQuoteTokenAccount", accounts.poolQuoteTokenAccount),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("token2022Program", accounts.token2022Program),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getWithdrawInstructionDataEncoder().encode(
-      args as WithdrawInstructionDataArgs
+      args as WithdrawInstructionDataArgs,
     ),
     programAddress,
   } as WithdrawInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountUser,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountTokenProgram,
-    TAccountToken2022Program,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountLpMint,
+      InstructionAccountInputAddress<TAccountLpMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserPoolTokenAccount,
+      InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountToken2022Program,
+      InstructionAccountInputAddress<TAccountToken2022Program>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -591,11 +851,16 @@ export function parseWithdrawInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 15) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 15,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

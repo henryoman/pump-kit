@@ -18,7 +18,7 @@ import {
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
-} from '@solana/kit';
+} from "@solana/kit";
 
 export type QuoteControlMint = {
   mint: Address;
@@ -32,15 +32,15 @@ export type QuoteControlMintArgs = {
 
 export function getQuoteControlMintEncoder(): FixedSizeEncoder<QuoteControlMintArgs> {
   return getStructEncoder([
-    ['mint', getAddressEncoder()],
-    ['initialVirtualQuoteReserves', getU64Encoder()],
+    ["mint", getAddressEncoder()],
+    ["initialVirtualQuoteReserves", getU64Encoder()],
   ]);
 }
 
 export function getQuoteControlMintDecoder(): FixedSizeDecoder<QuoteControlMint> {
   return getStructDecoder([
-    ['mint', getAddressDecoder()],
-    ['initialVirtualQuoteReserves', getU64Decoder()],
+    ["mint", getAddressDecoder()],
+    ["initialVirtualQuoteReserves", getU64Decoder()],
   ]);
 }
 
@@ -50,6 +50,6 @@ export function getQuoteControlMintCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getQuoteControlMintEncoder(),
-    getQuoteControlMintDecoder()
+    getQuoteControlMintDecoder(),
   );
 }

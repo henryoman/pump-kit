@@ -14,9 +14,10 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -30,19 +31,29 @@ import {
   type ReadonlyAccount,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findEventAuthorityPda,
+  findGlobalPda,
+  findProgramSignerPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const ADMIN_SET_IDL_AUTHORITY_DISCRIMINATOR = new Uint8Array([
-  8, 217, 96, 231, 144, 104, 192, 5,
-]);
+export const ADMIN_SET_IDL_AUTHORITY_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([8, 217, 96, 231, 144, 104, 192, 5]);
 
-export function getAdminSetIdlAuthorityDiscriminatorBytes() {
+export function getAdminSetIdlAuthorityDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    ADMIN_SET_IDL_AUTHORITY_DISCRIMINATOR
+    ADMIN_SET_IDL_AUTHORITY_DISCRIMINATOR,
   );
 }
 
@@ -51,9 +62,8 @@ export type AdminSetIdlAuthorityInstruction<
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountGlobal extends string | AccountMeta<string> = string,
   TAccountIdlAccount extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountProgramSigner extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
@@ -98,20 +108,20 @@ export type AdminSetIdlAuthorityInstructionDataArgs = { idlAuthority: Address };
 export function getAdminSetIdlAuthorityInstructionDataEncoder(): FixedSizeEncoder<AdminSetIdlAuthorityInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['idlAuthority', getAddressEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["idlAuthority", getAddressEncoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: ADMIN_SET_IDL_AUTHORITY_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getAdminSetIdlAuthorityInstructionDataDecoder(): FixedSizeDecoder<AdminSetIdlAuthorityInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['idlAuthority', getAddressDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["idlAuthority", getAddressDecoder()],
   ]);
 }
 
@@ -121,37 +131,40 @@ export function getAdminSetIdlAuthorityInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getAdminSetIdlAuthorityInstructionDataEncoder(),
-    getAdminSetIdlAuthorityInstructionDataDecoder()
+    getAdminSetIdlAuthorityInstructionDataDecoder(),
   );
 }
 
 export type AdminSetIdlAuthorityAsyncInput<
-  TAccountAuthority extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountIdlAccount extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountProgramSigner extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountIdlAccount extends InstructionAccountInput = InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgramSigner extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
-  global?: Address<TAccountGlobal>;
-  idlAccount: Address<TAccountIdlAccount>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  programSigner?: Address<TAccountProgramSigner>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  idlAuthority: AdminSetIdlAuthorityInstructionDataArgs['idlAuthority'];
+  authority: TAccountAuthority;
+  global?: TAccountGlobal;
+  idlAccount: TAccountIdlAccount;
+  systemProgram?: TAccountSystemProgram;
+  programSigner?: TAccountProgramSigner;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  idlAuthority: AdminSetIdlAuthorityInstructionDataArgs["idlAuthority"];
 };
 
 export async function getAdminSetIdlAuthorityInstructionAsync<
-  TAccountAuthority extends string,
-  TAccountGlobal extends string,
-  TAccountIdlAccount extends string,
-  TAccountSystemProgram extends string,
-  TAccountProgramSigner extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountIdlAccount extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountProgramSigner extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: AdminSetIdlAuthorityAsyncInput<
@@ -163,35 +176,83 @@ export async function getAdminSetIdlAuthorityInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   AdminSetIdlAuthorityInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountGlobal,
-    TAccountIdlAccount,
-    TAccountSystemProgram,
-    TAccountProgramSigner,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountIdlAccount,
+      InstructionAccountInputAddress<TAccountIdlAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgramSigner,
+      InstructionAccountInputAddress<TAccountProgramSigner>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: false },
-    global: { value: input.global ?? null, isWritable: false },
-    idlAccount: { value: input.idlAccount ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    programSigner: { value: input.programSigner ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    idlAccount: {
+      value: input.idlAccount ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    programSigner: {
+      value: input.programSigner ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -199,91 +260,100 @@ export async function getAdminSetIdlAuthorityInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.programSigner.value) {
-    accounts.programSigner.value = await getProgramDerivedAddress({
+    accounts.programSigner.value = await findProgramSignerPda({
       programAddress,
-      seeds: [],
     });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.idlAccount),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.programSigner),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("idlAccount", accounts.idlAccount),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("programSigner", accounts.programSigner),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getAdminSetIdlAuthorityInstructionDataEncoder().encode(
-      args as AdminSetIdlAuthorityInstructionDataArgs
+      args as AdminSetIdlAuthorityInstructionDataArgs,
     ),
     programAddress,
   } as AdminSetIdlAuthorityInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountGlobal,
-    TAccountIdlAccount,
-    TAccountSystemProgram,
-    TAccountProgramSigner,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountIdlAccount,
+      InstructionAccountInputAddress<TAccountIdlAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgramSigner,
+      InstructionAccountInputAddress<TAccountProgramSigner>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type AdminSetIdlAuthorityInput<
-  TAccountAuthority extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountIdlAccount extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountProgramSigner extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountIdlAccount extends InstructionAccountInput = InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgramSigner extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
-  global: Address<TAccountGlobal>;
-  idlAccount: Address<TAccountIdlAccount>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  programSigner: Address<TAccountProgramSigner>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  idlAuthority: AdminSetIdlAuthorityInstructionDataArgs['idlAuthority'];
+  authority: TAccountAuthority;
+  global: TAccountGlobal;
+  idlAccount: TAccountIdlAccount;
+  systemProgram?: TAccountSystemProgram;
+  programSigner: TAccountProgramSigner;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  idlAuthority: AdminSetIdlAuthorityInstructionDataArgs["idlAuthority"];
 };
 
 export function getAdminSetIdlAuthorityInstruction<
-  TAccountAuthority extends string,
-  TAccountGlobal extends string,
-  TAccountIdlAccount extends string,
-  TAccountSystemProgram extends string,
-  TAccountProgramSigner extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountIdlAccount extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountProgramSigner extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: AdminSetIdlAuthorityInput<
@@ -295,33 +365,81 @@ export function getAdminSetIdlAuthorityInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): AdminSetIdlAuthorityInstruction<
   TProgramAddress,
-  TAccountAuthority,
-  TAccountGlobal,
-  TAccountIdlAccount,
-  TAccountSystemProgram,
-  TAccountProgramSigner,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountAuthority,
+    InstructionAccountInputAddress<TAccountAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountIdlAccount,
+    InstructionAccountInputAddress<TAccountIdlAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgramSigner,
+    InstructionAccountInputAddress<TAccountProgramSigner>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: false },
-    global: { value: input.global ?? null, isWritable: false },
-    idlAccount: { value: input.idlAccount ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    programSigner: { value: input.programSigner ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    idlAccount: {
+      value: input.idlAccount ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    programSigner: {
+      value: input.programSigner ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -330,33 +448,53 @@ export function getAdminSetIdlAuthorityInstruction<
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.idlAccount),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.programSigner),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("idlAccount", accounts.idlAccount),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("programSigner", accounts.programSigner),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getAdminSetIdlAuthorityInstructionDataEncoder().encode(
-      args as AdminSetIdlAuthorityInstructionDataArgs
+      args as AdminSetIdlAuthorityInstructionDataArgs,
     ),
     programAddress,
   } as AdminSetIdlAuthorityInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountGlobal,
-    TAccountIdlAccount,
-    TAccountSystemProgram,
-    TAccountProgramSigner,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountIdlAccount,
+      InstructionAccountInputAddress<TAccountIdlAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgramSigner,
+      InstructionAccountInputAddress<TAccountProgramSigner>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -383,11 +521,16 @@ export function parseAdminSetIdlAuthorityInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAdminSetIdlAuthorityInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 7) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 7,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -407,7 +550,7 @@ export function parseAdminSetIdlAuthorityInstruction<
       program: getNextAccount(),
     },
     data: getAdminSetIdlAuthorityInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

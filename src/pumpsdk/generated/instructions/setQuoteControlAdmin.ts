@@ -14,9 +14,10 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -30,19 +31,29 @@ import {
   type ReadonlyAccount,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findEventAuthorityPda,
+  findGlobalPda,
+  findQuoteControlPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const SET_QUOTE_CONTROL_ADMIN_DISCRIMINATOR = new Uint8Array([
-  62, 79, 161, 211, 165, 170, 214, 210,
-]);
+export const SET_QUOTE_CONTROL_ADMIN_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([62, 79, 161, 211, 165, 170, 214, 210]);
 
-export function getSetQuoteControlAdminDiscriminatorBytes() {
+export function getSetQuoteControlAdminDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    SET_QUOTE_CONTROL_ADMIN_DISCRIMINATOR
+    SET_QUOTE_CONTROL_ADMIN_DISCRIMINATOR,
   );
 }
 
@@ -88,20 +99,20 @@ export type SetQuoteControlAdminInstructionDataArgs = { newAdmin: Address };
 export function getSetQuoteControlAdminInstructionDataEncoder(): FixedSizeEncoder<SetQuoteControlAdminInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['newAdmin', getAddressEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["newAdmin", getAddressEncoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: SET_QUOTE_CONTROL_ADMIN_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getSetQuoteControlAdminInstructionDataDecoder(): FixedSizeDecoder<SetQuoteControlAdminInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['newAdmin', getAddressDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["newAdmin", getAddressDecoder()],
   ]);
 }
 
@@ -111,31 +122,33 @@ export function getSetQuoteControlAdminInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getSetQuoteControlAdminInstructionDataEncoder(),
-    getSetQuoteControlAdminInstructionDataDecoder()
+    getSetQuoteControlAdminInstructionDataDecoder(),
   );
 }
 
 export type SetQuoteControlAdminAsyncInput<
-  TAccountGlobal extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountQuoteControl extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountQuoteControl extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global?: Address<TAccountGlobal>;
-  authority: TransactionSigner<TAccountAuthority>;
-  quoteControl?: Address<TAccountQuoteControl>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  newAdmin: SetQuoteControlAdminInstructionDataArgs['newAdmin'];
+  global?: TAccountGlobal;
+  authority: TAccountAuthority;
+  quoteControl?: TAccountQuoteControl;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  newAdmin: SetQuoteControlAdminInstructionDataArgs["newAdmin"];
 };
 
 export async function getSetQuoteControlAdminInstructionAsync<
-  TAccountGlobal extends string,
-  TAccountAuthority extends string,
-  TAccountQuoteControl extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountQuoteControl extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: SetQuoteControlAdminAsyncInput<
@@ -145,31 +158,65 @@ export async function getSetQuoteControlAdminInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   SetQuoteControlAdminInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountQuoteControl,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteControl,
+      InstructionAccountInputAddress<TAccountQuoteControl>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: false },
-    authority: { value: input.authority ?? null, isWritable: false },
-    quoteControl: { value: input.quoteControl ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    quoteControl: {
+      value: input.quoteControl ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -177,83 +224,77 @@ export async function getSetQuoteControlAdminInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.quoteControl.value) {
-    accounts.quoteControl.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            113, 117, 111, 116, 101, 45, 99, 111, 110, 116, 114, 111, 108,
-          ])
-        ),
-      ],
-    });
+    accounts.quoteControl.value = await findQuoteControlPda({ programAddress });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.quoteControl),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("quoteControl", accounts.quoteControl),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSetQuoteControlAdminInstructionDataEncoder().encode(
-      args as SetQuoteControlAdminInstructionDataArgs
+      args as SetQuoteControlAdminInstructionDataArgs,
     ),
     programAddress,
   } as SetQuoteControlAdminInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountQuoteControl,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteControl,
+      InstructionAccountInputAddress<TAccountQuoteControl>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type SetQuoteControlAdminInput<
-  TAccountGlobal extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountQuoteControl extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountQuoteControl extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global: Address<TAccountGlobal>;
-  authority: TransactionSigner<TAccountAuthority>;
-  quoteControl: Address<TAccountQuoteControl>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  newAdmin: SetQuoteControlAdminInstructionDataArgs['newAdmin'];
+  global: TAccountGlobal;
+  authority: TAccountAuthority;
+  quoteControl: TAccountQuoteControl;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  newAdmin: SetQuoteControlAdminInstructionDataArgs["newAdmin"];
 };
 
 export function getSetQuoteControlAdminInstruction<
-  TAccountGlobal extends string,
-  TAccountAuthority extends string,
-  TAccountQuoteControl extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountQuoteControl extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: SetQuoteControlAdminInput<
@@ -263,54 +304,102 @@ export function getSetQuoteControlAdminInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): SetQuoteControlAdminInstruction<
   TProgramAddress,
-  TAccountGlobal,
-  TAccountAuthority,
-  TAccountQuoteControl,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAuthority,
+    InstructionAccountInputAddress<TAccountAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteControl,
+    InstructionAccountInputAddress<TAccountQuoteControl>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: false },
-    authority: { value: input.authority ?? null, isWritable: false },
-    quoteControl: { value: input.quoteControl ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    quoteControl: {
+      value: input.quoteControl ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.quoteControl),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("quoteControl", accounts.quoteControl),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSetQuoteControlAdminInstructionDataEncoder().encode(
-      args as SetQuoteControlAdminInstructionDataArgs
+      args as SetQuoteControlAdminInstructionDataArgs,
     ),
     programAddress,
   } as SetQuoteControlAdminInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountQuoteControl,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteControl,
+      InstructionAccountInputAddress<TAccountQuoteControl>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -335,11 +424,16 @@ export function parseSetQuoteControlAdminInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSetQuoteControlAdminInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 5) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 5,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -357,7 +451,7 @@ export function parseSetQuoteControlAdminInstruction<
       program: getNextAccount(),
     },
     data: getSetQuoteControlAdminInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

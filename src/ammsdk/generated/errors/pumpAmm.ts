@@ -11,8 +11,8 @@ import {
   type Address,
   type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type SolanaError,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
 /** FeeBasisPointsExceedsMaximum:  */
 export const PUMP_AMM_ERROR__FEE_BASIS_POINTS_EXCEEDS_MAXIMUM = 0x1770; // 6000
@@ -252,7 +252,7 @@ export type PumpAmmError =
   | typeof PUMP_AMM_ERROR__ZERO_QUOTE_AMOUNT;
 
 let pumpAmmErrorMessages: Record<PumpAmmError, string> | undefined;
-if (process.env.NODE_ENV !== 'production') {
+if (process.env["NODE_ENV"] !== "production") {
   pumpAmmErrorMessages = {
     [PUMP_AMM_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED]: ``,
     [PUMP_AMM_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
@@ -336,11 +336,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export function getPumpAmmErrorMessage(code: PumpAmmError): string {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env["NODE_ENV"] !== "production") {
     return (pumpAmmErrorMessages as Record<PumpAmmError, string>)[code];
   }
 
-  return 'Error message not available in production bundles.';
+  return "Error message not available in production bundles.";
 }
 
 export function isPumpAmmError<TProgramErrorCode extends PumpAmmError>(
@@ -348,13 +348,13 @@ export function isPumpAmmError<TProgramErrorCode extends PumpAmmError>(
   transactionMessage: {
     instructions: Record<number, { programAddress: Address }>;
   },
-  code?: TProgramErrorCode
+  code?: TProgramErrorCode,
 ): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> &
   Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
   return isProgramError<TProgramErrorCode>(
     error,
     transactionMessage,
     PUMP_AMM_PROGRAM_ADDRESS,
-    code
+    code,
   );
 }

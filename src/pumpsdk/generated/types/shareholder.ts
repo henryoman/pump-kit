@@ -18,7 +18,7 @@ import {
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
-} from '@solana/kit';
+} from "@solana/kit";
 
 export type Shareholder = { address: Address; shareBps: number };
 
@@ -26,15 +26,15 @@ export type ShareholderArgs = Shareholder;
 
 export function getShareholderEncoder(): FixedSizeEncoder<ShareholderArgs> {
   return getStructEncoder([
-    ['address', getAddressEncoder()],
-    ['shareBps', getU16Encoder()],
+    ["address", getAddressEncoder()],
+    ["shareBps", getU16Encoder()],
   ]);
 }
 
 export function getShareholderDecoder(): FixedSizeDecoder<Shareholder> {
   return getStructDecoder([
-    ['address', getAddressDecoder()],
-    ['shareBps', getU16Decoder()],
+    ["address", getAddressDecoder()],
+    ["shareBps", getU16Decoder()],
   ]);
 }
 

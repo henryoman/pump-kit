@@ -1,0 +1,21 @@
+{
+  "repository": "pump-fun/pump-public-docs",
+  "commit": "cb188ce08b5069196eef1f3e4a0c43b70099793b",
+  "files": [
+    {
+      "file": "pumpfun.idl.json",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/cb188ce08b5069196eef1f3e4a0c43b70099793b/idl/pump.json",
+      "sha256": "ffe966c42f1af41652ee753fe2f1e3f7cd4077d7e6f49faf3138959c8b56064b"
+    },
+    {
+      "file": "pumpswap.idl.json",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/cb188ce08b5069196eef1f3e4a0c43b70099793b/idl/pump_amm.json",
+      "sha256": "2091433899b07d003d98118ae6cd3c628960fd393b40710b6e15bce6d0e7f2d1"
+    },
+    {
+      "file": "pumpfees.idl.json",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/cb188ce08b5069196eef1f3e4a0c43b70099793b/idl/pump_fees.json",
+      "sha256": "d87b52305fd6b2ec487d4ba1e08a49990c23fa9b8b76092b2097df0164fa3859"
+    }
+  ]
+}

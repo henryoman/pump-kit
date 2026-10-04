@@ -7,13 +7,179 @@
  */
 
 import {
+  assertIsInstructionWithAccounts,
   containsBytes,
+  extendClient,
   fixEncoderSize,
   getBytesEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+  SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+  SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+  SolanaError,
   type Address,
+  type ClientWithPayer,
+  type ClientWithRpc,
+  type ClientWithTransactionPlanning,
+  type ClientWithTransactionSending,
+  type ExtendedClient,
+  type GetAccountInfoApi,
+  type GetMultipleAccountsApi,
+  type Instruction,
+  type InstructionWithData,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 import {
+  addSelfFetchFunctions,
+  addSelfPlanAndSendFunctions,
+  type SelfFetchFunctions,
+  type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+  getBondingCurveCodec,
+  getFeeConfigCodec,
+  getGlobalCodec,
+  getGlobalVolumeAccumulatorCodec,
+  getQuoteControlCodec,
+  getSharingConfigCodec,
+  getUserVolumeAccumulatorCodec,
+  type BondingCurve,
+  type BondingCurveArgs,
+  type FeeConfig,
+  type FeeConfigArgs,
+  type Global,
+  type GlobalArgs,
+  type GlobalVolumeAccumulator,
+  type GlobalVolumeAccumulatorArgs,
+  type QuoteControl,
+  type QuoteControlArgs,
+  type SharingConfig,
+  type SharingConfigArgs,
+  type UserVolumeAccumulator,
+  type UserVolumeAccumulatorArgs,
+} from "../accounts";
+import {
+  getAddQuoteControlMintInstructionAsync,
+  getAddQuoteMintInstructionAsync,
+  getAdminCtoInstructionAsync,
+  getAdminSetIdlAuthorityInstructionAsync,
+  getAdminUpdateTokenIncentivesInstructionAsync,
+  getBuyExactQuoteInV2InstructionAsync,
+  getBuyExactSolInInstructionAsync,
+  getBuyInstructionAsync,
+  getBuyV2InstructionAsync,
+  getClaimCashbackInstructionAsync,
+  getClaimCashbackV2InstructionAsync,
+  getClaimTokenIncentivesInstructionAsync,
+  getCloseUserVolumeAccumulatorInstructionAsync,
+  getCollectCreatorFeeInstructionAsync,
+  getCollectCreatorFeeV2InstructionAsync,
+  getCreateInstructionAsync,
+  getCreateV2InstructionAsync,
+  getDistributeCreatorFeesInstructionAsync,
+  getDistributeCreatorFeesV2InstructionAsync,
+  getDistributeFeeToHoldersInstructionAsync,
+  getExtendAccountInstructionAsync,
+  getGetMinimumDistributableFeeInstructionAsync,
+  getInitializeInstructionAsync,
+  getInitializeQuoteControlInstructionAsync,
+  getInitUserVolumeAccumulatorInstructionAsync,
+  getMigrateBondingCurveCreatorInstructionAsync,
+  getMigrateInstructionAsync,
+  getMigrateV2InstructionAsync,
+  getRemoveQuoteControlMintInstructionAsync,
+  getRemoveQuoteMintInstructionAsync,
+  getSellInstructionAsync,
+  getSellV2InstructionAsync,
+  getSetCreatorInstructionAsync,
+  getSetMayhemVirtualParamsInstructionAsync,
+  getSetMetaplexCreatorInstructionAsync,
+  getSetParamsInstructionAsync,
+  getSetQuoteControlAdminInstructionAsync,
+  getSetReservedFeeRecipientsInstructionAsync,
+  getSetVirtualQuoteReservesInstructionAsync,
+  getSyncUserVolumeAccumulatorInstructionAsync,
+  getToggleCashbackEnabledInstructionAsync,
+  getToggleCreateV2InstructionAsync,
+  getToggleMayhemModeInstructionAsync,
+  getUpdateBuybackConfigInstructionAsync,
+  getUpdateCreatorFeeConfigInstructionAsync,
+  getUpdateGlobalAuthorityInstructionAsync,
+  getUpdateHolderRewardConfigInstructionAsync,
+  parseAddQuoteControlMintInstruction,
+  parseAddQuoteMintInstruction,
+  parseAdminCtoInstruction,
+  parseAdminSetIdlAuthorityInstruction,
+  parseAdminUpdateTokenIncentivesInstruction,
+  parseBuyExactQuoteInV2Instruction,
+  parseBuyExactSolInInstruction,
+  parseBuyInstruction,
+  parseBuyV2Instruction,
+  parseClaimCashbackInstruction,
+  parseClaimCashbackV2Instruction,
+  parseClaimTokenIncentivesInstruction,
+  parseCloseUserVolumeAccumulatorInstruction,
+  parseCollectCreatorFeeInstruction,
+  parseCollectCreatorFeeV2Instruction,
+  parseCreateInstruction,
+  parseCreateV2Instruction,
+  parseDistributeCreatorFeesInstruction,
+  parseDistributeCreatorFeesV2Instruction,
+  parseDistributeFeeToHoldersInstruction,
+  parseExtendAccountInstruction,
+  parseGetMinimumDistributableFeeInstruction,
+  parseInitializeInstruction,
+  parseInitializeQuoteControlInstruction,
+  parseInitUserVolumeAccumulatorInstruction,
+  parseMigrateBondingCurveCreatorInstruction,
+  parseMigrateInstruction,
+  parseMigrateV2Instruction,
+  parseRemoveQuoteControlMintInstruction,
+  parseRemoveQuoteMintInstruction,
+  parseSellInstruction,
+  parseSellV2Instruction,
+  parseSetCreatorInstruction,
+  parseSetMayhemVirtualParamsInstruction,
+  parseSetMetaplexCreatorInstruction,
+  parseSetParamsInstruction,
+  parseSetQuoteControlAdminInstruction,
+  parseSetReservedFeeRecipientsInstruction,
+  parseSetVirtualQuoteReservesInstruction,
+  parseSyncUserVolumeAccumulatorInstruction,
+  parseToggleCashbackEnabledInstruction,
+  parseToggleCreateV2Instruction,
+  parseToggleMayhemModeInstruction,
+  parseUpdateBuybackConfigInstruction,
+  parseUpdateCreatorFeeConfigInstruction,
+  parseUpdateGlobalAuthorityInstruction,
+  parseUpdateHolderRewardConfigInstruction,
+  type AddQuoteControlMintAsyncInput,
+  type AddQuoteMintAsyncInput,
+  type AdminCtoAsyncInput,
+  type AdminSetIdlAuthorityAsyncInput,
+  type AdminUpdateTokenIncentivesAsyncInput,
+  type BuyAsyncInput,
+  type BuyExactQuoteInV2AsyncInput,
+  type BuyExactSolInAsyncInput,
+  type BuyV2AsyncInput,
+  type ClaimCashbackAsyncInput,
+  type ClaimCashbackV2AsyncInput,
+  type ClaimTokenIncentivesAsyncInput,
+  type CloseUserVolumeAccumulatorAsyncInput,
+  type CollectCreatorFeeAsyncInput,
+  type CollectCreatorFeeV2AsyncInput,
+  type CreateAsyncInput,
+  type CreateV2AsyncInput,
+  type DistributeCreatorFeesAsyncInput,
+  type DistributeCreatorFeesV2AsyncInput,
+  type DistributeFeeToHoldersAsyncInput,
+  type ExtendAccountAsyncInput,
+  type GetMinimumDistributableFeeAsyncInput,
+  type InitializeAsyncInput,
+  type InitializeQuoteControlAsyncInput,
+  type InitUserVolumeAccumulatorAsyncInput,
+  type MigrateAsyncInput,
+  type MigrateBondingCurveCreatorAsyncInput,
+  type MigrateV2AsyncInput,
   type ParsedAddQuoteControlMintInstruction,
   type ParsedAddQuoteMintInstruction,
   type ParsedAdminCtoInstruction,
@@ -61,10 +227,70 @@ import {
   type ParsedUpdateCreatorFeeConfigInstruction,
   type ParsedUpdateGlobalAuthorityInstruction,
   type ParsedUpdateHolderRewardConfigInstruction,
-} from '../instructions';
+  type RemoveQuoteControlMintAsyncInput,
+  type RemoveQuoteMintAsyncInput,
+  type SellAsyncInput,
+  type SellV2AsyncInput,
+  type SetCreatorAsyncInput,
+  type SetMayhemVirtualParamsAsyncInput,
+  type SetMetaplexCreatorAsyncInput,
+  type SetParamsAsyncInput,
+  type SetQuoteControlAdminAsyncInput,
+  type SetReservedFeeRecipientsAsyncInput,
+  type SetVirtualQuoteReservesAsyncInput,
+  type SyncUserVolumeAccumulatorAsyncInput,
+  type ToggleCashbackEnabledAsyncInput,
+  type ToggleCreateV2AsyncInput,
+  type ToggleMayhemModeAsyncInput,
+  type UpdateBuybackConfigAsyncInput,
+  type UpdateCreatorFeeConfigAsyncInput,
+  type UpdateGlobalAuthorityAsyncInput,
+  type UpdateHolderRewardConfigAsyncInput,
+} from "../instructions";
+import {
+  findAmmGlobalConfigPda,
+  findAssociatedQuoteBondingCurvePda,
+  findAssociatedUserVolumeAccumulatorPda,
+  findBondingCurvePda,
+  findBuyExactQuoteInV2BondingCurvePda,
+  findCoinCreatorVaultAtaPda,
+  findCoinCreatorVaultAuthorityPda,
+  findCollectCreatorFeeCreatorVaultPda,
+  findCreatorTokenAccountPda,
+  findCreatorVaultPda,
+  findCreatorVaultQuoteTokenAccountPda,
+  findCurrentCreatorQuoteTokenAccountPda,
+  findEventAuthorityPda,
+  findFeeConfigPda,
+  findGlobalPda,
+  findGlobalVolumeAccumulatorPda,
+  findHolderCreatorVaultQuoteTokenAccountPda,
+  findHolderRewardsPda,
+  findLpMintPda,
+  findMetadataPda,
+  findMigratePoolPda,
+  findMigrateV2PoolAuthorityMintAccountPda,
+  findMigrateV2PoolAuthorityPda,
+  findMigrateV2PoolBaseTokenAccountPda,
+  findMigrateV2PoolPda,
+  findMigrateV2PoolQuoteTokenAccountPda,
+  findMintAuthorityPda,
+  findPoolAuthorityMintAccountPda,
+  findPoolAuthorityPda,
+  findPoolAuthorityQuoteAccountPda,
+  findPoolAuthorityWsolAccountPda,
+  findPoolBaseTokenAccountPda,
+  findPoolPda,
+  findPoolQuoteTokenAccountPda,
+  findProgramSignerPda,
+  findQuoteControlPda,
+  findSharingConfigPda,
+  findUserPoolTokenAccountPda,
+  findUserVolumeAccumulatorPda,
+} from "../pdas";
 
 export const PUMP_PROGRAM_ADDRESS =
-  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
 
 export enum PumpAccount {
   BondingCurve,
@@ -77,16 +303,16 @@ export enum PumpAccount {
 }
 
 export function identifyPumpAccount(
-  account: { data: ReadonlyUint8Array } | ReadonlyUint8Array
+  account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PumpAccount {
-  const data = 'data' in account ? account.data : account;
+  const data = "data" in account ? account.data : account;
   if (
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([23, 183, 248, 55, 96, 216, 172, 96])
+        new Uint8Array([23, 183, 248, 55, 96, 216, 172, 96]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.BondingCurve;
@@ -95,9 +321,9 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([143, 52, 146, 187, 219, 123, 76, 155])
+        new Uint8Array([143, 52, 146, 187, 219, 123, 76, 155]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.FeeConfig;
@@ -106,9 +332,9 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([167, 232, 232, 177, 200, 108, 114, 127])
+        new Uint8Array([167, 232, 232, 177, 200, 108, 114, 127]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.Global;
@@ -117,9 +343,9 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255])
+        new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.GlobalVolumeAccumulator;
@@ -128,9 +354,9 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([56, 244, 35, 238, 193, 213, 162, 201])
+        new Uint8Array([56, 244, 35, 238, 193, 213, 162, 201]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.QuoteControl;
@@ -139,9 +365,9 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75])
+        new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.SharingConfig;
@@ -150,15 +376,364 @@ export function identifyPumpAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250])
+        new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAccount.UserVolumeAccumulator;
   }
+  throw new SolanaError(
+    SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+    { accountData: data, programName: "pump" },
+  );
+}
+
+export enum PumpEvent {
+  AddQuoteControlMintEvent,
+  AdminCtoEvent,
+  AdminSetIdlAuthorityEvent,
+  AdminUpdateTokenIncentivesEvent,
+  ClaimCashbackEvent,
+  ClaimTokenIncentivesEvent,
+  CloseUserVolumeAccumulatorEvent,
+  CollectCreatorFeeEvent,
+  CompleteEvent,
+  CompletePumpAmmMigrationEvent,
+  CreateEvent,
+  DistributeCreatorFeesEvent,
+  DistributeFeeToHoldersEvent,
+  ExtendAccountEvent,
+  InitUserVolumeAccumulatorEvent,
+  MigrateBondingCurveCreatorEvent,
+  MinimumDistributableFeeEvent,
+  RemoveQuoteControlMintEvent,
+  ReservedFeeRecipientsEvent,
+  SetCreatorEvent,
+  SetMetaplexCreatorEvent,
+  SetParamsEvent,
+  SetQuoteControlAdminEvent,
+  SyncUserVolumeAccumulatorEvent,
+  TradeEvent,
+  UpdateCreatorFeeConfigEvent,
+  UpdateGlobalAuthorityEvent,
+  UpdateMayhemVirtualParamsEvent,
+}
+
+export function identifyPumpEvent(
+  event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): PumpEvent {
+  const data = "data" in event ? event.data : event;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([164, 175, 87, 74, 88, 45, 33, 62]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.AddQuoteControlMintEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([110, 124, 226, 98, 170, 255, 17, 120]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.AdminCtoEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([245, 59, 70, 34, 75, 185, 109, 92]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.AdminSetIdlAuthorityEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([147, 250, 108, 120, 247, 29, 67, 222]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.AdminUpdateTokenIncentivesEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([226, 214, 246, 33, 7, 242, 147, 229]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.ClaimCashbackEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([79, 172, 246, 49, 205, 91, 206, 232]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.ClaimTokenIncentivesEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([146, 159, 189, 172, 146, 88, 56, 244]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.CloseUserVolumeAccumulatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([122, 2, 127, 1, 14, 191, 12, 175]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.CollectCreatorFeeEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([95, 114, 97, 156, 212, 46, 152, 8]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.CompleteEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([189, 233, 93, 185, 92, 148, 234, 148]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.CompletePumpAmmMigrationEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([27, 114, 169, 77, 222, 235, 99, 118]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.CreateEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([165, 55, 129, 112, 4, 179, 202, 40]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.DistributeCreatorFeesEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([227, 190, 215, 206, 176, 180, 165, 132]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.DistributeFeeToHoldersEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([97, 97, 215, 144, 93, 146, 22, 124]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.ExtendAccountEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([134, 36, 13, 72, 232, 101, 130, 216]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.InitUserVolumeAccumulatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([155, 167, 104, 220, 213, 108, 243, 3]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.MigrateBondingCurveCreatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([168, 216, 132, 239, 235, 182, 49, 52]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.MinimumDistributableFeeEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([46, 33, 86, 134, 0, 213, 209, 48]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.RemoveQuoteControlMintEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([43, 188, 250, 18, 221, 75, 187, 95]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.ReservedFeeRecipientsEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([237, 52, 123, 37, 245, 251, 72, 210]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.SetCreatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([142, 203, 6, 32, 127, 105, 191, 162]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.SetMetaplexCreatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([223, 195, 159, 246, 62, 48, 143, 131]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.SetParamsEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([74, 248, 141, 69, 202, 81, 30, 247]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.SetQuoteControlAdminEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([197, 122, 167, 124, 116, 81, 91, 255]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.SyncUserVolumeAccumulatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([189, 219, 127, 211, 78, 230, 97, 238]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.TradeEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([152, 198, 124, 124, 106, 246, 127, 191]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.UpdateCreatorFeeConfigEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([182, 195, 137, 42, 35, 206, 207, 247]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.UpdateGlobalAuthorityEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([117, 123, 228, 182, 161, 168, 220, 214]),
+      ),
+      0,
+    )
+  ) {
+    return PumpEvent.UpdateMayhemVirtualParamsEvent;
+  }
   throw new Error(
-    'The provided account could not be identified as a pump account.'
+    "The provided event could not be identified as a pump event.",
   );
 }
 
@@ -213,16 +788,16 @@ export enum PumpInstruction {
 }
 
 export function identifyPumpInstruction(
-  instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array
+  instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PumpInstruction {
-  const data = 'data' in instruction ? instruction.data : instruction;
+  const data = "data" in instruction ? instruction.data : instruction;
   if (
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([2, 14, 61, 138, 170, 142, 14, 95])
+        new Uint8Array([2, 14, 61, 138, 170, 142, 14, 95]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.AddQuoteControlMint;
@@ -231,9 +806,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([111, 121, 21, 56, 40, 24, 94, 209])
+        new Uint8Array([111, 121, 21, 56, 40, 24, 94, 209]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.AddQuoteMint;
@@ -242,9 +817,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([125, 126, 214, 134, 77, 229, 188, 89])
+        new Uint8Array([125, 126, 214, 134, 77, 229, 188, 89]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.AdminCto;
@@ -253,9 +828,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([8, 217, 96, 231, 144, 104, 192, 5])
+        new Uint8Array([8, 217, 96, 231, 144, 104, 192, 5]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.AdminSetIdlAuthority;
@@ -264,9 +839,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([209, 11, 115, 87, 213, 23, 124, 204])
+        new Uint8Array([209, 11, 115, 87, 213, 23, 124, 204]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.AdminUpdateTokenIncentives;
@@ -275,9 +850,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([102, 6, 61, 18, 1, 218, 235, 234])
+        new Uint8Array([102, 6, 61, 18, 1, 218, 235, 234]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.Buy;
@@ -286,9 +861,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([194, 171, 28, 70, 104, 77, 91, 47])
+        new Uint8Array([194, 171, 28, 70, 104, 77, 91, 47]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.BuyExactQuoteInV2;
@@ -297,9 +872,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([56, 252, 116, 8, 158, 223, 205, 95])
+        new Uint8Array([56, 252, 116, 8, 158, 223, 205, 95]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.BuyExactSolIn;
@@ -308,9 +883,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([184, 23, 238, 97, 103, 197, 211, 61])
+        new Uint8Array([184, 23, 238, 97, 103, 197, 211, 61]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.BuyV2;
@@ -319,9 +894,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197])
+        new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ClaimCashback;
@@ -330,9 +905,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([122, 243, 204, 65, 94, 116, 29, 55])
+        new Uint8Array([122, 243, 204, 65, 94, 116, 29, 55]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ClaimCashbackV2;
@@ -341,9 +916,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27])
+        new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ClaimTokenIncentives;
@@ -352,9 +927,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138])
+        new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.CloseUserVolumeAccumulator;
@@ -363,9 +938,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([20, 22, 86, 123, 198, 28, 219, 132])
+        new Uint8Array([20, 22, 86, 123, 198, 28, 219, 132]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.CollectCreatorFee;
@@ -374,9 +949,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([207, 17, 138, 242, 4, 34, 19, 56])
+        new Uint8Array([207, 17, 138, 242, 4, 34, 19, 56]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.CollectCreatorFeeV2;
@@ -385,9 +960,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([24, 30, 200, 40, 5, 28, 7, 119])
+        new Uint8Array([24, 30, 200, 40, 5, 28, 7, 119]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.Create;
@@ -396,9 +971,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([214, 144, 76, 236, 95, 139, 49, 180])
+        new Uint8Array([214, 144, 76, 236, 95, 139, 49, 180]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.CreateV2;
@@ -407,9 +982,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([165, 114, 103, 0, 121, 206, 247, 81])
+        new Uint8Array([165, 114, 103, 0, 121, 206, 247, 81]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.DistributeCreatorFees;
@@ -418,9 +993,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([255, 203, 19, 79, 244, 68, 8, 159])
+        new Uint8Array([255, 203, 19, 79, 244, 68, 8, 159]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.DistributeCreatorFeesV2;
@@ -429,9 +1004,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([98, 54, 145, 97, 2, 70, 173, 43])
+        new Uint8Array([98, 54, 145, 97, 2, 70, 173, 43]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.DistributeFeeToHolders;
@@ -440,9 +1015,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([234, 102, 194, 203, 150, 72, 62, 229])
+        new Uint8Array([234, 102, 194, 203, 150, 72, 62, 229]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ExtendAccount;
@@ -451,9 +1026,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([117, 225, 127, 202, 134, 95, 68, 35])
+        new Uint8Array([117, 225, 127, 202, 134, 95, 68, 35]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.GetMinimumDistributableFee;
@@ -462,9 +1037,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183])
+        new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.InitUserVolumeAccumulator;
@@ -473,9 +1048,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([175, 175, 109, 31, 13, 152, 155, 237])
+        new Uint8Array([175, 175, 109, 31, 13, 152, 155, 237]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.Initialize;
@@ -484,9 +1059,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([239, 73, 245, 173, 209, 177, 84, 66])
+        new Uint8Array([239, 73, 245, 173, 209, 177, 84, 66]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.InitializeQuoteControl;
@@ -495,9 +1070,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([155, 234, 231, 146, 236, 158, 162, 30])
+        new Uint8Array([155, 234, 231, 146, 236, 158, 162, 30]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.Migrate;
@@ -506,9 +1081,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([87, 124, 52, 191, 52, 38, 214, 232])
+        new Uint8Array([87, 124, 52, 191, 52, 38, 214, 232]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.MigrateBondingCurveCreator;
@@ -517,9 +1092,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([187, 203, 18, 31, 206, 237, 254, 41])
+        new Uint8Array([187, 203, 18, 31, 206, 237, 254, 41]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.MigrateV2;
@@ -528,9 +1103,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([223, 7, 253, 26, 81, 165, 218, 166])
+        new Uint8Array([223, 7, 253, 26, 81, 165, 218, 166]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.RemoveQuoteControlMint;
@@ -539,9 +1114,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([177, 65, 223, 38, 88, 209, 158, 155])
+        new Uint8Array([177, 65, 223, 38, 88, 209, 158, 155]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.RemoveQuoteMint;
@@ -550,9 +1125,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173])
+        new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.Sell;
@@ -561,9 +1136,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([93, 246, 130, 60, 231, 233, 64, 178])
+        new Uint8Array([93, 246, 130, 60, 231, 233, 64, 178]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SellV2;
@@ -572,9 +1147,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([254, 148, 255, 112, 207, 142, 170, 165])
+        new Uint8Array([254, 148, 255, 112, 207, 142, 170, 165]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetCreator;
@@ -583,9 +1158,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([61, 169, 188, 191, 153, 149, 42, 97])
+        new Uint8Array([61, 169, 188, 191, 153, 149, 42, 97]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetMayhemVirtualParams;
@@ -594,9 +1169,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([138, 96, 174, 217, 48, 85, 197, 246])
+        new Uint8Array([138, 96, 174, 217, 48, 85, 197, 246]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetMetaplexCreator;
@@ -605,9 +1180,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([27, 234, 178, 52, 147, 2, 187, 141])
+        new Uint8Array([27, 234, 178, 52, 147, 2, 187, 141]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetParams;
@@ -616,9 +1191,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([62, 79, 161, 211, 165, 170, 214, 210])
+        new Uint8Array([62, 79, 161, 211, 165, 170, 214, 210]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetQuoteControlAdmin;
@@ -627,9 +1202,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142])
+        new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetReservedFeeRecipients;
@@ -638,9 +1213,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([101, 135, 191, 104, 9, 88, 20, 96])
+        new Uint8Array([101, 135, 191, 104, 9, 88, 20, 96]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SetVirtualQuoteReserves;
@@ -649,9 +1224,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238])
+        new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.SyncUserVolumeAccumulator;
@@ -660,9 +1235,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195])
+        new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ToggleCashbackEnabled;
@@ -671,9 +1246,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([28, 255, 230, 240, 172, 107, 203, 171])
+        new Uint8Array([28, 255, 230, 240, 172, 107, 203, 171]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ToggleCreateV2;
@@ -682,9 +1257,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([1, 9, 111, 208, 100, 31, 255, 163])
+        new Uint8Array([1, 9, 111, 208, 100, 31, 255, 163]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.ToggleMayhemMode;
@@ -693,9 +1268,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([251, 224, 171, 146, 160, 26, 113, 233])
+        new Uint8Array([251, 224, 171, 146, 160, 26, 113, 233]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.UpdateBuybackConfig;
@@ -704,9 +1279,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175])
+        new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.UpdateCreatorFeeConfig;
@@ -715,9 +1290,9 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([227, 181, 74, 196, 208, 21, 97, 213])
+        new Uint8Array([227, 181, 74, 196, 208, 21, 97, 213]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.UpdateGlobalAuthority;
@@ -726,20 +1301,21 @@ export function identifyPumpInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([225, 252, 66, 4, 199, 35, 236, 16])
+        new Uint8Array([225, 252, 66, 4, 199, 35, 236, 16]),
       ),
-      0
+      0,
     )
   ) {
     return PumpInstruction.UpdateHolderRewardConfig;
   }
-  throw new Error(
-    'The provided instruction could not be identified as a pump instruction.'
+  throw new SolanaError(
+    SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+    { instructionData: data, programName: "pump" },
   );
 }
 
 export type ParsedPumpInstruction<
-  TProgram extends string = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  TProgram extends string = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
 > =
   | ({
       instructionType: PumpInstruction.AddQuoteControlMint;
@@ -880,3 +1456,921 @@ export type ParsedPumpInstruction<
   | ({
       instructionType: PumpInstruction.UpdateHolderRewardConfig;
     } & ParsedUpdateHolderRewardConfigInstruction<TProgram>);
+
+export function parsePumpInstruction<TProgram extends string>(
+  instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
+): ParsedPumpInstruction<TProgram> {
+  const instructionType = identifyPumpInstruction(instruction);
+  switch (instructionType) {
+    case PumpInstruction.AddQuoteControlMint: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.AddQuoteControlMint,
+        ...parseAddQuoteControlMintInstruction(instruction),
+      };
+    }
+    case PumpInstruction.AddQuoteMint: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.AddQuoteMint,
+        ...parseAddQuoteMintInstruction(instruction),
+      };
+    }
+    case PumpInstruction.AdminCto: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.AdminCto,
+        ...parseAdminCtoInstruction(instruction),
+      };
+    }
+    case PumpInstruction.AdminSetIdlAuthority: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.AdminSetIdlAuthority,
+        ...parseAdminSetIdlAuthorityInstruction(instruction),
+      };
+    }
+    case PumpInstruction.AdminUpdateTokenIncentives: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.AdminUpdateTokenIncentives,
+        ...parseAdminUpdateTokenIncentivesInstruction(instruction),
+      };
+    }
+    case PumpInstruction.Buy: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.Buy,
+        ...parseBuyInstruction(instruction),
+      };
+    }
+    case PumpInstruction.BuyExactQuoteInV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.BuyExactQuoteInV2,
+        ...parseBuyExactQuoteInV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.BuyExactSolIn: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.BuyExactSolIn,
+        ...parseBuyExactSolInInstruction(instruction),
+      };
+    }
+    case PumpInstruction.BuyV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.BuyV2,
+        ...parseBuyV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.ClaimCashback: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ClaimCashback,
+        ...parseClaimCashbackInstruction(instruction),
+      };
+    }
+    case PumpInstruction.ClaimCashbackV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ClaimCashbackV2,
+        ...parseClaimCashbackV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.ClaimTokenIncentives: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ClaimTokenIncentives,
+        ...parseClaimTokenIncentivesInstruction(instruction),
+      };
+    }
+    case PumpInstruction.CloseUserVolumeAccumulator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.CloseUserVolumeAccumulator,
+        ...parseCloseUserVolumeAccumulatorInstruction(instruction),
+      };
+    }
+    case PumpInstruction.CollectCreatorFee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.CollectCreatorFee,
+        ...parseCollectCreatorFeeInstruction(instruction),
+      };
+    }
+    case PumpInstruction.CollectCreatorFeeV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.CollectCreatorFeeV2,
+        ...parseCollectCreatorFeeV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.Create: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.Create,
+        ...parseCreateInstruction(instruction),
+      };
+    }
+    case PumpInstruction.CreateV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.CreateV2,
+        ...parseCreateV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.DistributeCreatorFees: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.DistributeCreatorFees,
+        ...parseDistributeCreatorFeesInstruction(instruction),
+      };
+    }
+    case PumpInstruction.DistributeCreatorFeesV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.DistributeCreatorFeesV2,
+        ...parseDistributeCreatorFeesV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.DistributeFeeToHolders: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.DistributeFeeToHolders,
+        ...parseDistributeFeeToHoldersInstruction(instruction),
+      };
+    }
+    case PumpInstruction.ExtendAccount: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ExtendAccount,
+        ...parseExtendAccountInstruction(instruction),
+      };
+    }
+    case PumpInstruction.GetMinimumDistributableFee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.GetMinimumDistributableFee,
+        ...parseGetMinimumDistributableFeeInstruction(instruction),
+      };
+    }
+    case PumpInstruction.InitUserVolumeAccumulator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.InitUserVolumeAccumulator,
+        ...parseInitUserVolumeAccumulatorInstruction(instruction),
+      };
+    }
+    case PumpInstruction.Initialize: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.Initialize,
+        ...parseInitializeInstruction(instruction),
+      };
+    }
+    case PumpInstruction.InitializeQuoteControl: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.InitializeQuoteControl,
+        ...parseInitializeQuoteControlInstruction(instruction),
+      };
+    }
+    case PumpInstruction.Migrate: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.Migrate,
+        ...parseMigrateInstruction(instruction),
+      };
+    }
+    case PumpInstruction.MigrateBondingCurveCreator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.MigrateBondingCurveCreator,
+        ...parseMigrateBondingCurveCreatorInstruction(instruction),
+      };
+    }
+    case PumpInstruction.MigrateV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.MigrateV2,
+        ...parseMigrateV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.RemoveQuoteControlMint: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.RemoveQuoteControlMint,
+        ...parseRemoveQuoteControlMintInstruction(instruction),
+      };
+    }
+    case PumpInstruction.RemoveQuoteMint: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.RemoveQuoteMint,
+        ...parseRemoveQuoteMintInstruction(instruction),
+      };
+    }
+    case PumpInstruction.Sell: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.Sell,
+        ...parseSellInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SellV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SellV2,
+        ...parseSellV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.SetCreator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetCreator,
+        ...parseSetCreatorInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SetMayhemVirtualParams: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetMayhemVirtualParams,
+        ...parseSetMayhemVirtualParamsInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SetMetaplexCreator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetMetaplexCreator,
+        ...parseSetMetaplexCreatorInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SetParams: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetParams,
+        ...parseSetParamsInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SetQuoteControlAdmin: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetQuoteControlAdmin,
+        ...parseSetQuoteControlAdminInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SetReservedFeeRecipients: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetReservedFeeRecipients,
+        ...parseSetReservedFeeRecipientsInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SetVirtualQuoteReserves: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SetVirtualQuoteReserves,
+        ...parseSetVirtualQuoteReservesInstruction(instruction),
+      };
+    }
+    case PumpInstruction.SyncUserVolumeAccumulator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.SyncUserVolumeAccumulator,
+        ...parseSyncUserVolumeAccumulatorInstruction(instruction),
+      };
+    }
+    case PumpInstruction.ToggleCashbackEnabled: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ToggleCashbackEnabled,
+        ...parseToggleCashbackEnabledInstruction(instruction),
+      };
+    }
+    case PumpInstruction.ToggleCreateV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ToggleCreateV2,
+        ...parseToggleCreateV2Instruction(instruction),
+      };
+    }
+    case PumpInstruction.ToggleMayhemMode: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.ToggleMayhemMode,
+        ...parseToggleMayhemModeInstruction(instruction),
+      };
+    }
+    case PumpInstruction.UpdateBuybackConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.UpdateBuybackConfig,
+        ...parseUpdateBuybackConfigInstruction(instruction),
+      };
+    }
+    case PumpInstruction.UpdateCreatorFeeConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.UpdateCreatorFeeConfig,
+        ...parseUpdateCreatorFeeConfigInstruction(instruction),
+      };
+    }
+    case PumpInstruction.UpdateGlobalAuthority: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.UpdateGlobalAuthority,
+        ...parseUpdateGlobalAuthorityInstruction(instruction),
+      };
+    }
+    case PumpInstruction.UpdateHolderRewardConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpInstruction.UpdateHolderRewardConfig,
+        ...parseUpdateHolderRewardConfigInstruction(instruction),
+      };
+    }
+    default:
+      throw new SolanaError(
+        SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+        { instructionType: instructionType as string, programName: "pump" },
+      );
+  }
+}
+
+export type PumpPlugin = {
+  accounts: PumpPluginAccounts;
+  instructions: PumpPluginInstructions;
+  pdas: PumpPluginPdas;
+  identifyAccount: typeof identifyPumpAccount;
+  identifyInstruction: typeof identifyPumpInstruction;
+  parseInstruction: typeof parsePumpInstruction;
+};
+
+export type PumpPluginAccounts = {
+  bondingCurve: ReturnType<typeof getBondingCurveCodec> &
+    SelfFetchFunctions<BondingCurveArgs, BondingCurve>;
+  feeConfig: ReturnType<typeof getFeeConfigCodec> &
+    SelfFetchFunctions<FeeConfigArgs, FeeConfig>;
+  global: ReturnType<typeof getGlobalCodec> &
+    SelfFetchFunctions<GlobalArgs, Global>;
+  globalVolumeAccumulator: ReturnType<typeof getGlobalVolumeAccumulatorCodec> &
+    SelfFetchFunctions<GlobalVolumeAccumulatorArgs, GlobalVolumeAccumulator>;
+  quoteControl: ReturnType<typeof getQuoteControlCodec> &
+    SelfFetchFunctions<QuoteControlArgs, QuoteControl>;
+  sharingConfig: ReturnType<typeof getSharingConfigCodec> &
+    SelfFetchFunctions<SharingConfigArgs, SharingConfig>;
+  userVolumeAccumulator: ReturnType<typeof getUserVolumeAccumulatorCodec> &
+    SelfFetchFunctions<UserVolumeAccumulatorArgs, UserVolumeAccumulator>;
+};
+
+export type PumpPluginInstructions = {
+  addQuoteControlMint: (
+    input: AddQuoteControlMintAsyncInput,
+  ) => ReturnType<typeof getAddQuoteControlMintInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  addQuoteMint: (
+    input: AddQuoteMintAsyncInput,
+  ) => ReturnType<typeof getAddQuoteMintInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  adminCto: (
+    input: AdminCtoAsyncInput,
+  ) => ReturnType<typeof getAdminCtoInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  adminSetIdlAuthority: (
+    input: AdminSetIdlAuthorityAsyncInput,
+  ) => ReturnType<typeof getAdminSetIdlAuthorityInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  adminUpdateTokenIncentives: (
+    input: AdminUpdateTokenIncentivesAsyncInput,
+  ) => ReturnType<typeof getAdminUpdateTokenIncentivesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  buy: (
+    input: BuyAsyncInput,
+  ) => ReturnType<typeof getBuyInstructionAsync> & SelfPlanAndSendFunctions;
+  buyExactQuoteInV2: (
+    input: BuyExactQuoteInV2AsyncInput,
+  ) => ReturnType<typeof getBuyExactQuoteInV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  buyExactSolIn: (
+    input: BuyExactSolInAsyncInput,
+  ) => ReturnType<typeof getBuyExactSolInInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  buyV2: (
+    input: BuyV2AsyncInput,
+  ) => ReturnType<typeof getBuyV2InstructionAsync> & SelfPlanAndSendFunctions;
+  claimCashback: (
+    input: ClaimCashbackAsyncInput,
+  ) => ReturnType<typeof getClaimCashbackInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  claimCashbackV2: (
+    input: ClaimCashbackV2AsyncInput,
+  ) => ReturnType<typeof getClaimCashbackV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  claimTokenIncentives: (
+    input: MakeOptional<ClaimTokenIncentivesAsyncInput, "payer">,
+  ) => ReturnType<typeof getClaimTokenIncentivesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  closeUserVolumeAccumulator: (
+    input: CloseUserVolumeAccumulatorAsyncInput,
+  ) => ReturnType<typeof getCloseUserVolumeAccumulatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  collectCreatorFee: (
+    input: CollectCreatorFeeAsyncInput,
+  ) => ReturnType<typeof getCollectCreatorFeeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  collectCreatorFeeV2: (
+    input: CollectCreatorFeeV2AsyncInput,
+  ) => ReturnType<typeof getCollectCreatorFeeV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  create: (
+    input: CreateAsyncInput,
+  ) => ReturnType<typeof getCreateInstructionAsync> & SelfPlanAndSendFunctions;
+  createV2: (
+    input: CreateV2AsyncInput,
+  ) => ReturnType<typeof getCreateV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  distributeCreatorFees: (
+    input: DistributeCreatorFeesAsyncInput,
+  ) => ReturnType<typeof getDistributeCreatorFeesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  distributeCreatorFeesV2: (
+    input: MakeOptional<DistributeCreatorFeesV2AsyncInput, "payer">,
+  ) => ReturnType<typeof getDistributeCreatorFeesV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  distributeFeeToHolders: (
+    input: DistributeFeeToHoldersAsyncInput,
+  ) => ReturnType<typeof getDistributeFeeToHoldersInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  extendAccount: (
+    input: ExtendAccountAsyncInput,
+  ) => ReturnType<typeof getExtendAccountInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  getMinimumDistributableFee: (
+    input: GetMinimumDistributableFeeAsyncInput,
+  ) => ReturnType<typeof getGetMinimumDistributableFeeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  initUserVolumeAccumulator: (
+    input: MakeOptional<InitUserVolumeAccumulatorAsyncInput, "payer">,
+  ) => ReturnType<typeof getInitUserVolumeAccumulatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  initialize: (
+    input: InitializeAsyncInput,
+  ) => ReturnType<typeof getInitializeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  initializeQuoteControl: (
+    input: InitializeQuoteControlAsyncInput,
+  ) => ReturnType<typeof getInitializeQuoteControlInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  migrate: (
+    input: MigrateAsyncInput,
+  ) => ReturnType<typeof getMigrateInstructionAsync> & SelfPlanAndSendFunctions;
+  migrateBondingCurveCreator: (
+    input: MigrateBondingCurveCreatorAsyncInput,
+  ) => ReturnType<typeof getMigrateBondingCurveCreatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  migrateV2: (
+    input: MigrateV2AsyncInput,
+  ) => ReturnType<typeof getMigrateV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  removeQuoteControlMint: (
+    input: RemoveQuoteControlMintAsyncInput,
+  ) => ReturnType<typeof getRemoveQuoteControlMintInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  removeQuoteMint: (
+    input: RemoveQuoteMintAsyncInput,
+  ) => ReturnType<typeof getRemoveQuoteMintInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  sell: (
+    input: SellAsyncInput,
+  ) => ReturnType<typeof getSellInstructionAsync> & SelfPlanAndSendFunctions;
+  sellV2: (
+    input: SellV2AsyncInput,
+  ) => ReturnType<typeof getSellV2InstructionAsync> & SelfPlanAndSendFunctions;
+  setCreator: (
+    input: SetCreatorAsyncInput,
+  ) => ReturnType<typeof getSetCreatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setMayhemVirtualParams: (
+    input: SetMayhemVirtualParamsAsyncInput,
+  ) => ReturnType<typeof getSetMayhemVirtualParamsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setMetaplexCreator: (
+    input: SetMetaplexCreatorAsyncInput,
+  ) => ReturnType<typeof getSetMetaplexCreatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setParams: (
+    input: SetParamsAsyncInput,
+  ) => ReturnType<typeof getSetParamsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setQuoteControlAdmin: (
+    input: SetQuoteControlAdminAsyncInput,
+  ) => ReturnType<typeof getSetQuoteControlAdminInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setReservedFeeRecipients: (
+    input: SetReservedFeeRecipientsAsyncInput,
+  ) => ReturnType<typeof getSetReservedFeeRecipientsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setVirtualQuoteReserves: (
+    input: SetVirtualQuoteReservesAsyncInput,
+  ) => ReturnType<typeof getSetVirtualQuoteReservesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  syncUserVolumeAccumulator: (
+    input: SyncUserVolumeAccumulatorAsyncInput,
+  ) => ReturnType<typeof getSyncUserVolumeAccumulatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  toggleCashbackEnabled: (
+    input: ToggleCashbackEnabledAsyncInput,
+  ) => ReturnType<typeof getToggleCashbackEnabledInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  toggleCreateV2: (
+    input: ToggleCreateV2AsyncInput,
+  ) => ReturnType<typeof getToggleCreateV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  toggleMayhemMode: (
+    input: ToggleMayhemModeAsyncInput,
+  ) => ReturnType<typeof getToggleMayhemModeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateBuybackConfig: (
+    input: UpdateBuybackConfigAsyncInput,
+  ) => ReturnType<typeof getUpdateBuybackConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateCreatorFeeConfig: (
+    input: UpdateCreatorFeeConfigAsyncInput,
+  ) => ReturnType<typeof getUpdateCreatorFeeConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateGlobalAuthority: (
+    input: UpdateGlobalAuthorityAsyncInput,
+  ) => ReturnType<typeof getUpdateGlobalAuthorityInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateHolderRewardConfig: (
+    input: UpdateHolderRewardConfigAsyncInput,
+  ) => ReturnType<typeof getUpdateHolderRewardConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+};
+
+export type PumpPluginPdas = {
+  global: typeof findGlobalPda;
+  quoteControl: typeof findQuoteControlPda;
+  eventAuthority: typeof findEventAuthorityPda;
+  bondingCurve: typeof findBondingCurvePda;
+  currentCreatorQuoteTokenAccount: typeof findCurrentCreatorQuoteTokenAccountPda;
+  creatorVault: typeof findCreatorVaultPda;
+  creatorVaultQuoteTokenAccount: typeof findCreatorVaultQuoteTokenAccountPda;
+  holderCreatorVaultQuoteTokenAccount: typeof findHolderCreatorVaultQuoteTokenAccountPda;
+  ammGlobalConfig: typeof findAmmGlobalConfigPda;
+  poolAuthority: typeof findPoolAuthorityPda;
+  pool: typeof findPoolPda;
+  coinCreatorVaultAuthority: typeof findCoinCreatorVaultAuthorityPda;
+  coinCreatorVaultAta: typeof findCoinCreatorVaultAtaPda;
+  sharingConfig: typeof findSharingConfigPda;
+  programSigner: typeof findProgramSignerPda;
+  globalVolumeAccumulator: typeof findGlobalVolumeAccumulatorPda;
+  userVolumeAccumulator: typeof findUserVolumeAccumulatorPda;
+  feeConfig: typeof findFeeConfigPda;
+  buyExactQuoteInV2BondingCurve: typeof findBuyExactQuoteInV2BondingCurvePda;
+  associatedUserVolumeAccumulator: typeof findAssociatedUserVolumeAccumulatorPda;
+  collectCreatorFeeCreatorVault: typeof findCollectCreatorFeeCreatorVaultPda;
+  creatorTokenAccount: typeof findCreatorTokenAccountPda;
+  mintAuthority: typeof findMintAuthorityPda;
+  metadata: typeof findMetadataPda;
+  holderRewards: typeof findHolderRewardsPda;
+  migratePool: typeof findMigratePoolPda;
+  poolAuthorityMintAccount: typeof findPoolAuthorityMintAccountPda;
+  poolAuthorityWsolAccount: typeof findPoolAuthorityWsolAccountPda;
+  lpMint: typeof findLpMintPda;
+  userPoolTokenAccount: typeof findUserPoolTokenAccountPda;
+  poolBaseTokenAccount: typeof findPoolBaseTokenAccountPda;
+  poolQuoteTokenAccount: typeof findPoolQuoteTokenAccountPda;
+  associatedQuoteBondingCurve: typeof findAssociatedQuoteBondingCurvePda;
+  migrateV2Pool: typeof findMigrateV2PoolPda;
+  migrateV2PoolAuthority: typeof findMigrateV2PoolAuthorityPda;
+  migrateV2PoolAuthorityMintAccount: typeof findMigrateV2PoolAuthorityMintAccountPda;
+  poolAuthorityQuoteAccount: typeof findPoolAuthorityQuoteAccountPda;
+  migrateV2PoolBaseTokenAccount: typeof findMigrateV2PoolBaseTokenAccountPda;
+  migrateV2PoolQuoteTokenAccount: typeof findMigrateV2PoolQuoteTokenAccountPda;
+};
+
+export type PumpPluginRequirements = ClientWithRpc<
+  GetAccountInfoApi & GetMultipleAccountsApi
+> &
+  ClientWithPayer &
+  ClientWithTransactionPlanning &
+  ClientWithTransactionSending;
+
+export function pumpProgram() {
+  return <T extends PumpPluginRequirements>(
+    client: T,
+  ): ExtendedClient<T, { pump: PumpPlugin }> => {
+    return extendClient(client, {
+      pump: <PumpPlugin>{
+        accounts: {
+          bondingCurve: addSelfFetchFunctions(client, getBondingCurveCodec()),
+          feeConfig: addSelfFetchFunctions(client, getFeeConfigCodec()),
+          global: addSelfFetchFunctions(client, getGlobalCodec()),
+          globalVolumeAccumulator: addSelfFetchFunctions(
+            client,
+            getGlobalVolumeAccumulatorCodec(),
+          ),
+          quoteControl: addSelfFetchFunctions(client, getQuoteControlCodec()),
+          sharingConfig: addSelfFetchFunctions(client, getSharingConfigCodec()),
+          userVolumeAccumulator: addSelfFetchFunctions(
+            client,
+            getUserVolumeAccumulatorCodec(),
+          ),
+        },
+        instructions: {
+          addQuoteControlMint: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAddQuoteControlMintInstructionAsync(input),
+            ),
+          addQuoteMint: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAddQuoteMintInstructionAsync(input),
+            ),
+          adminCto: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdminCtoInstructionAsync(input),
+            ),
+          adminSetIdlAuthority: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdminSetIdlAuthorityInstructionAsync(input),
+            ),
+          adminUpdateTokenIncentives: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdminUpdateTokenIncentivesInstructionAsync(input),
+            ),
+          buy: (input) =>
+            addSelfPlanAndSendFunctions(client, getBuyInstructionAsync(input)),
+          buyExactQuoteInV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getBuyExactQuoteInV2InstructionAsync(input),
+            ),
+          buyExactSolIn: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getBuyExactSolInInstructionAsync(input),
+            ),
+          buyV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getBuyV2InstructionAsync(input),
+            ),
+          claimCashback: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimCashbackInstructionAsync(input),
+            ),
+          claimCashbackV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimCashbackV2InstructionAsync(input),
+            ),
+          claimTokenIncentives: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimTokenIncentivesInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          closeUserVolumeAccumulator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCloseUserVolumeAccumulatorInstructionAsync(input),
+            ),
+          collectCreatorFee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCollectCreatorFeeInstructionAsync(input),
+            ),
+          collectCreatorFeeV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCollectCreatorFeeV2InstructionAsync(input),
+            ),
+          create: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCreateInstructionAsync(input),
+            ),
+          createV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCreateV2InstructionAsync(input),
+            ),
+          distributeCreatorFees: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getDistributeCreatorFeesInstructionAsync(input),
+            ),
+          distributeCreatorFeesV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getDistributeCreatorFeesV2InstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          distributeFeeToHolders: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getDistributeFeeToHoldersInstructionAsync(input),
+            ),
+          extendAccount: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getExtendAccountInstructionAsync(input),
+            ),
+          getMinimumDistributableFee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getGetMinimumDistributableFeeInstructionAsync(input),
+            ),
+          initUserVolumeAccumulator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitUserVolumeAccumulatorInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          initialize: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitializeInstructionAsync(input),
+            ),
+          initializeQuoteControl: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitializeQuoteControlInstructionAsync(input),
+            ),
+          migrate: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getMigrateInstructionAsync(input),
+            ),
+          migrateBondingCurveCreator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getMigrateBondingCurveCreatorInstructionAsync(input),
+            ),
+          migrateV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getMigrateV2InstructionAsync(input),
+            ),
+          removeQuoteControlMint: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRemoveQuoteControlMintInstructionAsync(input),
+            ),
+          removeQuoteMint: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRemoveQuoteMintInstructionAsync(input),
+            ),
+          sell: (input) =>
+            addSelfPlanAndSendFunctions(client, getSellInstructionAsync(input)),
+          sellV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSellV2InstructionAsync(input),
+            ),
+          setCreator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetCreatorInstructionAsync(input),
+            ),
+          setMayhemVirtualParams: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetMayhemVirtualParamsInstructionAsync(input),
+            ),
+          setMetaplexCreator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetMetaplexCreatorInstructionAsync(input),
+            ),
+          setParams: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetParamsInstructionAsync(input),
+            ),
+          setQuoteControlAdmin: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetQuoteControlAdminInstructionAsync(input),
+            ),
+          setReservedFeeRecipients: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetReservedFeeRecipientsInstructionAsync(input),
+            ),
+          setVirtualQuoteReserves: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetVirtualQuoteReservesInstructionAsync(input),
+            ),
+          syncUserVolumeAccumulator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSyncUserVolumeAccumulatorInstructionAsync(input),
+            ),
+          toggleCashbackEnabled: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleCashbackEnabledInstructionAsync(input),
+            ),
+          toggleCreateV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleCreateV2InstructionAsync(input),
+            ),
+          toggleMayhemMode: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleMayhemModeInstructionAsync(input),
+            ),
+          updateBuybackConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateBuybackConfigInstructionAsync(input),
+            ),
+          updateCreatorFeeConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateCreatorFeeConfigInstructionAsync(input),
+            ),
+          updateGlobalAuthority: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateGlobalAuthorityInstructionAsync(input),
+            ),
+          updateHolderRewardConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateHolderRewardConfigInstructionAsync(input),
+            ),
+        },
+        pdas: {
+          global: findGlobalPda,
+          quoteControl: findQuoteControlPda,
+          eventAuthority: findEventAuthorityPda,
+          bondingCurve: findBondingCurvePda,
+          currentCreatorQuoteTokenAccount:
+            findCurrentCreatorQuoteTokenAccountPda,
+          creatorVault: findCreatorVaultPda,
+          creatorVaultQuoteTokenAccount: findCreatorVaultQuoteTokenAccountPda,
+          holderCreatorVaultQuoteTokenAccount:
+            findHolderCreatorVaultQuoteTokenAccountPda,
+          ammGlobalConfig: findAmmGlobalConfigPda,
+          poolAuthority: findPoolAuthorityPda,
+          pool: findPoolPda,
+          coinCreatorVaultAuthority: findCoinCreatorVaultAuthorityPda,
+          coinCreatorVaultAta: findCoinCreatorVaultAtaPda,
+          sharingConfig: findSharingConfigPda,
+          programSigner: findProgramSignerPda,
+          globalVolumeAccumulator: findGlobalVolumeAccumulatorPda,
+          userVolumeAccumulator: findUserVolumeAccumulatorPda,
+          feeConfig: findFeeConfigPda,
+          buyExactQuoteInV2BondingCurve: findBuyExactQuoteInV2BondingCurvePda,
+          associatedUserVolumeAccumulator:
+            findAssociatedUserVolumeAccumulatorPda,
+          collectCreatorFeeCreatorVault: findCollectCreatorFeeCreatorVaultPda,
+          creatorTokenAccount: findCreatorTokenAccountPda,
+          mintAuthority: findMintAuthorityPda,
+          metadata: findMetadataPda,
+          holderRewards: findHolderRewardsPda,
+          migratePool: findMigratePoolPda,
+          poolAuthorityMintAccount: findPoolAuthorityMintAccountPda,
+          poolAuthorityWsolAccount: findPoolAuthorityWsolAccountPda,
+          lpMint: findLpMintPda,
+          userPoolTokenAccount: findUserPoolTokenAccountPda,
+          poolBaseTokenAccount: findPoolBaseTokenAccountPda,
+          poolQuoteTokenAccount: findPoolQuoteTokenAccountPda,
+          associatedQuoteBondingCurve: findAssociatedQuoteBondingCurvePda,
+          migrateV2Pool: findMigrateV2PoolPda,
+          migrateV2PoolAuthority: findMigrateV2PoolAuthorityPda,
+          migrateV2PoolAuthorityMintAccount:
+            findMigrateV2PoolAuthorityMintAccountPda,
+          poolAuthorityQuoteAccount: findPoolAuthorityQuoteAccountPda,
+          migrateV2PoolBaseTokenAccount: findMigrateV2PoolBaseTokenAccountPda,
+          migrateV2PoolQuoteTokenAccount: findMigrateV2PoolQuoteTokenAccountPda,
+        },
+        identifyAccount: identifyPumpAccount,
+        identifyInstruction: identifyPumpInstruction,
+        parseInstruction: parsePumpInstruction,
+      },
+    });
+  };
+}
+
+type MakeOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;

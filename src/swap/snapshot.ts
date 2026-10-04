@@ -4,7 +4,7 @@ import { getGlobalConfigDecoder, GLOBAL_CONFIG_DISCRIMINATOR } from "../ammsdk/g
 import { getFeeConfigDecoder as getAmmFeeConfigDecoder, FEE_CONFIG_DISCRIMINATOR as AMM_FEE_CONFIG_DISCRIMINATOR } from "../ammsdk/generated/accounts/feeConfig";
 import { canonicalPoolCreator } from "./venue";
 import { address, getAddressDecoder } from "@solana/kit";
-import type { Address } from "@solana/kit";
+import type { Address, ReadonlyUint8Array } from "@solana/kit";
 import type { RpcClient } from "../config/connection";
 import { PUMP_PROGRAM_ID, FEE_PROGRAM_ID, PUMP_AMM_PROGRAM_ID } from "../config/addresses";
 import { bondingCurvePda, globalPda, feeConfigPda } from "../pda/pump";
@@ -113,7 +113,7 @@ export async function loadAmmSnapshot(params: {
     quoteTokenProgram: quoteMint.tokenProgram, baseReserve, realQuoteReserve, quoteReserve, fees };
 }
 
-function protocolData(account: SnapshotAccount, owner: string | Address, discriminator: Uint8Array) {
+function protocolData(account: SnapshotAccount, owner: string | Address, discriminator: ReadonlyUint8Array) {
   const data = assertSnapshotOwner(account, owner);
   if (!discriminator.every((byte, index) => data[index] === byte)) throw new Error("Invalid protocol account discriminator");
   return data;

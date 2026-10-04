@@ -14,6 +14,13 @@ Fixture preparation reads public programs and configuration accounts from devnet
    run, durable confirmation records, and status reconciliation. The verifier
    rejects remote RPC hosts when this option is supplied.
 
+`bun run test:launch` focuses on SDK and CLI launch dry-runs. It verifies that
+caller-supplied mint and creator addresses reach the Pump instruction and the
+created accounts, successful and rejected simulations preserve balances and
+account data, and an atomic setup/dry-run/run uses the same mint. It also checks
+that `run` stops on simulation failure. With `PUMP_PACKAGE_VALIDATOR_RPC` set,
+the package verifier runs these checks against the installed SDK and CLI.
+
 The script generates disposable wallets, funds them and the configured fee
 recipients using the local faucet, creates an address lookup table, and sends
 signed create-only, atomic first-buy, subsequent buy, partial sell, and full sell

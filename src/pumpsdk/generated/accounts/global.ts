@@ -39,13 +39,13 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 
-export const GLOBAL_DISCRIMINATOR = new Uint8Array([
+export const GLOBAL_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   167, 232, 232, 177, 200, 108, 114, 127,
 ]);
 
-export function getGlobalDiscriminatorBytes() {
+export function getGlobalDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(GLOBAL_DISCRIMINATOR);
 }
 
@@ -118,117 +118,120 @@ export type GlobalArgs = {
   isHolderRewardEnabled: boolean;
 };
 
+/** Gets the encoder for {@link GlobalArgs} account data. */
 export function getGlobalEncoder(): FixedSizeEncoder<GlobalArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['initialized', getBooleanEncoder()],
-      ['authority', getAddressEncoder()],
-      ['feeRecipient', getAddressEncoder()],
-      ['initialVirtualTokenReserves', getU64Encoder()],
-      ['initialVirtualSolReserves', getU64Encoder()],
-      ['initialRealTokenReserves', getU64Encoder()],
-      ['tokenTotalSupply', getU64Encoder()],
-      ['feeBasisPoints', getU64Encoder()],
-      ['withdrawAuthority', getAddressEncoder()],
-      ['enableMigrate', getBooleanEncoder()],
-      ['poolMigrationFee', getU64Encoder()],
-      ['creatorFeeBasisPoints', getU64Encoder()],
-      ['feeRecipients', getArrayEncoder(getAddressEncoder(), { size: 7 })],
-      ['setCreatorAuthority', getAddressEncoder()],
-      ['adminSetCreatorAuthority', getAddressEncoder()],
-      ['createV2Enabled', getBooleanEncoder()],
-      ['whitelistPda', getAddressEncoder()],
-      ['reservedFeeRecipient', getAddressEncoder()],
-      ['mayhemModeEnabled', getBooleanEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["initialized", getBooleanEncoder()],
+      ["authority", getAddressEncoder()],
+      ["feeRecipient", getAddressEncoder()],
+      ["initialVirtualTokenReserves", getU64Encoder()],
+      ["initialVirtualSolReserves", getU64Encoder()],
+      ["initialRealTokenReserves", getU64Encoder()],
+      ["tokenTotalSupply", getU64Encoder()],
+      ["feeBasisPoints", getU64Encoder()],
+      ["withdrawAuthority", getAddressEncoder()],
+      ["enableMigrate", getBooleanEncoder()],
+      ["poolMigrationFee", getU64Encoder()],
+      ["creatorFeeBasisPoints", getU64Encoder()],
+      ["feeRecipients", getArrayEncoder(getAddressEncoder(), { size: 7 })],
+      ["setCreatorAuthority", getAddressEncoder()],
+      ["adminSetCreatorAuthority", getAddressEncoder()],
+      ["createV2Enabled", getBooleanEncoder()],
+      ["whitelistPda", getAddressEncoder()],
+      ["reservedFeeRecipient", getAddressEncoder()],
+      ["mayhemModeEnabled", getBooleanEncoder()],
       [
-        'reservedFeeRecipients',
+        "reservedFeeRecipients",
         getArrayEncoder(getAddressEncoder(), { size: 7 }),
       ],
-      ['isCashbackEnabled', getBooleanEncoder()],
+      ["isCashbackEnabled", getBooleanEncoder()],
       [
-        'buybackFeeRecipients',
+        "buybackFeeRecipients",
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
-      ['buybackBasisPoints', getU64Encoder()],
-      ['initialVirtualQuoteReserves', getU64Encoder()],
+      ["buybackBasisPoints", getU64Encoder()],
+      ["initialVirtualQuoteReserves", getU64Encoder()],
       [
-        'whitelistedQuoteMints',
+        "whitelistedQuoteMints",
         getArrayEncoder(getAddressEncoder(), { size: 1 }),
       ],
-      ['creatorFeeConfigurable', getBooleanEncoder()],
-      ['maxConfigurableCreatorFeeBps', getU64Encoder()],
-      ['holderRewardClaimAuthority', getAddressEncoder()],
-      ['isHolderRewardEnabled', getBooleanEncoder()],
+      ["creatorFeeConfigurable", getBooleanEncoder()],
+      ["maxConfigurableCreatorFeeBps", getU64Encoder()],
+      ["holderRewardClaimAuthority", getAddressEncoder()],
+      ["isHolderRewardEnabled", getBooleanEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: GLOBAL_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: GLOBAL_DISCRIMINATOR }),
   );
 }
 
+/** Gets the decoder for {@link Global} account data. */
 export function getGlobalDecoder(): FixedSizeDecoder<Global> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['initialized', getBooleanDecoder()],
-    ['authority', getAddressDecoder()],
-    ['feeRecipient', getAddressDecoder()],
-    ['initialVirtualTokenReserves', getU64Decoder()],
-    ['initialVirtualSolReserves', getU64Decoder()],
-    ['initialRealTokenReserves', getU64Decoder()],
-    ['tokenTotalSupply', getU64Decoder()],
-    ['feeBasisPoints', getU64Decoder()],
-    ['withdrawAuthority', getAddressDecoder()],
-    ['enableMigrate', getBooleanDecoder()],
-    ['poolMigrationFee', getU64Decoder()],
-    ['creatorFeeBasisPoints', getU64Decoder()],
-    ['feeRecipients', getArrayDecoder(getAddressDecoder(), { size: 7 })],
-    ['setCreatorAuthority', getAddressDecoder()],
-    ['adminSetCreatorAuthority', getAddressDecoder()],
-    ['createV2Enabled', getBooleanDecoder()],
-    ['whitelistPda', getAddressDecoder()],
-    ['reservedFeeRecipient', getAddressDecoder()],
-    ['mayhemModeEnabled', getBooleanDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["initialized", getBooleanDecoder()],
+    ["authority", getAddressDecoder()],
+    ["feeRecipient", getAddressDecoder()],
+    ["initialVirtualTokenReserves", getU64Decoder()],
+    ["initialVirtualSolReserves", getU64Decoder()],
+    ["initialRealTokenReserves", getU64Decoder()],
+    ["tokenTotalSupply", getU64Decoder()],
+    ["feeBasisPoints", getU64Decoder()],
+    ["withdrawAuthority", getAddressDecoder()],
+    ["enableMigrate", getBooleanDecoder()],
+    ["poolMigrationFee", getU64Decoder()],
+    ["creatorFeeBasisPoints", getU64Decoder()],
+    ["feeRecipients", getArrayDecoder(getAddressDecoder(), { size: 7 })],
+    ["setCreatorAuthority", getAddressDecoder()],
+    ["adminSetCreatorAuthority", getAddressDecoder()],
+    ["createV2Enabled", getBooleanDecoder()],
+    ["whitelistPda", getAddressDecoder()],
+    ["reservedFeeRecipient", getAddressDecoder()],
+    ["mayhemModeEnabled", getBooleanDecoder()],
     [
-      'reservedFeeRecipients',
+      "reservedFeeRecipients",
       getArrayDecoder(getAddressDecoder(), { size: 7 }),
     ],
-    ['isCashbackEnabled', getBooleanDecoder()],
-    ['buybackFeeRecipients', getArrayDecoder(getAddressDecoder(), { size: 8 })],
-    ['buybackBasisPoints', getU64Decoder()],
-    ['initialVirtualQuoteReserves', getU64Decoder()],
+    ["isCashbackEnabled", getBooleanDecoder()],
+    ["buybackFeeRecipients", getArrayDecoder(getAddressDecoder(), { size: 8 })],
+    ["buybackBasisPoints", getU64Decoder()],
+    ["initialVirtualQuoteReserves", getU64Decoder()],
     [
-      'whitelistedQuoteMints',
+      "whitelistedQuoteMints",
       getArrayDecoder(getAddressDecoder(), { size: 1 }),
     ],
-    ['creatorFeeConfigurable', getBooleanDecoder()],
-    ['maxConfigurableCreatorFeeBps', getU64Decoder()],
-    ['holderRewardClaimAuthority', getAddressDecoder()],
-    ['isHolderRewardEnabled', getBooleanDecoder()],
+    ["creatorFeeConfigurable", getBooleanDecoder()],
+    ["maxConfigurableCreatorFeeBps", getU64Decoder()],
+    ["holderRewardClaimAuthority", getAddressDecoder()],
+    ["isHolderRewardEnabled", getBooleanDecoder()],
   ]);
 }
 
+/** Gets the codec for {@link Global} account data. */
 export function getGlobalCodec(): FixedSizeCodec<GlobalArgs, Global> {
   return combineCodec(getGlobalEncoder(), getGlobalDecoder());
 }
 
 export function decodeGlobal<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<Global, TAddress>;
 export function decodeGlobal<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<Global, TAddress>;
 export function decodeGlobal<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ): Account<Global, TAddress> | MaybeAccount<Global, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getGlobalDecoder()
+    getGlobalDecoder(),
   );
 }
 
 export async function fetchGlobal<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<Global, TAddress>> {
   const maybeAccount = await fetchMaybeGlobal(rpc, address, config);
   assertAccountExists(maybeAccount);
@@ -238,7 +241,7 @@ export async function fetchGlobal<TAddress extends string = string>(
 export async function fetchMaybeGlobal<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<Global, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeGlobal(maybeAccount);
@@ -247,7 +250,7 @@ export async function fetchMaybeGlobal<TAddress extends string = string>(
 export async function fetchAllGlobal(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<Global>[]> {
   const maybeAccounts = await fetchAllMaybeGlobal(rpc, addresses, config);
   assertAccountsExist(maybeAccounts);
@@ -257,7 +260,7 @@ export async function fetchAllGlobal(
 export async function fetchAllMaybeGlobal(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<Global>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodeGlobal(maybeAccount));

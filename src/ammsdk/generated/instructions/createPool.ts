@@ -25,6 +25,8 @@ import {
   getU16Encoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -37,29 +39,33 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
-  expectSome,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  getNonNullResolvedInstructionInput,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda, findLpMintPda, findPoolPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 import {
   getOptionBoolDecoder,
   getOptionBoolEncoder,
   type OptionBool,
   type OptionBoolArgs,
-} from '../types';
+} from "../types";
 
-export const CREATE_POOL_DISCRIMINATOR = new Uint8Array([
+export const CREATE_POOL_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   233, 146, 209, 142, 207, 104, 64, 188,
 ]);
 
-export function getCreatePoolDiscriminatorBytes() {
+export function getCreatePoolDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(CREATE_POOL_DISCRIMINATOR);
 }
 
@@ -76,17 +82,14 @@ export type CreatePoolInstruction<
   TAccountUserPoolTokenAccount extends string | AccountMeta<string> = string,
   TAccountPoolBaseTokenAccount extends string | AccountMeta<string> = string,
   TAccountPoolQuoteTokenAccount extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
-  TAccountToken2022Program extends
-    | string
-    | AccountMeta<string> = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
+  TAccountToken2022Program extends string | AccountMeta<string> =
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
   TAccountBaseTokenProgram extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -181,33 +184,33 @@ export type CreatePoolInstructionDataArgs = {
 export function getCreatePoolInstructionDataEncoder(): FixedSizeEncoder<CreatePoolInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['index', getU16Encoder()],
-      ['baseAmountIn', getU64Encoder()],
-      ['quoteAmountIn', getU64Encoder()],
-      ['coinCreator', getAddressEncoder()],
-      ['isMayhemMode', getBooleanEncoder()],
-      ['isCashbackCoin', getOptionBoolEncoder()],
-      ['creatorFeeBps', getTupleEncoder([getU64Encoder()])],
-      ['canEditCreatorFee', getOptionBoolEncoder()],
-      ['isHolderReward', getOptionBoolEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["index", getU16Encoder()],
+      ["baseAmountIn", getU64Encoder()],
+      ["quoteAmountIn", getU64Encoder()],
+      ["coinCreator", getAddressEncoder()],
+      ["isMayhemMode", getBooleanEncoder()],
+      ["isCashbackCoin", getOptionBoolEncoder()],
+      ["creatorFeeBps", getTupleEncoder([getU64Encoder()])],
+      ["canEditCreatorFee", getOptionBoolEncoder()],
+      ["isHolderReward", getOptionBoolEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: CREATE_POOL_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: CREATE_POOL_DISCRIMINATOR }),
   );
 }
 
 export function getCreatePoolInstructionDataDecoder(): FixedSizeDecoder<CreatePoolInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['index', getU16Decoder()],
-    ['baseAmountIn', getU64Decoder()],
-    ['quoteAmountIn', getU64Decoder()],
-    ['coinCreator', getAddressDecoder()],
-    ['isMayhemMode', getBooleanDecoder()],
-    ['isCashbackCoin', getOptionBoolDecoder()],
-    ['creatorFeeBps', getTupleDecoder([getU64Decoder()])],
-    ['canEditCreatorFee', getOptionBoolDecoder()],
-    ['isHolderReward', getOptionBoolDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["index", getU16Decoder()],
+    ["baseAmountIn", getU64Decoder()],
+    ["quoteAmountIn", getU64Decoder()],
+    ["coinCreator", getAddressDecoder()],
+    ["isMayhemMode", getBooleanDecoder()],
+    ["isCashbackCoin", getOptionBoolDecoder()],
+    ["creatorFeeBps", getTupleDecoder([getU64Decoder()])],
+    ["canEditCreatorFee", getOptionBoolDecoder()],
+    ["isHolderReward", getOptionBoolDecoder()],
   ]);
 }
 
@@ -217,78 +220,90 @@ export function getCreatePoolInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getCreatePoolInstructionDataEncoder(),
-    getCreatePoolInstructionDataDecoder()
+    getCreatePoolInstructionDataDecoder(),
   );
 }
 
 export type CreatePoolAsyncInput<
-  TAccountPool extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountCreator extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountLpMint extends string = string,
-  TAccountUserBaseTokenAccount extends string = string,
-  TAccountUserQuoteTokenAccount extends string = string,
-  TAccountUserPoolTokenAccount extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountToken2022Program extends string = string,
-  TAccountBaseTokenProgram extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool?: Address<TAccountPool>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  creator: TransactionSigner<TAccountCreator>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  lpMint?: Address<TAccountLpMint>;
-  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
-  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
-  userPoolTokenAccount?: Address<TAccountUserPoolTokenAccount>;
-  poolBaseTokenAccount?: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount?: Address<TAccountPoolQuoteTokenAccount>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  token2022Program?: Address<TAccountToken2022Program>;
-  baseTokenProgram: Address<TAccountBaseTokenProgram>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  index: CreatePoolInstructionDataArgs['index'];
-  baseAmountIn: CreatePoolInstructionDataArgs['baseAmountIn'];
-  quoteAmountIn: CreatePoolInstructionDataArgs['quoteAmountIn'];
-  coinCreator: CreatePoolInstructionDataArgs['coinCreator'];
-  isMayhemMode: CreatePoolInstructionDataArgs['isMayhemMode'];
-  isCashbackCoin: CreatePoolInstructionDataArgs['isCashbackCoin'];
-  creatorFeeBps: CreatePoolInstructionDataArgs['creatorFeeBps'];
-  canEditCreatorFee: CreatePoolInstructionDataArgs['canEditCreatorFee'];
-  isHolderReward: CreatePoolInstructionDataArgs['isHolderReward'];
+  pool?: TAccountPool;
+  globalConfig: TAccountGlobalConfig;
+  creator: TAccountCreator;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  lpMint?: TAccountLpMint;
+  userBaseTokenAccount: TAccountUserBaseTokenAccount;
+  userQuoteTokenAccount: TAccountUserQuoteTokenAccount;
+  userPoolTokenAccount?: TAccountUserPoolTokenAccount;
+  poolBaseTokenAccount?: TAccountPoolBaseTokenAccount;
+  poolQuoteTokenAccount?: TAccountPoolQuoteTokenAccount;
+  systemProgram?: TAccountSystemProgram;
+  token2022Program?: TAccountToken2022Program;
+  baseTokenProgram: TAccountBaseTokenProgram;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  index: CreatePoolInstructionDataArgs["index"];
+  baseAmountIn: CreatePoolInstructionDataArgs["baseAmountIn"];
+  quoteAmountIn: CreatePoolInstructionDataArgs["quoteAmountIn"];
+  coinCreator: CreatePoolInstructionDataArgs["coinCreator"];
+  isMayhemMode: CreatePoolInstructionDataArgs["isMayhemMode"];
+  isCashbackCoin: CreatePoolInstructionDataArgs["isCashbackCoin"];
+  creatorFeeBps: CreatePoolInstructionDataArgs["creatorFeeBps"];
+  canEditCreatorFee: CreatePoolInstructionDataArgs["canEditCreatorFee"];
+  isHolderReward: CreatePoolInstructionDataArgs["isHolderReward"];
 };
 
 export async function getCreatePoolInstructionAsync<
-  TAccountPool extends string,
-  TAccountGlobalConfig extends string,
-  TAccountCreator extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountLpMint extends string,
-  TAccountUserBaseTokenAccount extends string,
-  TAccountUserQuoteTokenAccount extends string,
-  TAccountUserPoolTokenAccount extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountSystemProgram extends string,
-  TAccountToken2022Program extends string,
-  TAccountBaseTokenProgram extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountCreator extends InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: CreatePoolAsyncInput<
@@ -311,84 +326,174 @@ export async function getCreatePoolInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   CreatePoolInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountCreator,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountSystemProgram,
-    TAccountToken2022Program,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountLpMint,
+      InstructionAccountInputAddress<TAccountLpMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserPoolTokenAccount,
+      InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountToken2022Program,
+      InstructionAccountInputAddress<TAccountToken2022Program>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    creator: { value: input.creator ?? null, isWritable: true },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: true },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    creator: { value: input.creator ?? null, isSigner: true, isWritable: true },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    lpMint: { value: input.lpMint ?? null, isSigner: false, isWritable: true },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userPoolTokenAccount: {
       value: input.userPoolTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     token2022Program: {
       value: input.token2022Program ?? null,
+      isSigner: false,
       isWritable: false,
     },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -396,212 +501,308 @@ export async function getCreatePoolInstructionAsync<
 
   // Resolve default values.
   if (!accounts.pool.value) {
-    accounts.pool.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([112, 111, 111, 108])),
-        getU16Encoder().encode(expectSome(args.index)),
-        getAddressEncoder().encode(expectAddress(accounts.creator.value)),
-        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-      ],
-    });
+    accounts.pool.value = await findPoolPda(
+      {
+        index: getNonNullResolvedInstructionInput("index", args.index),
+        creator: getAddressFromResolvedInstructionAccount(
+          "creator",
+          accounts.creator.value,
+        ),
+        baseMint: getAddressFromResolvedInstructionAccount(
+          "baseMint",
+          accounts.baseMint.value,
+        ),
+        quoteMint: getAddressFromResolvedInstructionAccount(
+          "quoteMint",
+          accounts.quoteMint.value,
+        ),
+      },
+      { programAddress },
+    );
   }
   if (!accounts.lpMint.value) {
-    accounts.lpMint.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            112, 111, 111, 108, 95, 108, 112, 95, 109, 105, 110, 116,
-          ])
+    accounts.lpMint.value = await findLpMintPda(
+      {
+        pool: getAddressFromResolvedInstructionAccount(
+          "pool",
+          accounts.pool.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.token2022Program.value) {
     accounts.token2022Program.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" as Address<"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb">;
   }
   if (!accounts.userPoolTokenAccount.value) {
     accounts.userPoolTokenAccount.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.creator.value)),
         getAddressEncoder().encode(
-          expectAddress(accounts.token2022Program.value)
+          getAddressFromResolvedInstructionAccount(
+            "creator",
+            accounts.creator.value,
+          ),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.lpMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "token2022Program",
+            accounts.token2022Program.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "lpMint",
+            accounts.lpMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.poolBaseTokenAccount.value) {
     accounts.poolBaseTokenAccount.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
         getAddressEncoder().encode(
-          expectAddress(accounts.baseTokenProgram.value)
+          getAddressFromResolvedInstructionAccount("pool", accounts.pool.value),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "baseTokenProgram",
+            accounts.baseTokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "baseMint",
+            accounts.baseMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.poolQuoteTokenAccount.value) {
     accounts.poolQuoteTokenAccount.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
         getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
+          getAddressFromResolvedInstructionAccount("pool", accounts.pool.value),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.creator),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.lpMint),
-      getAccountMeta(accounts.userBaseTokenAccount),
-      getAccountMeta(accounts.userQuoteTokenAccount),
-      getAccountMeta(accounts.userPoolTokenAccount),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.token2022Program),
-      getAccountMeta(accounts.baseTokenProgram),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("creator", accounts.creator),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("lpMint", accounts.lpMint),
+      getAccountMeta("userBaseTokenAccount", accounts.userBaseTokenAccount),
+      getAccountMeta("userQuoteTokenAccount", accounts.userQuoteTokenAccount),
+      getAccountMeta("userPoolTokenAccount", accounts.userPoolTokenAccount),
+      getAccountMeta("poolBaseTokenAccount", accounts.poolBaseTokenAccount),
+      getAccountMeta("poolQuoteTokenAccount", accounts.poolQuoteTokenAccount),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("token2022Program", accounts.token2022Program),
+      getAccountMeta("baseTokenProgram", accounts.baseTokenProgram),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getCreatePoolInstructionDataEncoder().encode(
-      args as CreatePoolInstructionDataArgs
+      args as CreatePoolInstructionDataArgs,
     ),
     programAddress,
   } as CreatePoolInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountCreator,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountSystemProgram,
-    TAccountToken2022Program,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountLpMint,
+      InstructionAccountInputAddress<TAccountLpMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserPoolTokenAccount,
+      InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountToken2022Program,
+      InstructionAccountInputAddress<TAccountToken2022Program>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type CreatePoolInput<
-  TAccountPool extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountCreator extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountLpMint extends string = string,
-  TAccountUserBaseTokenAccount extends string = string,
-  TAccountUserQuoteTokenAccount extends string = string,
-  TAccountUserPoolTokenAccount extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountToken2022Program extends string = string,
-  TAccountBaseTokenProgram extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  creator: TransactionSigner<TAccountCreator>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  lpMint: Address<TAccountLpMint>;
-  userBaseTokenAccount: Address<TAccountUserBaseTokenAccount>;
-  userQuoteTokenAccount: Address<TAccountUserQuoteTokenAccount>;
-  userPoolTokenAccount: Address<TAccountUserPoolTokenAccount>;
-  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  token2022Program?: Address<TAccountToken2022Program>;
-  baseTokenProgram: Address<TAccountBaseTokenProgram>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  index: CreatePoolInstructionDataArgs['index'];
-  baseAmountIn: CreatePoolInstructionDataArgs['baseAmountIn'];
-  quoteAmountIn: CreatePoolInstructionDataArgs['quoteAmountIn'];
-  coinCreator: CreatePoolInstructionDataArgs['coinCreator'];
-  isMayhemMode: CreatePoolInstructionDataArgs['isMayhemMode'];
-  isCashbackCoin: CreatePoolInstructionDataArgs['isCashbackCoin'];
-  creatorFeeBps: CreatePoolInstructionDataArgs['creatorFeeBps'];
-  canEditCreatorFee: CreatePoolInstructionDataArgs['canEditCreatorFee'];
-  isHolderReward: CreatePoolInstructionDataArgs['isHolderReward'];
+  pool: TAccountPool;
+  globalConfig: TAccountGlobalConfig;
+  creator: TAccountCreator;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  lpMint: TAccountLpMint;
+  userBaseTokenAccount: TAccountUserBaseTokenAccount;
+  userQuoteTokenAccount: TAccountUserQuoteTokenAccount;
+  userPoolTokenAccount: TAccountUserPoolTokenAccount;
+  poolBaseTokenAccount: TAccountPoolBaseTokenAccount;
+  poolQuoteTokenAccount: TAccountPoolQuoteTokenAccount;
+  systemProgram?: TAccountSystemProgram;
+  token2022Program?: TAccountToken2022Program;
+  baseTokenProgram: TAccountBaseTokenProgram;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  index: CreatePoolInstructionDataArgs["index"];
+  baseAmountIn: CreatePoolInstructionDataArgs["baseAmountIn"];
+  quoteAmountIn: CreatePoolInstructionDataArgs["quoteAmountIn"];
+  coinCreator: CreatePoolInstructionDataArgs["coinCreator"];
+  isMayhemMode: CreatePoolInstructionDataArgs["isMayhemMode"];
+  isCashbackCoin: CreatePoolInstructionDataArgs["isCashbackCoin"];
+  creatorFeeBps: CreatePoolInstructionDataArgs["creatorFeeBps"];
+  canEditCreatorFee: CreatePoolInstructionDataArgs["canEditCreatorFee"];
+  isHolderReward: CreatePoolInstructionDataArgs["isHolderReward"];
 };
 
 export function getCreatePoolInstruction<
-  TAccountPool extends string,
-  TAccountGlobalConfig extends string,
-  TAccountCreator extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountLpMint extends string,
-  TAccountUserBaseTokenAccount extends string,
-  TAccountUserQuoteTokenAccount extends string,
-  TAccountUserPoolTokenAccount extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountSystemProgram extends string,
-  TAccountToken2022Program extends string,
-  TAccountBaseTokenProgram extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountCreator extends InstructionSignerInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountLpMint extends InstructionAccountInput,
+  TAccountUserBaseTokenAccount extends InstructionAccountInput,
+  TAccountUserQuoteTokenAccount extends InstructionAccountInput,
+  TAccountUserPoolTokenAccount extends InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountToken2022Program extends InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: CreatePoolInput<
@@ -624,82 +825,172 @@ export function getCreatePoolInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): CreatePoolInstruction<
   TProgramAddress,
-  TAccountPool,
-  TAccountGlobalConfig,
-  TAccountCreator,
-  TAccountBaseMint,
-  TAccountQuoteMint,
-  TAccountLpMint,
-  TAccountUserBaseTokenAccount,
-  TAccountUserQuoteTokenAccount,
-  TAccountUserPoolTokenAccount,
-  TAccountPoolBaseTokenAccount,
-  TAccountPoolQuoteTokenAccount,
-  TAccountSystemProgram,
-  TAccountToken2022Program,
-  TAccountBaseTokenProgram,
-  TAccountQuoteTokenProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountPool,
+    InstructionAccountInputAddress<TAccountPool>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreator,
+    InstructionAccountInputAddress<TAccountCreator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseMint,
+    InstructionAccountInputAddress<TAccountBaseMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountLpMint,
+    InstructionAccountInputAddress<TAccountLpMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserBaseTokenAccount,
+    InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserPoolTokenAccount,
+    InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolBaseTokenAccount,
+    InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountToken2022Program,
+    InstructionAccountInputAddress<TAccountToken2022Program>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseTokenProgram,
+    InstructionAccountInputAddress<TAccountBaseTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    creator: { value: input.creator ?? null, isWritable: true },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
-    lpMint: { value: input.lpMint ?? null, isWritable: true },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    creator: { value: input.creator ?? null, isSigner: true, isWritable: true },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    lpMint: { value: input.lpMint ?? null, isSigner: false, isWritable: true },
     userBaseTokenAccount: {
       value: input.userBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userQuoteTokenAccount: {
       value: input.userQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     userPoolTokenAccount: {
       value: input.userPoolTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     token2022Program: {
       value: input.token2022Program ?? null,
+      isSigner: false,
       isWritable: false,
     },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -708,63 +999,116 @@ export function getCreatePoolInstruction<
   // Resolve default values.
   if (!accounts.token2022Program.value) {
     accounts.token2022Program.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" as Address<"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.creator),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.lpMint),
-      getAccountMeta(accounts.userBaseTokenAccount),
-      getAccountMeta(accounts.userQuoteTokenAccount),
-      getAccountMeta(accounts.userPoolTokenAccount),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.token2022Program),
-      getAccountMeta(accounts.baseTokenProgram),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("creator", accounts.creator),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("lpMint", accounts.lpMint),
+      getAccountMeta("userBaseTokenAccount", accounts.userBaseTokenAccount),
+      getAccountMeta("userQuoteTokenAccount", accounts.userQuoteTokenAccount),
+      getAccountMeta("userPoolTokenAccount", accounts.userPoolTokenAccount),
+      getAccountMeta("poolBaseTokenAccount", accounts.poolBaseTokenAccount),
+      getAccountMeta("poolQuoteTokenAccount", accounts.poolQuoteTokenAccount),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("token2022Program", accounts.token2022Program),
+      getAccountMeta("baseTokenProgram", accounts.baseTokenProgram),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getCreatePoolInstructionDataEncoder().encode(
-      args as CreatePoolInstructionDataArgs
+      args as CreatePoolInstructionDataArgs,
     ),
     programAddress,
   } as CreatePoolInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountGlobalConfig,
-    TAccountCreator,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountLpMint,
-    TAccountUserBaseTokenAccount,
-    TAccountUserQuoteTokenAccount,
-    TAccountUserPoolTokenAccount,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountSystemProgram,
-    TAccountToken2022Program,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountLpMint,
+      InstructionAccountInputAddress<TAccountLpMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountUserBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountUserQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserPoolTokenAccount,
+      InstructionAccountInputAddress<TAccountUserPoolTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountToken2022Program,
+      InstructionAccountInputAddress<TAccountToken2022Program>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -802,11 +1146,16 @@ export function parseCreatePoolInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreatePoolInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 18) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 18,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

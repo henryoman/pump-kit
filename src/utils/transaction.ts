@@ -2,9 +2,9 @@
  * Transaction building, sending, confirmation, and simulation utilities.
  */
 
-import { address as toAddress } from "@solana/addresses";
+import { address as toAddress } from "@solana/kit";
 import { sendAndConfirmTransactionFactory } from "@solana/kit";
-import type { Commitment } from "@solana/rpc-types";
+import type { Commitment } from "@solana/kit";
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
 import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
@@ -16,18 +16,18 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   type TransactionMessageWithBlockhashLifetime,
   type TransactionMessageWithFeePayer,
-} from "@solana/transaction-messages";
+} from "@solana/kit";
 import {
   addSignersToTransactionMessage,
   isTransactionSigner,
   setTransactionMessageFeePayerSigner,
   signTransactionMessageWithSigners,
-} from "@solana/signers";
+} from "@solana/kit";
 import {
   getBase64EncodedWireTransaction,
   assertIsTransactionWithinSizeLimit,
   getSignatureFromTransaction,
-} from "@solana/transactions";
+} from "@solana/kit";
 
 import { getSetComputeUnitLimitInstruction, getSetComputeUnitPriceInstruction } from "@solana-program/compute-budget";
 
@@ -451,6 +451,18 @@ export function buildPriorityFeeInstructions(
   priorityFees?: PriorityFeeOptions
 ): Instruction[] {
   if (!priorityFees) return [];
+
+  const { computeUnitLimit, computeUnitPriceMicroLamports } = priorityFees;
+  if (computeUnitLimit !== undefined && (!Number.isInteger(computeUnitLimit) || computeUnitLimit < 0 || computeUnitLimit > 1_400_000)) {
+    throw new Error("computeUnitLimit must be an integer between 0 and 1400000");
+  }
+  if (computeUnitPriceMicroLamports !== undefined) {
+    if ((typeof computeUnitPriceMicroLamports !== "bigint" && typeof computeUnitPriceMicroLamports !== "number") ||
+        (typeof computeUnitPriceMicroLamports === "number" && !Number.isSafeInteger(computeUnitPriceMicroLamports)) ||
+        BigInt(computeUnitPriceMicroLamports) < 0n || BigInt(computeUnitPriceMicroLamports) > 18446744073709551615n) {
+      throw new Error("computeUnitPriceMicroLamports must be a nonnegative u64 bigint or safe integer");
+    }
+  }
 
   const instructions: Instruction[] = [];
 

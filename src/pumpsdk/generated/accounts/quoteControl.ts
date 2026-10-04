@@ -35,21 +35,21 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 import {
   getQuoteControlMintDecoder,
   getQuoteControlMintEncoder,
   type QuoteControlMint,
   type QuoteControlMintArgs,
-} from '../types';
+} from "../types";
 
-export const QUOTE_CONTROL_DISCRIMINATOR = new Uint8Array([
+export const QUOTE_CONTROL_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   56, 244, 35, 238, 193, 213, 162, 201,
 ]);
 
-export function getQuoteControlDiscriminatorBytes() {
+export function getQuoteControlDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    QUOTE_CONTROL_DISCRIMINATOR
+    QUOTE_CONTROL_DISCRIMINATOR,
   );
 }
 
@@ -66,50 +66,53 @@ export type QuoteControlArgs = {
   mints: Array<QuoteControlMintArgs>;
 };
 
+/** Gets the encoder for {@link QuoteControlArgs} account data. */
 export function getQuoteControlEncoder(): Encoder<QuoteControlArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['admin', getAddressEncoder()],
-      ['reserved', fixEncoderSize(getBytesEncoder(), 64)],
-      ['mints', getArrayEncoder(getQuoteControlMintEncoder())],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["admin", getAddressEncoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["mints", getArrayEncoder(getQuoteControlMintEncoder())],
     ]),
-    (value) => ({ ...value, discriminator: QUOTE_CONTROL_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: QUOTE_CONTROL_DISCRIMINATOR }),
   );
 }
 
+/** Gets the decoder for {@link QuoteControl} account data. */
 export function getQuoteControlDecoder(): Decoder<QuoteControl> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['admin', getAddressDecoder()],
-    ['reserved', fixDecoderSize(getBytesDecoder(), 64)],
-    ['mints', getArrayDecoder(getQuoteControlMintDecoder())],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["admin", getAddressDecoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["mints", getArrayDecoder(getQuoteControlMintDecoder())],
   ]);
 }
 
+/** Gets the codec for {@link QuoteControl} account data. */
 export function getQuoteControlCodec(): Codec<QuoteControlArgs, QuoteControl> {
   return combineCodec(getQuoteControlEncoder(), getQuoteControlDecoder());
 }
 
 export function decodeQuoteControl<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<QuoteControl, TAddress>;
 export function decodeQuoteControl<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<QuoteControl, TAddress>;
 export function decodeQuoteControl<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ): Account<QuoteControl, TAddress> | MaybeAccount<QuoteControl, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getQuoteControlDecoder()
+    getQuoteControlDecoder(),
   );
 }
 
 export async function fetchQuoteControl<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<QuoteControl, TAddress>> {
   const maybeAccount = await fetchMaybeQuoteControl(rpc, address, config);
   assertAccountExists(maybeAccount);
@@ -119,7 +122,7 @@ export async function fetchQuoteControl<TAddress extends string = string>(
 export async function fetchMaybeQuoteControl<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<QuoteControl, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeQuoteControl(maybeAccount);
@@ -128,7 +131,7 @@ export async function fetchMaybeQuoteControl<TAddress extends string = string>(
 export async function fetchAllQuoteControl(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<QuoteControl>[]> {
   const maybeAccounts = await fetchAllMaybeQuoteControl(rpc, addresses, config);
   assertAccountsExist(maybeAccounts);
@@ -138,7 +141,7 @@ export async function fetchAllQuoteControl(
 export async function fetchAllMaybeQuoteControl(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<QuoteControl>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodeQuoteControl(maybeAccount));

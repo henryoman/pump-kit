@@ -10,12 +10,12 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -28,21 +28,28 @@ import {
   type ReadonlyAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findAssociatedUserVolumeAccumulatorPda,
+  findEventAuthorityPda,
+  findUserVolumeAccumulatorPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const CLAIM_CASHBACK_V2_DISCRIMINATOR = new Uint8Array([
-  122, 243, 204, 65, 94, 116, 29, 55,
-]);
+export const CLAIM_CASHBACK_V2_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([122, 243, 204, 65, 94, 116, 29, 55]);
 
-export function getClaimCashbackV2DiscriminatorBytes() {
+export function getClaimCashbackV2DiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CLAIM_CASHBACK_V2_DISCRIMINATOR
+    CLAIM_CASHBACK_V2_DISCRIMINATOR,
   );
 }
 
@@ -52,20 +59,16 @@ export type ClaimCashbackV2Instruction<
   TAccountUserVolumeAccumulator extends string | AccountMeta<string> = string,
   TAccountQuoteMint extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-  TAccountAssociatedUserVolumeAccumulator extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountAssociatedUserVolumeAccumulator extends string | AccountMeta<string> =
+    string,
   TAccountAssociatedQuoteUser extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
-  TAccountProgram extends
-    | string
-    | AccountMeta<string> = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  TAccountProgram extends string | AccountMeta<string> =
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -113,14 +116,14 @@ export type ClaimCashbackV2InstructionDataArgs = {};
 
 export function getClaimCashbackV2InstructionDataEncoder(): FixedSizeEncoder<ClaimCashbackV2InstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: CLAIM_CASHBACK_V2_DISCRIMINATOR })
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
+    (value) => ({ ...value, discriminator: CLAIM_CASHBACK_V2_DISCRIMINATOR }),
   );
 }
 
 export function getClaimCashbackV2InstructionDataDecoder(): FixedSizeDecoder<ClaimCashbackV2InstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -130,45 +133,52 @@ export function getClaimCashbackV2InstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getClaimCashbackV2InstructionDataEncoder(),
-    getClaimCashbackV2InstructionDataDecoder()
+    getClaimCashbackV2InstructionDataDecoder(),
   );
 }
 
 export type ClaimCashbackV2AsyncInput<
-  TAccountUser extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountAssociatedUserVolumeAccumulator extends string = string,
-  TAccountAssociatedQuoteUser extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountUser extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  user: Address<TAccountUser>;
-  userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  associatedUserVolumeAccumulator?: Address<TAccountAssociatedUserVolumeAccumulator>;
-  associatedQuoteUser: Address<TAccountAssociatedQuoteUser>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program?: Address<TAccountProgram>;
+  user: TAccountUser;
+  userVolumeAccumulator?: TAccountUserVolumeAccumulator;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  associatedUserVolumeAccumulator?: TAccountAssociatedUserVolumeAccumulator;
+  associatedQuoteUser: TAccountAssociatedQuoteUser;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program?: TAccountProgram;
 };
 
 export async function getClaimCashbackV2InstructionAsync<
-  TAccountUser extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountAssociatedUserVolumeAccumulator extends string,
-  TAccountAssociatedQuoteUser extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountUser extends InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: ClaimCashbackV2AsyncInput<
@@ -183,181 +193,272 @@ export async function getClaimCashbackV2InstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   ClaimCashbackV2Instruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserVolumeAccumulator,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountAssociatedUserVolumeAccumulator,
-    TAccountAssociatedQuoteUser,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteUser,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: false, isWritable: true },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedUserVolumeAccumulator: {
       value: input.associatedUserVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteUser: {
       value: input.associatedQuoteUser ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.userVolumeAccumulator.value) {
-    accounts.userVolumeAccumulator.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            117, 115, 101, 114, 95, 118, 111, 108, 117, 109, 101, 95, 97, 99,
-            99, 117, 109, 117, 108, 97, 116, 111, 114,
-          ])
+    accounts.userVolumeAccumulator.value = await findUserVolumeAccumulatorPda(
+      {
+        user: getAddressFromResolvedInstructionAccount(
+          "user",
+          accounts.user.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.associatedUserVolumeAccumulator.value) {
     accounts.associatedUserVolumeAccumulator.value =
-      await getProgramDerivedAddress({
-        programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-        seeds: [
-          getAddressEncoder().encode(
-            expectAddress(accounts.userVolumeAccumulator.value)
+      await findAssociatedUserVolumeAccumulatorPda(
+        {
+          userVolumeAccumulator: getAddressFromResolvedInstructionAccount(
+            "userVolumeAccumulator",
+            accounts.userVolumeAccumulator.value,
           ),
-          getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+          quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-        ],
-      });
+          quoteMint: getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        },
+        {
+          programAddress: getAddressFromResolvedInstructionAccount(
+            "associatedTokenProgram",
+            accounts.associatedTokenProgram.value,
+          ),
+        },
+      );
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
   if (!accounts.program.value) {
     accounts.program.value =
-      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.associatedUserVolumeAccumulator),
-      getAccountMeta(accounts.associatedQuoteUser),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta(
+        "associatedUserVolumeAccumulator",
+        accounts.associatedUserVolumeAccumulator,
+      ),
+      getAccountMeta("associatedQuoteUser", accounts.associatedQuoteUser),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getClaimCashbackV2InstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimCashbackV2Instruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserVolumeAccumulator,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountAssociatedUserVolumeAccumulator,
-    TAccountAssociatedQuoteUser,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteUser,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type ClaimCashbackV2Input<
-  TAccountUser extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountAssociatedUserVolumeAccumulator extends string = string,
-  TAccountAssociatedQuoteUser extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountUser extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  user: Address<TAccountUser>;
-  userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  associatedUserVolumeAccumulator: Address<TAccountAssociatedUserVolumeAccumulator>;
-  associatedQuoteUser: Address<TAccountAssociatedQuoteUser>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program?: Address<TAccountProgram>;
+  user: TAccountUser;
+  userVolumeAccumulator: TAccountUserVolumeAccumulator;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  associatedUserVolumeAccumulator: TAccountAssociatedUserVolumeAccumulator;
+  associatedQuoteUser: TAccountAssociatedQuoteUser;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program?: TAccountProgram;
 };
 
 export function getClaimCashbackV2Instruction<
-  TAccountUser extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountAssociatedUserVolumeAccumulator extends string,
-  TAccountAssociatedQuoteUser extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountUser extends InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: ClaimCashbackV2Input<
@@ -372,98 +473,184 @@ export function getClaimCashbackV2Instruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): ClaimCashbackV2Instruction<
   TProgramAddress,
-  TAccountUser,
-  TAccountUserVolumeAccumulator,
-  TAccountQuoteMint,
-  TAccountQuoteTokenProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountAssociatedUserVolumeAccumulator,
-  TAccountAssociatedQuoteUser,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountUser,
+    InstructionAccountInputAddress<TAccountUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedUserVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedQuoteUser,
+    InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: false, isWritable: true },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedUserVolumeAccumulator: {
       value: input.associatedUserVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteUser: {
       value: input.associatedQuoteUser ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.program.value) {
     accounts.program.value =
-      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.associatedUserVolumeAccumulator),
-      getAccountMeta(accounts.associatedQuoteUser),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta(
+        "associatedUserVolumeAccumulator",
+        accounts.associatedUserVolumeAccumulator,
+      ),
+      getAccountMeta("associatedQuoteUser", accounts.associatedQuoteUser),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getClaimCashbackV2InstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimCashbackV2Instruction<
     TProgramAddress,
-    TAccountUser,
-    TAccountUserVolumeAccumulator,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountAssociatedUserVolumeAccumulator,
-    TAccountAssociatedQuoteUser,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteUser,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -493,11 +680,16 @@ export function parseClaimCashbackV2Instruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimCashbackV2Instruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 10) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 10,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

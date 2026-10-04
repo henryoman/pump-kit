@@ -14,9 +14,10 @@ import {
   getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -29,20 +30,26 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda, findGlobalPda } from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const TOGGLE_CASHBACK_ENABLED_DISCRIMINATOR = new Uint8Array([
-  115, 103, 224, 255, 189, 89, 86, 195,
-]);
+export const TOGGLE_CASHBACK_ENABLED_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195]);
 
-export function getToggleCashbackEnabledDiscriminatorBytes() {
+export function getToggleCashbackEnabledDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    TOGGLE_CASHBACK_ENABLED_DISCRIMINATOR
+    TOGGLE_CASHBACK_ENABLED_DISCRIMINATOR,
   );
 }
 
@@ -84,20 +91,20 @@ export type ToggleCashbackEnabledInstructionDataArgs = { enabled: boolean };
 export function getToggleCashbackEnabledInstructionDataEncoder(): FixedSizeEncoder<ToggleCashbackEnabledInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['enabled', getBooleanEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["enabled", getBooleanEncoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: TOGGLE_CASHBACK_ENABLED_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getToggleCashbackEnabledInstructionDataDecoder(): FixedSizeDecoder<ToggleCashbackEnabledInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['enabled', getBooleanDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["enabled", getBooleanDecoder()],
   ]);
 }
 
@@ -107,28 +114,29 @@ export function getToggleCashbackEnabledInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getToggleCashbackEnabledInstructionDataEncoder(),
-    getToggleCashbackEnabledInstructionDataDecoder()
+    getToggleCashbackEnabledInstructionDataDecoder(),
   );
 }
 
 export type ToggleCashbackEnabledAsyncInput<
-  TAccountGlobal extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global?: Address<TAccountGlobal>;
-  authority: TransactionSigner<TAccountAuthority>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  enabled: ToggleCashbackEnabledInstructionDataArgs['enabled'];
+  global?: TAccountGlobal;
+  authority: TAccountAuthority;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  enabled: ToggleCashbackEnabledInstructionDataArgs["enabled"];
 };
 
 export async function getToggleCashbackEnabledInstructionAsync<
-  TAccountGlobal extends string,
-  TAccountAuthority extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: ToggleCashbackEnabledAsyncInput<
@@ -137,29 +145,56 @@ export async function getToggleCashbackEnabledInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   ToggleCashbackEnabledInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: true },
-    authority: { value: input.authority ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: true },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -167,66 +202,65 @@ export async function getToggleCashbackEnabledInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getToggleCashbackEnabledInstructionDataEncoder().encode(
-      args as ToggleCashbackEnabledInstructionDataArgs
+      args as ToggleCashbackEnabledInstructionDataArgs,
     ),
     programAddress,
   } as ToggleCashbackEnabledInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type ToggleCashbackEnabledInput<
-  TAccountGlobal extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global: Address<TAccountGlobal>;
-  authority: TransactionSigner<TAccountAuthority>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  enabled: ToggleCashbackEnabledInstructionDataArgs['enabled'];
+  global: TAccountGlobal;
+  authority: TAccountAuthority;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  enabled: ToggleCashbackEnabledInstructionDataArgs["enabled"];
 };
 
 export function getToggleCashbackEnabledInstruction<
-  TAccountGlobal extends string,
-  TAccountAuthority extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: ToggleCashbackEnabledInput<
@@ -235,50 +269,88 @@ export function getToggleCashbackEnabledInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): ToggleCashbackEnabledInstruction<
   TProgramAddress,
-  TAccountGlobal,
-  TAccountAuthority,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAuthority,
+    InstructionAccountInputAddress<TAccountAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: true },
-    authority: { value: input.authority ?? null, isWritable: true },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: true },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getToggleCashbackEnabledInstructionDataEncoder().encode(
-      args as ToggleCashbackEnabledInstructionDataArgs
+      args as ToggleCashbackEnabledInstructionDataArgs,
     ),
     programAddress,
   } as ToggleCashbackEnabledInstruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -302,11 +374,16 @@ export function parseToggleCashbackEnabledInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedToggleCashbackEnabledInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 4,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -323,7 +400,7 @@ export function parseToggleCashbackEnabledInstruction<
       program: getNextAccount(),
     },
     data: getToggleCashbackEnabledInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

@@ -45,6 +45,7 @@ async function patchIndexBarrel(outDir: string) {
 async function patchCompatibleAccount(outDir: string, name: string, discriminator: string, historicalSizes: number[], size: number) {
   const path = join(outDir, "accounts", `${name}.ts`);
   const content = await readFile(path, "utf8");
+  if (!content.includes(`return ${size};`)) throw new Error(`Account size changed in ${path}; update compatibility decoding before regenerating`);
   const original = "encodedAccount as MaybeEncodedAccount<TAddress>,";
   if (!content.includes(original)) throw new Error(`Cannot install compatibility decoding in ${path}`);
   const updated = 'import { normalizeProtocolAccount } from "../../../utils/protocol_accounts";\n' +
@@ -61,6 +62,15 @@ async function render(idlPath: string, outDir: string, { normalizePubkey = false
   if (normalizePubkey) {
     normalizeAnchorTypes(idl);
   }
+  // The upstream legacy migrate IDL repeats `mint` in the ATA token-program
+  // position. Correct the resolver seeds without changing the official snapshot.
+  const migration = idl.instructions.find((instruction: { name: string }) => instruction.name === "migrate");
+  for (const account of migration?.accounts ?? []) {
+    const seeds = account.pda?.seeds;
+    if (seeds?.length === 3 && seeds[1].kind === "account" && seeds[1].path === "mint" && seeds[2].path === "mint") {
+      seeds[1] = { kind: "account", path: "token_program" };
+    }
+  }
   
   console.log(`🔧 Processing ${idl.metadata?.name || "unknown"} program...`);
   const rootNode = rootNodeFromAnchor(idl);
@@ -69,6 +79,8 @@ async function render(idlPath: string, outDir: string, { normalizePubkey = false
   console.log(`✨ Rendering TypeScript code to ${outDir}...`);
   const visitor = renderVisitor(outDir, {
     formatCode: true,
+    generatedFolder: ".",
+    syncPackageJson: false,
   });
   
   await codama.accept(visitor);

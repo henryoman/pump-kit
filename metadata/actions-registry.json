@@ -3,7 +3,9 @@
   "package": "pump-kit",
   "entrypoints": [
     "pump-kit",
-    "pump-kit/simple"
+    "pump-kit/simple",
+    "pump-kit/launch",
+    "pump-kit/launch/store"
   ],
   "jsonConventions": {
     "bigintEncoding": "decimal-string",
@@ -14,16 +16,42 @@
   },
   "actions": [
     {
+      "name": "createPump().launch.prepare",
+      "entrypoint": "pump-kit/launch",
+      "description": "Prepare a SOL-paired Token-2022 launch, optionally with an atomic bonding-curve first buy.",
+      "requiredParams": [
+        "config",
+        "signer",
+        "mint"
+      ],
+      "optionalParams": [
+        "saveRecord",
+        "addressLookupTables",
+        "priorityFees",
+        "prependInstructions",
+        "appendInstructions",
+        "expectedMint"
+      ],
+      "returns": "LaunchSession",
+      "notes": [
+        "Upload metadata first and supply metadataUri.",
+        "Omit firstBuy for create-only launches.",
+        "Persist the signed identity before broadcast with saveRecord.",
+        "Call setup or supply an active lookup table before atomic first-buy simulation.",
+        "A chosen CA requires the corresponding mint signer. expectedMint rejects mismatches before RPC."
+      ]
+    },
+    {
       "name": "buy",
       "entrypoint": "pump-kit",
-      "mapsTo": "curveBuy",
-      "description": "Alias for curve buy."
+      "description": "Build an automatically routed buy plan for a bonding curve or migrated AMM pool.",
+      "returns": "SwapPlan"
     },
     {
       "name": "sell",
       "entrypoint": "pump-kit",
-      "mapsTo": "curveSell",
-      "description": "Alias for curve sell."
+      "description": "Build an automatically routed sell plan for a bonding curve or migrated AMM pool.",
+      "returns": "SwapPlan"
     },
     {
       "name": "curveBuy",
@@ -45,7 +73,7 @@
         "allowAtaCreation",
         "commitment"
       ],
-      "returns": "Instruction"
+      "returns": "SwapPlan"
     },
     {
       "name": "curveSell",
@@ -68,7 +96,7 @@
         "feeStructureOverride",
         "commitment"
       ],
-      "returns": "Instruction"
+      "returns": "SwapPlan"
     },
     {
       "name": "ammBuy",
@@ -89,7 +117,7 @@
         "allowTrackVolume",
         "commitment"
       ],
-      "returns": "Instruction"
+      "returns": "SwapPlan"
     },
     {
       "name": "ammSell",
@@ -113,7 +141,7 @@
         "allowTrackVolume",
         "commitment"
       ],
-      "returns": "Instruction"
+      "returns": "SwapPlan"
     },
     {
       "name": "addLiquidity",
@@ -164,12 +192,9 @@
       "requiredParams": [
         "user",
         "mint",
-        "mintAuthority",
         "name",
         "symbol",
         "uri",
-        "firstBuyTokenAmount",
-        "estimatedFirstBuyCost",
         "rpc"
       ],
       "optionalParams": [
@@ -177,36 +202,48 @@
         "feeRecipient",
         "bondingCurveCreator",
         "trackVolume",
-        "commitment"
+        "commitment",
+        "firstBuyAmountSol",
+        "firstBuyTokenAmount",
+        "estimatedFirstBuyCost",
+        "holderReward"
       ],
-      "returns": "MintAndBuyInstructions"
+      "returns": "MintWithFirstBuyInstructions",
+      "notes": [
+        "Use firstBuyAmountSol for an exact decimal SOL budget, or supply firstBuyTokenAmount with estimatedFirstBuyCost; do not mix modes."
+      ]
     },
     {
       "name": "createAndBuy",
       "entrypoint": "pump-kit",
-      "description": "Generate mint signer, create mint+buy instructions, then send+confirm transaction.",
+      "description": "Create and buy using the caller-supplied mint signer, then send and confirm the transaction.",
       "requiredParams": [
         "creator",
         "metadata",
-        "firstBuyTokenAmount",
-        "estimatedFirstBuyCost",
         "rpc",
-        "rpcSubscriptions"
+        "rpcSubscriptions",
+        "mint"
       ],
       "optionalParams": [
         "slippageBps",
         "feeRecipient",
         "bondingCurveCreator",
         "mintAuthority",
-        "mint",
         "priorityFees",
         "prependInstructions",
         "appendInstructions",
         "additionalSigners",
         "sendOptions",
-        "commitment"
+        "commitment",
+        "firstBuyAmountSol",
+        "firstBuyTokenAmount",
+        "estimatedFirstBuyCost",
+        "addressLookupTables"
       ],
-      "returns": "CreateAndBuyResult"
+      "returns": "CreateAndBuyResult",
+      "notes": [
+        "Use firstBuyAmountSol for an exact decimal SOL budget, or supply firstBuyTokenAmount with estimatedFirstBuyCost; do not mix modes."
+      ]
     },
     {
       "name": "buildTransaction",
@@ -219,13 +256,13 @@
       ],
       "optionalParams": [
         "additionalSigners",
-        "latestBlockhash",
-        "lastValidBlockHeight",
         "prependInstructions",
         "appendInstructions",
         "priorityFees",
         "version",
-        "commitment"
+        "commitment",
+        "lifetime",
+        "addressLookupTables"
       ],
       "returns": "BuiltTransaction"
     },
@@ -241,14 +278,15 @@
       ],
       "optionalParams": [
         "additionalSigners",
-        "latestBlockhash",
-        "lastValidBlockHeight",
         "prependInstructions",
         "appendInstructions",
         "priorityFees",
         "version",
         "sendOptions",
-        "commitment"
+        "commitment",
+        "lifetime",
+        "addressLookupTables",
+        "onSigned"
       ],
       "returns": "TransactionResult"
     },
@@ -263,14 +301,14 @@
       ],
       "optionalParams": [
         "additionalSigners",
-        "latestBlockhash",
-        "lastValidBlockHeight",
         "prependInstructions",
         "appendInstructions",
         "priorityFees",
         "version",
         "options",
-        "commitment"
+        "commitment",
+        "lifetime",
+        "addressLookupTables"
       ],
       "returns": "SimulationResponse"
     }

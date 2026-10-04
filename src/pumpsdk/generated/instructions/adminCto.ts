@@ -18,11 +18,12 @@ import {
   getBytesEncoder,
   getOptionDecoder,
   getOptionEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -37,68 +38,77 @@ import {
   type OptionOrNullable,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findAmmGlobalConfigPda,
+  findBondingCurvePda,
+  findCoinCreatorVaultAtaPda,
+  findCoinCreatorVaultAuthorityPda,
+  findCreatorVaultPda,
+  findCreatorVaultQuoteTokenAccountPda,
+  findCurrentCreatorQuoteTokenAccountPda,
+  findEventAuthorityPda,
+  findGlobalPda,
+  findHolderCreatorVaultQuoteTokenAccountPda,
+  findPoolAuthorityPda,
+  findPoolPda,
+  findSharingConfigPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const ADMIN_CTO_DISCRIMINATOR = new Uint8Array([
+export const ADMIN_CTO_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   125, 126, 214, 134, 77, 229, 188, 89,
 ]);
 
-export function getAdminCtoDiscriminatorBytes() {
+export function getAdminCtoDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(ADMIN_CTO_DISCRIMINATOR);
 }
 
 export type AdminCtoInstruction<
   TProgram extends string = typeof PUMP_PROGRAM_ADDRESS,
-  TAccountAdminSetCreatorAuthority extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountAdminSetCreatorAuthority extends string | AccountMeta<string> =
+    string,
   TAccountGlobal extends string | AccountMeta<string> = string,
   TAccountMint extends string | AccountMeta<string> = string,
   TAccountQuoteMint extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountBondingCurve extends string | AccountMeta<string> = string,
   TAccountCurrentCreator extends string | AccountMeta<string> = string,
-  TAccountCurrentCreatorQuoteTokenAccount extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountCurrentCreatorQuoteTokenAccount extends string | AccountMeta<string> =
+    string,
   TAccountCreatorVault extends string | AccountMeta<string> = string,
-  TAccountCreatorVaultQuoteTokenAccount extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountCreatorVaultQuoteTokenAccount extends string | AccountMeta<string> =
+    string,
   TAccountHolderCreatorVault extends string | AccountMeta<string> = string,
   TAccountHolderCreatorVaultQuoteTokenAccount extends
-    | string
-    | AccountMeta<string> = string,
-  TAccountPumpAmm extends
-    | string
-    | AccountMeta<string> = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
+    string | AccountMeta<string> = string,
+  TAccountPumpAmm extends string | AccountMeta<string> =
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
   TAccountAmmGlobalConfig extends string | AccountMeta<string> = string,
   TAccountPoolAuthority extends string | AccountMeta<string> = string,
   TAccountPool extends string | AccountMeta<string> = string,
   TAccountPumpAmmEventAuthority extends string | AccountMeta<string> = string,
-  TAccountCoinCreatorVaultAuthority extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountCoinCreatorVaultAuthority extends string | AccountMeta<string> =
+    string,
   TAccountCoinCreatorVaultAta extends string | AccountMeta<string> = string,
   TAccountSharingConfig extends string | AccountMeta<string> = string,
-  TAccountPumpFees extends
-    | string
-    | AccountMeta<string> = 'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ',
+  TAccountPumpFees extends string | AccountMeta<string> =
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
   TAccountPumpFeesEventAuthority extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
@@ -206,21 +216,21 @@ export type AdminCtoInstructionDataArgs = {
 export function getAdminCtoInstructionDataEncoder(): Encoder<AdminCtoInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['isHolderReward', getOptionEncoder(getBooleanEncoder())],
-      ['creatorFeeBps', getOptionEncoder(getU64Encoder())],
-      ['newCreator', getOptionEncoder(getAddressEncoder())],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["isHolderReward", getOptionEncoder(getBooleanEncoder())],
+      ["creatorFeeBps", getOptionEncoder(getU64Encoder())],
+      ["newCreator", getOptionEncoder(getAddressEncoder())],
     ]),
-    (value) => ({ ...value, discriminator: ADMIN_CTO_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: ADMIN_CTO_DISCRIMINATOR }),
   );
 }
 
 export function getAdminCtoInstructionDataDecoder(): Decoder<AdminCtoInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['isHolderReward', getOptionDecoder(getBooleanDecoder())],
-    ['creatorFeeBps', getOptionDecoder(getU64Decoder())],
-    ['newCreator', getOptionDecoder(getAddressDecoder())],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["isHolderReward", getOptionDecoder(getBooleanDecoder())],
+    ["creatorFeeBps", getOptionDecoder(getU64Decoder())],
+    ["newCreator", getOptionDecoder(getAddressDecoder())],
   ]);
 }
 
@@ -230,46 +240,65 @@ export function getAdminCtoInstructionDataCodec(): Codec<
 > {
   return combineCodec(
     getAdminCtoInstructionDataEncoder(),
-    getAdminCtoInstructionDataDecoder()
+    getAdminCtoInstructionDataDecoder(),
   );
 }
 
 export type AdminCtoAsyncInput<
-  TAccountAdminSetCreatorAuthority extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountCurrentCreator extends string = string,
-  TAccountCurrentCreatorQuoteTokenAccount extends string = string,
-  TAccountCreatorVault extends string = string,
-  TAccountCreatorVaultQuoteTokenAccount extends string = string,
-  TAccountHolderCreatorVault extends string = string,
-  TAccountHolderCreatorVaultQuoteTokenAccount extends string = string,
-  TAccountPumpAmm extends string = string,
-  TAccountAmmGlobalConfig extends string = string,
-  TAccountPoolAuthority extends string = string,
-  TAccountPool extends string = string,
-  TAccountPumpAmmEventAuthority extends string = string,
-  TAccountCoinCreatorVaultAuthority extends string = string,
-  TAccountCoinCreatorVaultAta extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountPumpFees extends string = string,
-  TAccountPumpFeesEventAuthority extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAdminSetCreatorAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCurrentCreator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCurrentCreatorQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVaultQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountHolderCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountHolderCreatorVaultQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPumpAmm extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAmmGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPumpAmmEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPumpFees extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPumpFeesEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  adminSetCreatorAuthority: TransactionSigner<TAccountAdminSetCreatorAuthority>;
-  global?: Address<TAccountGlobal>;
-  mint: Address<TAccountMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  bondingCurve?: Address<TAccountBondingCurve>;
+  adminSetCreatorAuthority: TAccountAdminSetCreatorAuthority;
+  global?: TAccountGlobal;
+  mint: TAccountMint;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  bondingCurve?: TAccountBondingCurve;
   /**
    * Not declared writable: a pre-creator (legacy) curve stores the zero key, which is the
    * system program, whose write lock the runtime always demotes. Callers MUST still pass this
@@ -278,62 +307,62 @@ export type AdminCtoAsyncInput<
    * is not a system-owned wallet (a program, a sysvar, a pump-fees or other program-owned
    * account) is skipped, its vault balances stay collectable, and it may be passed read-only.
    */
-  currentCreator: Address<TAccountCurrentCreator>;
-  currentCreatorQuoteTokenAccount?: Address<TAccountCurrentCreatorQuoteTokenAccount>;
-  creatorVault?: Address<TAccountCreatorVault>;
-  creatorVaultQuoteTokenAccount?: Address<TAccountCreatorVaultQuoteTokenAccount>;
+  currentCreator: TAccountCurrentCreator;
+  currentCreatorQuoteTokenAccount?: TAccountCurrentCreatorQuoteTokenAccount;
+  creatorVault?: TAccountCreatorVault;
+  creatorVaultQuoteTokenAccount?: TAccountCreatorVaultQuoteTokenAccount;
   /**
    * `["creator-vault", find_program_address(["holder-rewards", mint], pump)]`. The sweep
    * destination on the holder path of a fee-shared coin, ignored otherwise. Re-derived in the
    * handler before it is written to; kept out of the seeds constraints to stay under the sBPF
    * stack frame.
    */
-  holderCreatorVault: Address<TAccountHolderCreatorVault>;
-  holderCreatorVaultQuoteTokenAccount?: Address<TAccountHolderCreatorVaultQuoteTokenAccount>;
-  pumpAmm?: Address<TAccountPumpAmm>;
-  ammGlobalConfig?: Address<TAccountAmmGlobalConfig>;
-  poolAuthority?: Address<TAccountPoolAuthority>;
-  pool?: Address<TAccountPool>;
-  pumpAmmEventAuthority?: Address<TAccountPumpAmmEventAuthority>;
-  coinCreatorVaultAuthority?: Address<TAccountCoinCreatorVaultAuthority>;
-  coinCreatorVaultAta?: Address<TAccountCoinCreatorVaultAta>;
-  sharingConfig?: Address<TAccountSharingConfig>;
-  pumpFees?: Address<TAccountPumpFees>;
-  pumpFeesEventAuthority?: Address<TAccountPumpFeesEventAuthority>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  isHolderReward: AdminCtoInstructionDataArgs['isHolderReward'];
-  creatorFeeBps: AdminCtoInstructionDataArgs['creatorFeeBps'];
-  newCreator: AdminCtoInstructionDataArgs['newCreator'];
+  holderCreatorVault: TAccountHolderCreatorVault;
+  holderCreatorVaultQuoteTokenAccount?: TAccountHolderCreatorVaultQuoteTokenAccount;
+  pumpAmm?: TAccountPumpAmm;
+  ammGlobalConfig?: TAccountAmmGlobalConfig;
+  poolAuthority?: TAccountPoolAuthority;
+  pool?: TAccountPool;
+  pumpAmmEventAuthority?: TAccountPumpAmmEventAuthority;
+  coinCreatorVaultAuthority?: TAccountCoinCreatorVaultAuthority;
+  coinCreatorVaultAta?: TAccountCoinCreatorVaultAta;
+  sharingConfig?: TAccountSharingConfig;
+  pumpFees?: TAccountPumpFees;
+  pumpFeesEventAuthority?: TAccountPumpFeesEventAuthority;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  isHolderReward: AdminCtoInstructionDataArgs["isHolderReward"];
+  creatorFeeBps: AdminCtoInstructionDataArgs["creatorFeeBps"];
+  newCreator: AdminCtoInstructionDataArgs["newCreator"];
 };
 
 export async function getAdminCtoInstructionAsync<
-  TAccountAdminSetCreatorAuthority extends string,
-  TAccountGlobal extends string,
-  TAccountMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountBondingCurve extends string,
-  TAccountCurrentCreator extends string,
-  TAccountCurrentCreatorQuoteTokenAccount extends string,
-  TAccountCreatorVault extends string,
-  TAccountCreatorVaultQuoteTokenAccount extends string,
-  TAccountHolderCreatorVault extends string,
-  TAccountHolderCreatorVaultQuoteTokenAccount extends string,
-  TAccountPumpAmm extends string,
-  TAccountAmmGlobalConfig extends string,
-  TAccountPoolAuthority extends string,
-  TAccountPool extends string,
-  TAccountPumpAmmEventAuthority extends string,
-  TAccountCoinCreatorVaultAuthority extends string,
-  TAccountCoinCreatorVaultAta extends string,
-  TAccountSharingConfig extends string,
-  TAccountPumpFees extends string,
-  TAccountPumpFeesEventAuthority extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAdminSetCreatorAuthority extends InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountCurrentCreator extends InstructionAccountInput,
+  TAccountCurrentCreatorQuoteTokenAccount extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
+  TAccountCreatorVaultQuoteTokenAccount extends InstructionAccountInput,
+  TAccountHolderCreatorVault extends InstructionAccountInput,
+  TAccountHolderCreatorVaultQuoteTokenAccount extends InstructionAccountInput,
+  TAccountPumpAmm extends InstructionAccountInput,
+  TAccountAmmGlobalConfig extends InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput,
+  TAccountPumpAmmEventAuthority extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountPumpFees extends InstructionAccountInput,
+  TAccountPumpFeesEventAuthority extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: AdminCtoAsyncInput<
@@ -364,109 +393,246 @@ export async function getAdminCtoInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   AdminCtoInstruction<
     TProgramAddress,
-    TAccountAdminSetCreatorAuthority,
-    TAccountGlobal,
-    TAccountMint,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountBondingCurve,
-    TAccountCurrentCreator,
-    TAccountCurrentCreatorQuoteTokenAccount,
-    TAccountCreatorVault,
-    TAccountCreatorVaultQuoteTokenAccount,
-    TAccountHolderCreatorVault,
-    TAccountHolderCreatorVaultQuoteTokenAccount,
-    TAccountPumpAmm,
-    TAccountAmmGlobalConfig,
-    TAccountPoolAuthority,
-    TAccountPool,
-    TAccountPumpAmmEventAuthority,
-    TAccountCoinCreatorVaultAuthority,
-    TAccountCoinCreatorVaultAta,
-    TAccountSharingConfig,
-    TAccountPumpFees,
-    TAccountPumpFeesEventAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAdminSetCreatorAuthority,
+      InstructionAccountInputAddress<TAccountAdminSetCreatorAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCurrentCreator,
+      InstructionAccountInputAddress<TAccountCurrentCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCurrentCreatorQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountCurrentCreatorQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVaultQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorVaultQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderCreatorVault,
+      InstructionAccountInputAddress<TAccountHolderCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderCreatorVaultQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountHolderCreatorVaultQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpAmm,
+      InstructionAccountInputAddress<TAccountPumpAmm>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAmmGlobalConfig,
+      InstructionAccountInputAddress<TAccountAmmGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolAuthority,
+      InstructionAccountInputAddress<TAccountPoolAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpAmmEventAuthority,
+      InstructionAccountInputAddress<TAccountPumpAmmEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAuthority,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAta,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpFees,
+      InstructionAccountInputAddress<TAccountPumpFees>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpFeesEventAuthority,
+      InstructionAccountInputAddress<TAccountPumpFeesEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
     adminSetCreatorAuthority: {
       value: input.adminSetCreatorAuthority ?? null,
+      isSigner: true,
       isWritable: true,
     },
-    global: { value: input.global ?? null, isWritable: false },
-    mint: { value: input.mint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: true },
-    currentCreator: { value: input.currentCreator ?? null, isWritable: false },
-    currentCreatorQuoteTokenAccount: {
-      value: input.currentCreatorQuoteTokenAccount ?? null,
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: true },
+    currentCreator: {
+      value: input.currentCreator ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    currentCreatorQuoteTokenAccount: {
+      value: input.currentCreatorQuoteTokenAccount ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     creatorVaultQuoteTokenAccount: {
       value: input.creatorVaultQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     holderCreatorVault: {
       value: input.holderCreatorVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
     holderCreatorVaultQuoteTokenAccount: {
       value: input.holderCreatorVaultQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    pumpAmm: { value: input.pumpAmm ?? null, isWritable: false },
-    ammGlobalConfig: {
-      value: input.ammGlobalConfig ?? null,
+    pumpAmm: {
+      value: input.pumpAmm ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    poolAuthority: { value: input.poolAuthority ?? null, isWritable: false },
-    pool: { value: input.pool ?? null, isWritable: true },
+    ammGlobalConfig: {
+      value: input.ammGlobalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    poolAuthority: {
+      value: input.poolAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
     pumpAmmEventAuthority: {
       value: input.pumpAmmEventAuthority ?? null,
+      isSigner: false,
       isWritable: false,
     },
     coinCreatorVaultAuthority: {
       value: input.coinCreatorVaultAuthority ?? null,
+      isSigner: false,
       isWritable: true,
     },
     coinCreatorVaultAta: {
       value: input.coinCreatorVaultAta ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: true },
-    pumpFees: { value: input.pumpFees ?? null, isWritable: false },
-    pumpFeesEventAuthority: {
-      value: input.pumpFeesEventAuthority ?? null,
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    pumpFees: {
+      value: input.pumpFees ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    pumpFeesEventAuthority: {
+      value: input.pumpFeesEventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -474,332 +640,455 @@ export async function getAdminCtoInstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.bondingCurve.value) {
-    accounts.bondingCurve.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            98, 111, 110, 100, 105, 110, 103, 45, 99, 117, 114, 118, 101,
-          ])
+    accounts.bondingCurve.value = await findBondingCurvePda(
+      {
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.currentCreatorQuoteTokenAccount.value) {
     accounts.currentCreatorQuoteTokenAccount.value =
-      await getProgramDerivedAddress({
-        programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-        seeds: [
-          getAddressEncoder().encode(
-            expectAddress(accounts.currentCreator.value)
+      await findCurrentCreatorQuoteTokenAccountPda(
+        {
+          currentCreator: getAddressFromResolvedInstructionAccount(
+            "currentCreator",
+            accounts.currentCreator.value,
           ),
-          getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+          quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-        ],
-      });
+          quoteMint: getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        },
+        {
+          programAddress: getAddressFromResolvedInstructionAccount(
+            "associatedTokenProgram",
+            accounts.associatedTokenProgram.value,
+          ),
+        },
+      );
   }
   if (!accounts.creatorVault.value) {
-    accounts.creatorVault.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            99, 114, 101, 97, 116, 111, 114, 45, 118, 97, 117, 108, 116,
-          ])
+    accounts.creatorVault.value = await findCreatorVaultPda(
+      {
+        currentCreator: getAddressFromResolvedInstructionAccount(
+          "currentCreator",
+          accounts.currentCreator.value,
         ),
-        getAddressEncoder().encode(
-          expectAddress(accounts.currentCreator.value)
-        ),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.creatorVaultQuoteTokenAccount.value) {
     accounts.creatorVaultQuoteTokenAccount.value =
-      await getProgramDerivedAddress({
-        programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-        seeds: [
-          getAddressEncoder().encode(
-            expectAddress(accounts.creatorVault.value)
+      await findCreatorVaultQuoteTokenAccountPda(
+        {
+          creatorVault: getAddressFromResolvedInstructionAccount(
+            "creatorVault",
+            accounts.creatorVault.value,
           ),
-          getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+          quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-        ],
-      });
+          quoteMint: getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        },
+        {
+          programAddress: getAddressFromResolvedInstructionAccount(
+            "associatedTokenProgram",
+            accounts.associatedTokenProgram.value,
+          ),
+        },
+      );
   }
   if (!accounts.holderCreatorVaultQuoteTokenAccount.value) {
     accounts.holderCreatorVaultQuoteTokenAccount.value =
-      await getProgramDerivedAddress({
-        programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-        seeds: [
-          getAddressEncoder().encode(
-            expectAddress(accounts.holderCreatorVault.value)
+      await findHolderCreatorVaultQuoteTokenAccountPda(
+        {
+          holderCreatorVault: getAddressFromResolvedInstructionAccount(
+            "holderCreatorVault",
+            accounts.holderCreatorVault.value,
           ),
-          getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+          quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-        ],
-      });
+          quoteMint: getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        },
+        {
+          programAddress: getAddressFromResolvedInstructionAccount(
+            "associatedTokenProgram",
+            accounts.associatedTokenProgram.value,
+          ),
+        },
+      );
   }
   if (!accounts.pumpAmm.value) {
     accounts.pumpAmm.value =
-      'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
+      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" as Address<"pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA">;
   }
   if (!accounts.ammGlobalConfig.value) {
-    accounts.ammGlobalConfig.value = await getProgramDerivedAddress({
-      programAddress:
-        'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            103, 108, 111, 98, 97, 108, 95, 99, 111, 110, 102, 105, 103,
-          ])
-        ),
-      ],
+    accounts.ammGlobalConfig.value = await findAmmGlobalConfigPda({
+      programAddress: getAddressFromResolvedInstructionAccount(
+        "pumpAmm",
+        accounts.pumpAmm.value,
+      ),
     });
   }
   if (!accounts.poolAuthority.value) {
-    accounts.poolAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            112, 111, 111, 108, 45, 97, 117, 116, 104, 111, 114, 105, 116, 121,
-          ])
+    accounts.poolAuthority.value = await findPoolAuthorityPda(
+      {
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.pool.value) {
-    accounts.pool.value = await getProgramDerivedAddress({
-      programAddress:
-        'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([112, 111, 111, 108])),
-        getBytesEncoder().encode(new Uint8Array([0, 0])),
-        getAddressEncoder().encode(expectAddress(accounts.poolAuthority.value)),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-      ],
-    });
+    accounts.pool.value = await findPoolPda(
+      {
+        poolAuthority: getAddressFromResolvedInstructionAccount(
+          "poolAuthority",
+          accounts.poolAuthority.value,
+        ),
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
+        ),
+        quoteMint: getAddressFromResolvedInstructionAccount(
+          "quoteMint",
+          accounts.quoteMint.value,
+        ),
+      },
+      {
+        programAddress: getAddressFromResolvedInstructionAccount(
+          "pumpAmm",
+          accounts.pumpAmm.value,
+        ),
+      },
+    );
   }
   if (!accounts.pumpAmmEventAuthority.value) {
-    accounts.pumpAmmEventAuthority.value = await getProgramDerivedAddress({
-      programAddress:
-        'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
+    accounts.pumpAmmEventAuthority.value = await findEventAuthorityPda({
+      programAddress: getAddressFromResolvedInstructionAccount(
+        "pumpAmm",
+        accounts.pumpAmm.value,
+      ),
     });
   }
   if (!accounts.coinCreatorVaultAuthority.value) {
-    accounts.coinCreatorVaultAuthority.value = await getProgramDerivedAddress({
-      programAddress:
-        'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            99, 114, 101, 97, 116, 111, 114, 95, 118, 97, 117, 108, 116,
-          ])
-        ),
-        getAddressEncoder().encode(
-          expectAddress(accounts.currentCreator.value)
-        ),
-      ],
-    });
+    accounts.coinCreatorVaultAuthority.value =
+      await findCoinCreatorVaultAuthorityPda(
+        {
+          currentCreator: getAddressFromResolvedInstructionAccount(
+            "currentCreator",
+            accounts.currentCreator.value,
+          ),
+        },
+        {
+          programAddress: getAddressFromResolvedInstructionAccount(
+            "pumpAmm",
+            accounts.pumpAmm.value,
+          ),
+        },
+      );
   }
   if (!accounts.coinCreatorVaultAta.value) {
-    accounts.coinCreatorVaultAta.value = await getProgramDerivedAddress({
-      programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-      seeds: [
-        getAddressEncoder().encode(
-          expectAddress(accounts.coinCreatorVaultAuthority.value)
+    accounts.coinCreatorVaultAta.value = await findCoinCreatorVaultAtaPda(
+      {
+        coinCreatorVaultAuthority: getAddressFromResolvedInstructionAccount(
+          "coinCreatorVaultAuthority",
+          accounts.coinCreatorVaultAuthority.value,
         ),
-        getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
+        quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+          "quoteTokenProgram",
+          accounts.quoteTokenProgram.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-      ],
-    });
-  }
-  if (!accounts.sharingConfig.value) {
-    accounts.sharingConfig.value = await getProgramDerivedAddress({
-      programAddress:
-        'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            115, 104, 97, 114, 105, 110, 103, 45, 99, 111, 110, 102, 105, 103,
-          ])
+        quoteMint: getAddressFromResolvedInstructionAccount(
+          "quoteMint",
+          accounts.quoteMint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-      ],
-    });
+      },
+      {
+        programAddress: getAddressFromResolvedInstructionAccount(
+          "associatedTokenProgram",
+          accounts.associatedTokenProgram.value,
+        ),
+      },
+    );
   }
   if (!accounts.pumpFees.value) {
     accounts.pumpFees.value =
-      'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>;
+      "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ" as Address<"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ">;
+  }
+  if (!accounts.sharingConfig.value) {
+    accounts.sharingConfig.value = await findSharingConfigPda(
+      {
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
+        ),
+      },
+      {
+        programAddress: getAddressFromResolvedInstructionAccount(
+          "pumpFees",
+          accounts.pumpFees.value,
+        ),
+      },
+    );
   }
   if (!accounts.pumpFeesEventAuthority.value) {
-    accounts.pumpFeesEventAuthority.value = await getProgramDerivedAddress({
-      programAddress:
-        'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
+    accounts.pumpFeesEventAuthority.value = await findEventAuthorityPda({
+      programAddress: getAddressFromResolvedInstructionAccount(
+        "pumpFees",
+        accounts.pumpFees.value,
+      ),
     });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.adminSetCreatorAuthority),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.currentCreator),
-      getAccountMeta(accounts.currentCreatorQuoteTokenAccount),
-      getAccountMeta(accounts.creatorVault),
-      getAccountMeta(accounts.creatorVaultQuoteTokenAccount),
-      getAccountMeta(accounts.holderCreatorVault),
-      getAccountMeta(accounts.holderCreatorVaultQuoteTokenAccount),
-      getAccountMeta(accounts.pumpAmm),
-      getAccountMeta(accounts.ammGlobalConfig),
-      getAccountMeta(accounts.poolAuthority),
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.pumpAmmEventAuthority),
-      getAccountMeta(accounts.coinCreatorVaultAuthority),
-      getAccountMeta(accounts.coinCreatorVaultAta),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.pumpFees),
-      getAccountMeta(accounts.pumpFeesEventAuthority),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta(
+        "adminSetCreatorAuthority",
+        accounts.adminSetCreatorAuthority,
+      ),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta("currentCreator", accounts.currentCreator),
+      getAccountMeta(
+        "currentCreatorQuoteTokenAccount",
+        accounts.currentCreatorQuoteTokenAccount,
+      ),
+      getAccountMeta("creatorVault", accounts.creatorVault),
+      getAccountMeta(
+        "creatorVaultQuoteTokenAccount",
+        accounts.creatorVaultQuoteTokenAccount,
+      ),
+      getAccountMeta("holderCreatorVault", accounts.holderCreatorVault),
+      getAccountMeta(
+        "holderCreatorVaultQuoteTokenAccount",
+        accounts.holderCreatorVaultQuoteTokenAccount,
+      ),
+      getAccountMeta("pumpAmm", accounts.pumpAmm),
+      getAccountMeta("ammGlobalConfig", accounts.ammGlobalConfig),
+      getAccountMeta("poolAuthority", accounts.poolAuthority),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("pumpAmmEventAuthority", accounts.pumpAmmEventAuthority),
+      getAccountMeta(
+        "coinCreatorVaultAuthority",
+        accounts.coinCreatorVaultAuthority,
+      ),
+      getAccountMeta("coinCreatorVaultAta", accounts.coinCreatorVaultAta),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("pumpFees", accounts.pumpFees),
+      getAccountMeta("pumpFeesEventAuthority", accounts.pumpFeesEventAuthority),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getAdminCtoInstructionDataEncoder().encode(
-      args as AdminCtoInstructionDataArgs
+      args as AdminCtoInstructionDataArgs,
     ),
     programAddress,
   } as AdminCtoInstruction<
     TProgramAddress,
-    TAccountAdminSetCreatorAuthority,
-    TAccountGlobal,
-    TAccountMint,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountBondingCurve,
-    TAccountCurrentCreator,
-    TAccountCurrentCreatorQuoteTokenAccount,
-    TAccountCreatorVault,
-    TAccountCreatorVaultQuoteTokenAccount,
-    TAccountHolderCreatorVault,
-    TAccountHolderCreatorVaultQuoteTokenAccount,
-    TAccountPumpAmm,
-    TAccountAmmGlobalConfig,
-    TAccountPoolAuthority,
-    TAccountPool,
-    TAccountPumpAmmEventAuthority,
-    TAccountCoinCreatorVaultAuthority,
-    TAccountCoinCreatorVaultAta,
-    TAccountSharingConfig,
-    TAccountPumpFees,
-    TAccountPumpFeesEventAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAdminSetCreatorAuthority,
+      InstructionAccountInputAddress<TAccountAdminSetCreatorAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCurrentCreator,
+      InstructionAccountInputAddress<TAccountCurrentCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCurrentCreatorQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountCurrentCreatorQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVaultQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorVaultQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderCreatorVault,
+      InstructionAccountInputAddress<TAccountHolderCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderCreatorVaultQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountHolderCreatorVaultQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpAmm,
+      InstructionAccountInputAddress<TAccountPumpAmm>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAmmGlobalConfig,
+      InstructionAccountInputAddress<TAccountAmmGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolAuthority,
+      InstructionAccountInputAddress<TAccountPoolAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpAmmEventAuthority,
+      InstructionAccountInputAddress<TAccountPumpAmmEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAuthority,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAta,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpFees,
+      InstructionAccountInputAddress<TAccountPumpFees>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpFeesEventAuthority,
+      InstructionAccountInputAddress<TAccountPumpFeesEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type AdminCtoInput<
-  TAccountAdminSetCreatorAuthority extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountCurrentCreator extends string = string,
-  TAccountCurrentCreatorQuoteTokenAccount extends string = string,
-  TAccountCreatorVault extends string = string,
-  TAccountCreatorVaultQuoteTokenAccount extends string = string,
-  TAccountHolderCreatorVault extends string = string,
-  TAccountHolderCreatorVaultQuoteTokenAccount extends string = string,
-  TAccountPumpAmm extends string = string,
-  TAccountAmmGlobalConfig extends string = string,
-  TAccountPoolAuthority extends string = string,
-  TAccountPool extends string = string,
-  TAccountPumpAmmEventAuthority extends string = string,
-  TAccountCoinCreatorVaultAuthority extends string = string,
-  TAccountCoinCreatorVaultAta extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountPumpFees extends string = string,
-  TAccountPumpFeesEventAuthority extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountAdminSetCreatorAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCurrentCreator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCurrentCreatorQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVaultQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountHolderCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountHolderCreatorVaultQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPumpAmm extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAmmGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPumpAmmEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPumpFees extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPumpFeesEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  adminSetCreatorAuthority: TransactionSigner<TAccountAdminSetCreatorAuthority>;
-  global: Address<TAccountGlobal>;
-  mint: Address<TAccountMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  bondingCurve: Address<TAccountBondingCurve>;
+  adminSetCreatorAuthority: TAccountAdminSetCreatorAuthority;
+  global: TAccountGlobal;
+  mint: TAccountMint;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  bondingCurve: TAccountBondingCurve;
   /**
    * Not declared writable: a pre-creator (legacy) curve stores the zero key, which is the
    * system program, whose write lock the runtime always demotes. Callers MUST still pass this
@@ -808,62 +1097,62 @@ export type AdminCtoInput<
    * is not a system-owned wallet (a program, a sysvar, a pump-fees or other program-owned
    * account) is skipped, its vault balances stay collectable, and it may be passed read-only.
    */
-  currentCreator: Address<TAccountCurrentCreator>;
-  currentCreatorQuoteTokenAccount: Address<TAccountCurrentCreatorQuoteTokenAccount>;
-  creatorVault: Address<TAccountCreatorVault>;
-  creatorVaultQuoteTokenAccount: Address<TAccountCreatorVaultQuoteTokenAccount>;
+  currentCreator: TAccountCurrentCreator;
+  currentCreatorQuoteTokenAccount: TAccountCurrentCreatorQuoteTokenAccount;
+  creatorVault: TAccountCreatorVault;
+  creatorVaultQuoteTokenAccount: TAccountCreatorVaultQuoteTokenAccount;
   /**
    * `["creator-vault", find_program_address(["holder-rewards", mint], pump)]`. The sweep
    * destination on the holder path of a fee-shared coin, ignored otherwise. Re-derived in the
    * handler before it is written to; kept out of the seeds constraints to stay under the sBPF
    * stack frame.
    */
-  holderCreatorVault: Address<TAccountHolderCreatorVault>;
-  holderCreatorVaultQuoteTokenAccount: Address<TAccountHolderCreatorVaultQuoteTokenAccount>;
-  pumpAmm?: Address<TAccountPumpAmm>;
-  ammGlobalConfig: Address<TAccountAmmGlobalConfig>;
-  poolAuthority: Address<TAccountPoolAuthority>;
-  pool: Address<TAccountPool>;
-  pumpAmmEventAuthority: Address<TAccountPumpAmmEventAuthority>;
-  coinCreatorVaultAuthority: Address<TAccountCoinCreatorVaultAuthority>;
-  coinCreatorVaultAta: Address<TAccountCoinCreatorVaultAta>;
-  sharingConfig: Address<TAccountSharingConfig>;
-  pumpFees?: Address<TAccountPumpFees>;
-  pumpFeesEventAuthority: Address<TAccountPumpFeesEventAuthority>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  isHolderReward: AdminCtoInstructionDataArgs['isHolderReward'];
-  creatorFeeBps: AdminCtoInstructionDataArgs['creatorFeeBps'];
-  newCreator: AdminCtoInstructionDataArgs['newCreator'];
+  holderCreatorVault: TAccountHolderCreatorVault;
+  holderCreatorVaultQuoteTokenAccount: TAccountHolderCreatorVaultQuoteTokenAccount;
+  pumpAmm?: TAccountPumpAmm;
+  ammGlobalConfig: TAccountAmmGlobalConfig;
+  poolAuthority: TAccountPoolAuthority;
+  pool: TAccountPool;
+  pumpAmmEventAuthority: TAccountPumpAmmEventAuthority;
+  coinCreatorVaultAuthority: TAccountCoinCreatorVaultAuthority;
+  coinCreatorVaultAta: TAccountCoinCreatorVaultAta;
+  sharingConfig: TAccountSharingConfig;
+  pumpFees?: TAccountPumpFees;
+  pumpFeesEventAuthority: TAccountPumpFeesEventAuthority;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  isHolderReward: AdminCtoInstructionDataArgs["isHolderReward"];
+  creatorFeeBps: AdminCtoInstructionDataArgs["creatorFeeBps"];
+  newCreator: AdminCtoInstructionDataArgs["newCreator"];
 };
 
 export function getAdminCtoInstruction<
-  TAccountAdminSetCreatorAuthority extends string,
-  TAccountGlobal extends string,
-  TAccountMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountBondingCurve extends string,
-  TAccountCurrentCreator extends string,
-  TAccountCurrentCreatorQuoteTokenAccount extends string,
-  TAccountCreatorVault extends string,
-  TAccountCreatorVaultQuoteTokenAccount extends string,
-  TAccountHolderCreatorVault extends string,
-  TAccountHolderCreatorVaultQuoteTokenAccount extends string,
-  TAccountPumpAmm extends string,
-  TAccountAmmGlobalConfig extends string,
-  TAccountPoolAuthority extends string,
-  TAccountPool extends string,
-  TAccountPumpAmmEventAuthority extends string,
-  TAccountCoinCreatorVaultAuthority extends string,
-  TAccountCoinCreatorVaultAta extends string,
-  TAccountSharingConfig extends string,
-  TAccountPumpFees extends string,
-  TAccountPumpFeesEventAuthority extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountAdminSetCreatorAuthority extends InstructionSignerInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountCurrentCreator extends InstructionAccountInput,
+  TAccountCurrentCreatorQuoteTokenAccount extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
+  TAccountCreatorVaultQuoteTokenAccount extends InstructionAccountInput,
+  TAccountHolderCreatorVault extends InstructionAccountInput,
+  TAccountHolderCreatorVaultQuoteTokenAccount extends InstructionAccountInput,
+  TAccountPumpAmm extends InstructionAccountInput,
+  TAccountAmmGlobalConfig extends InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput,
+  TAccountPumpAmmEventAuthority extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAuthority extends InstructionAccountInput,
+  TAccountCoinCreatorVaultAta extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountPumpFees extends InstructionAccountInput,
+  TAccountPumpFeesEventAuthority extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: AdminCtoInput<
@@ -894,107 +1183,244 @@ export function getAdminCtoInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): AdminCtoInstruction<
   TProgramAddress,
-  TAccountAdminSetCreatorAuthority,
-  TAccountGlobal,
-  TAccountMint,
-  TAccountQuoteMint,
-  TAccountQuoteTokenProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountSystemProgram,
-  TAccountBondingCurve,
-  TAccountCurrentCreator,
-  TAccountCurrentCreatorQuoteTokenAccount,
-  TAccountCreatorVault,
-  TAccountCreatorVaultQuoteTokenAccount,
-  TAccountHolderCreatorVault,
-  TAccountHolderCreatorVaultQuoteTokenAccount,
-  TAccountPumpAmm,
-  TAccountAmmGlobalConfig,
-  TAccountPoolAuthority,
-  TAccountPool,
-  TAccountPumpAmmEventAuthority,
-  TAccountCoinCreatorVaultAuthority,
-  TAccountCoinCreatorVaultAta,
-  TAccountSharingConfig,
-  TAccountPumpFees,
-  TAccountPumpFeesEventAuthority,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountAdminSetCreatorAuthority,
+    InstructionAccountInputAddress<TAccountAdminSetCreatorAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountMint,
+    InstructionAccountInputAddress<TAccountMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBondingCurve,
+    InstructionAccountInputAddress<TAccountBondingCurve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCurrentCreator,
+    InstructionAccountInputAddress<TAccountCurrentCreator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCurrentCreatorQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountCurrentCreatorQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorVault,
+    InstructionAccountInputAddress<TAccountCreatorVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorVaultQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountCreatorVaultQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountHolderCreatorVault,
+    InstructionAccountInputAddress<TAccountHolderCreatorVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountHolderCreatorVaultQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountHolderCreatorVaultQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPumpAmm,
+    InstructionAccountInputAddress<TAccountPumpAmm>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAmmGlobalConfig,
+    InstructionAccountInputAddress<TAccountAmmGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolAuthority,
+    InstructionAccountInputAddress<TAccountPoolAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPool,
+    InstructionAccountInputAddress<TAccountPool>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPumpAmmEventAuthority,
+    InstructionAccountInputAddress<TAccountPumpAmmEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCoinCreatorVaultAuthority,
+    InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCoinCreatorVaultAta,
+    InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSharingConfig,
+    InstructionAccountInputAddress<TAccountSharingConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPumpFees,
+    InstructionAccountInputAddress<TAccountPumpFees>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPumpFeesEventAuthority,
+    InstructionAccountInputAddress<TAccountPumpFeesEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
+
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 
   // Original accounts.
   const originalAccounts = {
     adminSetCreatorAuthority: {
       value: input.adminSetCreatorAuthority ?? null,
+      isSigner: true,
       isWritable: true,
     },
-    global: { value: input.global ?? null, isWritable: false },
-    mint: { value: input.mint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: true },
-    currentCreator: { value: input.currentCreator ?? null, isWritable: false },
-    currentCreatorQuoteTokenAccount: {
-      value: input.currentCreatorQuoteTokenAccount ?? null,
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: true },
+    currentCreator: {
+      value: input.currentCreator ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    currentCreatorQuoteTokenAccount: {
+      value: input.currentCreatorQuoteTokenAccount ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     creatorVaultQuoteTokenAccount: {
       value: input.creatorVaultQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     holderCreatorVault: {
       value: input.holderCreatorVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
     holderCreatorVaultQuoteTokenAccount: {
       value: input.holderCreatorVaultQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    pumpAmm: { value: input.pumpAmm ?? null, isWritable: false },
-    ammGlobalConfig: {
-      value: input.ammGlobalConfig ?? null,
+    pumpAmm: {
+      value: input.pumpAmm ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    poolAuthority: { value: input.poolAuthority ?? null, isWritable: false },
-    pool: { value: input.pool ?? null, isWritable: true },
+    ammGlobalConfig: {
+      value: input.ammGlobalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    poolAuthority: {
+      value: input.poolAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
     pumpAmmEventAuthority: {
       value: input.pumpAmmEventAuthority ?? null,
+      isSigner: false,
       isWritable: false,
     },
     coinCreatorVaultAuthority: {
       value: input.coinCreatorVaultAuthority ?? null,
+      isSigner: false,
       isWritable: true,
     },
     coinCreatorVaultAta: {
       value: input.coinCreatorVaultAta ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: true },
-    pumpFees: { value: input.pumpFees ?? null, isWritable: false },
-    pumpFeesEventAuthority: {
-      value: input.pumpFeesEventAuthority ?? null,
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    pumpFees: {
+      value: input.pumpFees ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    pumpFeesEventAuthority: {
+      value: input.pumpFeesEventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -1003,83 +1429,175 @@ export function getAdminCtoInstruction<
   // Resolve default values.
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.pumpAmm.value) {
     accounts.pumpAmm.value =
-      'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
+      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" as Address<"pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA">;
   }
   if (!accounts.pumpFees.value) {
     accounts.pumpFees.value =
-      'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>;
+      "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ" as Address<"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.adminSetCreatorAuthority),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.currentCreator),
-      getAccountMeta(accounts.currentCreatorQuoteTokenAccount),
-      getAccountMeta(accounts.creatorVault),
-      getAccountMeta(accounts.creatorVaultQuoteTokenAccount),
-      getAccountMeta(accounts.holderCreatorVault),
-      getAccountMeta(accounts.holderCreatorVaultQuoteTokenAccount),
-      getAccountMeta(accounts.pumpAmm),
-      getAccountMeta(accounts.ammGlobalConfig),
-      getAccountMeta(accounts.poolAuthority),
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.pumpAmmEventAuthority),
-      getAccountMeta(accounts.coinCreatorVaultAuthority),
-      getAccountMeta(accounts.coinCreatorVaultAta),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.pumpFees),
-      getAccountMeta(accounts.pumpFeesEventAuthority),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta(
+        "adminSetCreatorAuthority",
+        accounts.adminSetCreatorAuthority,
+      ),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta("currentCreator", accounts.currentCreator),
+      getAccountMeta(
+        "currentCreatorQuoteTokenAccount",
+        accounts.currentCreatorQuoteTokenAccount,
+      ),
+      getAccountMeta("creatorVault", accounts.creatorVault),
+      getAccountMeta(
+        "creatorVaultQuoteTokenAccount",
+        accounts.creatorVaultQuoteTokenAccount,
+      ),
+      getAccountMeta("holderCreatorVault", accounts.holderCreatorVault),
+      getAccountMeta(
+        "holderCreatorVaultQuoteTokenAccount",
+        accounts.holderCreatorVaultQuoteTokenAccount,
+      ),
+      getAccountMeta("pumpAmm", accounts.pumpAmm),
+      getAccountMeta("ammGlobalConfig", accounts.ammGlobalConfig),
+      getAccountMeta("poolAuthority", accounts.poolAuthority),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("pumpAmmEventAuthority", accounts.pumpAmmEventAuthority),
+      getAccountMeta(
+        "coinCreatorVaultAuthority",
+        accounts.coinCreatorVaultAuthority,
+      ),
+      getAccountMeta("coinCreatorVaultAta", accounts.coinCreatorVaultAta),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("pumpFees", accounts.pumpFees),
+      getAccountMeta("pumpFeesEventAuthority", accounts.pumpFeesEventAuthority),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getAdminCtoInstructionDataEncoder().encode(
-      args as AdminCtoInstructionDataArgs
+      args as AdminCtoInstructionDataArgs,
     ),
     programAddress,
   } as AdminCtoInstruction<
     TProgramAddress,
-    TAccountAdminSetCreatorAuthority,
-    TAccountGlobal,
-    TAccountMint,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountBondingCurve,
-    TAccountCurrentCreator,
-    TAccountCurrentCreatorQuoteTokenAccount,
-    TAccountCreatorVault,
-    TAccountCreatorVaultQuoteTokenAccount,
-    TAccountHolderCreatorVault,
-    TAccountHolderCreatorVaultQuoteTokenAccount,
-    TAccountPumpAmm,
-    TAccountAmmGlobalConfig,
-    TAccountPoolAuthority,
-    TAccountPool,
-    TAccountPumpAmmEventAuthority,
-    TAccountCoinCreatorVaultAuthority,
-    TAccountCoinCreatorVaultAta,
-    TAccountSharingConfig,
-    TAccountPumpFees,
-    TAccountPumpFeesEventAuthority,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountAdminSetCreatorAuthority,
+      InstructionAccountInputAddress<TAccountAdminSetCreatorAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCurrentCreator,
+      InstructionAccountInputAddress<TAccountCurrentCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCurrentCreatorQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountCurrentCreatorQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVaultQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorVaultQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderCreatorVault,
+      InstructionAccountInputAddress<TAccountHolderCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountHolderCreatorVaultQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountHolderCreatorVaultQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpAmm,
+      InstructionAccountInputAddress<TAccountPumpAmm>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAmmGlobalConfig,
+      InstructionAccountInputAddress<TAccountAmmGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolAuthority,
+      InstructionAccountInputAddress<TAccountPoolAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpAmmEventAuthority,
+      InstructionAccountInputAddress<TAccountPumpAmmEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAuthority,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCoinCreatorVaultAta,
+      InstructionAccountInputAddress<TAccountCoinCreatorVaultAta>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpFees,
+      InstructionAccountInputAddress<TAccountPumpFees>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPumpFeesEventAuthority,
+      InstructionAccountInputAddress<TAccountPumpFeesEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -1139,11 +1657,16 @@ export function parseAdminCtoInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAdminCtoInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 26) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 26,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

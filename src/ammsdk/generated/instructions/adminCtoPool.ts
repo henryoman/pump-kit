@@ -18,11 +18,12 @@ import {
   getBytesEncoder,
   getOptionDecoder,
   getOptionEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -38,20 +39,27 @@ import {
   type ReadonlyAccount,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const ADMIN_CTO_POOL_DISCRIMINATOR = new Uint8Array([
+export const ADMIN_CTO_POOL_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   45, 61, 165, 151, 104, 0, 49, 189,
 ]);
 
-export function getAdminCtoPoolDiscriminatorBytes() {
+export function getAdminCtoPoolDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    ADMIN_CTO_POOL_DISCRIMINATOR
+    ADMIN_CTO_POOL_DISCRIMINATOR,
   );
 }
 
@@ -61,9 +69,8 @@ export type AdminCtoPoolInstruction<
   TAccountGlobalConfig extends string | AccountMeta<string> = string,
   TAccountPool extends string | AccountMeta<string> = string,
   TAccountPoolAuthority extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -114,21 +121,21 @@ export type AdminCtoPoolInstructionDataArgs = {
 export function getAdminCtoPoolInstructionDataEncoder(): Encoder<AdminCtoPoolInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['coinCreator', getAddressEncoder()],
-      ['isHolderReward', getBooleanEncoder()],
-      ['creatorFeeBps', getOptionEncoder(getU64Encoder())],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["coinCreator", getAddressEncoder()],
+      ["isHolderReward", getBooleanEncoder()],
+      ["creatorFeeBps", getOptionEncoder(getU64Encoder())],
     ]),
-    (value) => ({ ...value, discriminator: ADMIN_CTO_POOL_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: ADMIN_CTO_POOL_DISCRIMINATOR }),
   );
 }
 
 export function getAdminCtoPoolInstructionDataDecoder(): Decoder<AdminCtoPoolInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['coinCreator', getAddressDecoder()],
-    ['isHolderReward', getBooleanDecoder()],
-    ['creatorFeeBps', getOptionDecoder(getU64Decoder())],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["coinCreator", getAddressDecoder()],
+    ["isHolderReward", getBooleanDecoder()],
+    ["creatorFeeBps", getOptionDecoder(getU64Decoder())],
   ]);
 }
 
@@ -138,39 +145,42 @@ export function getAdminCtoPoolInstructionDataCodec(): Codec<
 > {
   return combineCodec(
     getAdminCtoPoolInstructionDataEncoder(),
-    getAdminCtoPoolInstructionDataDecoder()
+    getAdminCtoPoolInstructionDataDecoder(),
   );
 }
 
 export type AdminCtoPoolAsyncInput<
-  TAccountPayer extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountPool extends string = string,
-  TAccountPoolAuthority extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  payer: TransactionSigner<TAccountPayer>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  pool: Address<TAccountPool>;
-  poolAuthority: TransactionSigner<TAccountPoolAuthority>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  coinCreator: AdminCtoPoolInstructionDataArgs['coinCreator'];
-  isHolderReward: AdminCtoPoolInstructionDataArgs['isHolderReward'];
-  creatorFeeBps: AdminCtoPoolInstructionDataArgs['creatorFeeBps'];
+  payer: TAccountPayer;
+  globalConfig: TAccountGlobalConfig;
+  pool: TAccountPool;
+  poolAuthority: TAccountPoolAuthority;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  coinCreator: AdminCtoPoolInstructionDataArgs["coinCreator"];
+  isHolderReward: AdminCtoPoolInstructionDataArgs["isHolderReward"];
+  creatorFeeBps: AdminCtoPoolInstructionDataArgs["creatorFeeBps"];
 };
 
 export async function getAdminCtoPoolInstructionAsync<
-  TAccountPayer extends string,
-  TAccountGlobalConfig extends string,
-  TAccountPool extends string,
-  TAccountPoolAuthority extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPayer extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: AdminCtoPoolAsyncInput<
@@ -182,35 +192,79 @@ export async function getAdminCtoPoolInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   AdminCtoPoolInstruction<
     TProgramAddress,
-    TAccountPayer,
-    TAccountGlobalConfig,
-    TAccountPool,
-    TAccountPoolAuthority,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPayer,
+      InstructionAccountInputAddress<TAccountPayer>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolAuthority,
+      InstructionAccountInputAddress<TAccountPoolAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    payer: { value: input.payer ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    pool: { value: input.pool ?? null, isWritable: true },
-    poolAuthority: { value: input.poolAuthority ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    poolAuthority: {
+      value: input.poolAuthority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -219,78 +273,93 @@ export async function getAdminCtoPoolInstructionAsync<
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.payer),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.poolAuthority),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("payer", accounts.payer),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("poolAuthority", accounts.poolAuthority),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getAdminCtoPoolInstructionDataEncoder().encode(
-      args as AdminCtoPoolInstructionDataArgs
+      args as AdminCtoPoolInstructionDataArgs,
     ),
     programAddress,
   } as AdminCtoPoolInstruction<
     TProgramAddress,
-    TAccountPayer,
-    TAccountGlobalConfig,
-    TAccountPool,
-    TAccountPoolAuthority,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPayer,
+      InstructionAccountInputAddress<TAccountPayer>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolAuthority,
+      InstructionAccountInputAddress<TAccountPoolAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type AdminCtoPoolInput<
-  TAccountPayer extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountPool extends string = string,
-  TAccountPoolAuthority extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  payer: TransactionSigner<TAccountPayer>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  pool: Address<TAccountPool>;
-  poolAuthority: TransactionSigner<TAccountPoolAuthority>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  coinCreator: AdminCtoPoolInstructionDataArgs['coinCreator'];
-  isHolderReward: AdminCtoPoolInstructionDataArgs['isHolderReward'];
-  creatorFeeBps: AdminCtoPoolInstructionDataArgs['creatorFeeBps'];
+  payer: TAccountPayer;
+  globalConfig: TAccountGlobalConfig;
+  pool: TAccountPool;
+  poolAuthority: TAccountPoolAuthority;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  coinCreator: AdminCtoPoolInstructionDataArgs["coinCreator"];
+  isHolderReward: AdminCtoPoolInstructionDataArgs["isHolderReward"];
+  creatorFeeBps: AdminCtoPoolInstructionDataArgs["creatorFeeBps"];
 };
 
 export function getAdminCtoPoolInstruction<
-  TAccountPayer extends string,
-  TAccountGlobalConfig extends string,
-  TAccountPool extends string,
-  TAccountPoolAuthority extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPayer extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountPool extends InstructionAccountInput,
+  TAccountPoolAuthority extends InstructionSignerInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: AdminCtoPoolInput<
@@ -302,33 +371,77 @@ export function getAdminCtoPoolInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): AdminCtoPoolInstruction<
   TProgramAddress,
-  TAccountPayer,
-  TAccountGlobalConfig,
-  TAccountPool,
-  TAccountPoolAuthority,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountPayer,
+    InstructionAccountInputAddress<TAccountPayer>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPool,
+    InstructionAccountInputAddress<TAccountPool>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolAuthority,
+    InstructionAccountInputAddress<TAccountPoolAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    payer: { value: input.payer ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    pool: { value: input.pool ?? null, isWritable: true },
-    poolAuthority: { value: input.poolAuthority ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: true },
+    poolAuthority: {
+      value: input.poolAuthority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -337,33 +450,53 @@ export function getAdminCtoPoolInstruction<
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.payer),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.poolAuthority),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("payer", accounts.payer),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("poolAuthority", accounts.poolAuthority),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getAdminCtoPoolInstructionDataEncoder().encode(
-      args as AdminCtoPoolInstructionDataArgs
+      args as AdminCtoPoolInstructionDataArgs,
     ),
     programAddress,
   } as AdminCtoPoolInstruction<
     TProgramAddress,
-    TAccountPayer,
-    TAccountGlobalConfig,
-    TAccountPool,
-    TAccountPoolAuthority,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPayer,
+      InstructionAccountInputAddress<TAccountPayer>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolAuthority,
+      InstructionAccountInputAddress<TAccountPoolAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -390,11 +523,16 @@ export function parseAdminCtoPoolInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAdminCtoPoolInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 7) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 7,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

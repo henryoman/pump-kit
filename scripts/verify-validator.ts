@@ -29,12 +29,13 @@ for (const recipient of [global.feeRecipient, global.buybackFeeRecipients[0]!]) 
 }
 await Bun.sleep(600);
 const baseConfig = { schemaVersion: 1, quote: "SOL", token: { name: "Validator Example", symbol: "TEST", metadataUri: "ipfs://validator-example" } };
-const createOnly = await pump.launch.prepare(baseConfig, { signer });
+const priorityFees = { computeUnitLimit: 300000, computeUnitPriceMicroLamports: 5000n };
+const createOnly = await pump.launch.prepare(baseConfig, { signer, mint: await generateKeyPairSigner(), priorityFees });
 const simulation = await createOnly.simulate();
 assert.equal(simulation.value.err, null, JSON.stringify(simulation.value, (_k, v) => typeof v === "bigint" ? String(v) : v));
 const created = await createOnly.send({ abortSignal: AbortSignal.timeout(45000) });
 console.log("Create-only confirmed", created.signature);
-const launch = await pump.launch.prepare({ ...baseConfig, firstBuy: { amount: "0.01", slippageBps: 100 } }, { signer, saveRecord: async record => { if (record.signature) { await Bun.write("/tmp/pump-kit-validator-last-record.json", JSON.stringify(record)); console.log(record.status, record.signature); } } });
+const launch = await pump.launch.prepare({ ...baseConfig, firstBuy: { amount: "0.01", slippageBps: 100 } }, { signer, mint: await generateKeyPairSigner(), priorityFees, saveRecord: async record => { if (record.signature) { await Bun.write("/tmp/pump-kit-validator-last-record.json", JSON.stringify(record)); console.log(record.status, record.signature); } } });
 await launch.setup();
 console.log("SDK lookup-table setup confirmed");
 const firstSimulation = await launch.simulate();

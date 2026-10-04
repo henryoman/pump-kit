@@ -1,9 +1,9 @@
-import type { MaybeEncodedAccount } from "@solana/kit";
+import type { MaybeEncodedAccount, ReadonlyUint8Array } from "@solana/kit";
 
 /** Only whole appended fields may be absent. Core fields and partial fields are required. */
 export function normalizeProtocolAccount<TAddress extends string>(
   account: MaybeEncodedAccount<TAddress>,
-  discriminator: Uint8Array,
+  discriminator: ReadonlyUint8Array,
   historicalSizes: readonly number[],
   currentSize: number,
 ): MaybeEncodedAccount<TAddress> {

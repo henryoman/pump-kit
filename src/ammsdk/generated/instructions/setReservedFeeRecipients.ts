@@ -14,9 +14,10 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -30,19 +31,25 @@ import {
   type ReadonlyAccount,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findEventAuthorityPda, findGlobalConfigPda } from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const SET_RESERVED_FEE_RECIPIENTS_DISCRIMINATOR = new Uint8Array([
-  111, 172, 162, 232, 114, 89, 213, 142,
-]);
+export const SET_RESERVED_FEE_RECIPIENTS_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142]);
 
-export function getSetReservedFeeRecipientsDiscriminatorBytes() {
+export function getSetReservedFeeRecipientsDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    SET_RESERVED_FEE_RECIPIENTS_DISCRIMINATOR
+    SET_RESERVED_FEE_RECIPIENTS_DISCRIMINATOR,
   );
 }
 
@@ -86,20 +93,20 @@ export type SetReservedFeeRecipientsInstructionDataArgs = {
 export function getSetReservedFeeRecipientsInstructionDataEncoder(): FixedSizeEncoder<SetReservedFeeRecipientsInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['whitelistPda', getAddressEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["whitelistPda", getAddressEncoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: SET_RESERVED_FEE_RECIPIENTS_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getSetReservedFeeRecipientsInstructionDataDecoder(): FixedSizeDecoder<SetReservedFeeRecipientsInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['whitelistPda', getAddressDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["whitelistPda", getAddressDecoder()],
   ]);
 }
 
@@ -109,28 +116,30 @@ export function getSetReservedFeeRecipientsInstructionDataCodec(): FixedSizeCode
 > {
   return combineCodec(
     getSetReservedFeeRecipientsInstructionDataEncoder(),
-    getSetReservedFeeRecipientsInstructionDataDecoder()
+    getSetReservedFeeRecipientsInstructionDataDecoder(),
   );
 }
 
 export type SetReservedFeeRecipientsAsyncInput<
-  TAccountGlobalConfig extends string = string,
-  TAccountAdmin extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  globalConfig?: Address<TAccountGlobalConfig>;
-  admin: TransactionSigner<TAccountAdmin>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  whitelistPda: SetReservedFeeRecipientsInstructionDataArgs['whitelistPda'];
+  globalConfig?: TAccountGlobalConfig;
+  admin: TAccountAdmin;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  whitelistPda: SetReservedFeeRecipientsInstructionDataArgs["whitelistPda"];
 };
 
 export async function getSetReservedFeeRecipientsInstructionAsync<
-  TAccountGlobalConfig extends string,
-  TAccountAdmin extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountAdmin extends InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: SetReservedFeeRecipientsAsyncInput<
@@ -139,29 +148,56 @@ export async function getSetReservedFeeRecipientsInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   SetReservedFeeRecipientsInstruction<
     TProgramAddress,
-    TAccountGlobalConfig,
-    TAccountAdmin,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    admin: { value: input.admin ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -169,70 +205,66 @@ export async function getSetReservedFeeRecipientsInstructionAsync<
 
   // Resolve default values.
   if (!accounts.globalConfig.value) {
-    accounts.globalConfig.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            103, 108, 111, 98, 97, 108, 95, 99, 111, 110, 102, 105, 103,
-          ])
-        ),
-      ],
-    });
+    accounts.globalConfig.value = await findGlobalConfigPda({ programAddress });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSetReservedFeeRecipientsInstructionDataEncoder().encode(
-      args as SetReservedFeeRecipientsInstructionDataArgs
+      args as SetReservedFeeRecipientsInstructionDataArgs,
     ),
     programAddress,
   } as SetReservedFeeRecipientsInstruction<
     TProgramAddress,
-    TAccountGlobalConfig,
-    TAccountAdmin,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type SetReservedFeeRecipientsInput<
-  TAccountGlobalConfig extends string = string,
-  TAccountAdmin extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  globalConfig: Address<TAccountGlobalConfig>;
-  admin: TransactionSigner<TAccountAdmin>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  whitelistPda: SetReservedFeeRecipientsInstructionDataArgs['whitelistPda'];
+  globalConfig: TAccountGlobalConfig;
+  admin: TAccountAdmin;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  whitelistPda: SetReservedFeeRecipientsInstructionDataArgs["whitelistPda"];
 };
 
 export function getSetReservedFeeRecipientsInstruction<
-  TAccountGlobalConfig extends string,
-  TAccountAdmin extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountAdmin extends InstructionSignerInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: SetReservedFeeRecipientsInput<
@@ -241,50 +273,88 @@ export function getSetReservedFeeRecipientsInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): SetReservedFeeRecipientsInstruction<
   TProgramAddress,
-  TAccountGlobalConfig,
-  TAccountAdmin,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAdmin,
+    InstructionAccountInputAddress<TAccountAdmin>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
-    admin: { value: input.admin ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSetReservedFeeRecipientsInstructionDataEncoder().encode(
-      args as SetReservedFeeRecipientsInstructionDataArgs
+      args as SetReservedFeeRecipientsInstructionDataArgs,
     ),
     programAddress,
   } as SetReservedFeeRecipientsInstruction<
     TProgramAddress,
-    TAccountGlobalConfig,
-    TAccountAdmin,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -308,11 +378,16 @@ export function parseSetReservedFeeRecipientsInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSetReservedFeeRecipientsInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 4,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -329,7 +404,7 @@ export function parseSetReservedFeeRecipientsInstruction<
       program: getNextAccount(),
     },
     data: getSetReservedFeeRecipientsInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

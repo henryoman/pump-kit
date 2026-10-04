@@ -10,12 +10,12 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -28,21 +28,29 @@ import {
   type ReadonlyAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findCollectCreatorFeeCreatorVaultPda,
+  findCreatorTokenAccountPda,
+  findCreatorVaultQuoteTokenAccountPda,
+  findEventAuthorityPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const COLLECT_CREATOR_FEE_V2_DISCRIMINATOR = new Uint8Array([
-  207, 17, 138, 242, 4, 34, 19, 56,
-]);
+export const COLLECT_CREATOR_FEE_V2_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([207, 17, 138, 242, 4, 34, 19, 56]);
 
-export function getCollectCreatorFeeV2DiscriminatorBytes() {
+export function getCollectCreatorFeeV2DiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    COLLECT_CREATOR_FEE_V2_DISCRIMINATOR
+    COLLECT_CREATOR_FEE_V2_DISCRIMINATOR,
   );
 }
 
@@ -51,17 +59,14 @@ export type CollectCreatorFeeV2Instruction<
   TAccountCreator extends string | AccountMeta<string> = string,
   TAccountCreatorTokenAccount extends string | AccountMeta<string> = string,
   TAccountCreatorVault extends string | AccountMeta<string> = string,
-  TAccountCreatorVaultTokenAccount extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountCreatorVaultTokenAccount extends string | AccountMeta<string> =
+    string,
   TAccountQuoteMint extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -111,17 +116,17 @@ export type CollectCreatorFeeV2InstructionDataArgs = {};
 
 export function getCollectCreatorFeeV2InstructionDataEncoder(): FixedSizeEncoder<CollectCreatorFeeV2InstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: COLLECT_CREATOR_FEE_V2_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getCollectCreatorFeeV2InstructionDataDecoder(): FixedSizeDecoder<CollectCreatorFeeV2InstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -131,45 +136,52 @@ export function getCollectCreatorFeeV2InstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getCollectCreatorFeeV2InstructionDataEncoder(),
-    getCollectCreatorFeeV2InstructionDataDecoder()
+    getCollectCreatorFeeV2InstructionDataDecoder(),
   );
 }
 
 export type CollectCreatorFeeV2AsyncInput<
-  TAccountCreator extends string = string,
-  TAccountCreatorTokenAccount extends string = string,
-  TAccountCreatorVault extends string = string,
-  TAccountCreatorVaultTokenAccount extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountCreator extends InstructionAccountInput = InstructionAccountInput,
+  TAccountCreatorTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVaultTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  creator: Address<TAccountCreator>;
-  creatorTokenAccount?: Address<TAccountCreatorTokenAccount>;
-  creatorVault?: Address<TAccountCreatorVault>;
-  creatorVaultTokenAccount?: Address<TAccountCreatorVaultTokenAccount>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  creator: TAccountCreator;
+  creatorTokenAccount?: TAccountCreatorTokenAccount;
+  creatorVault?: TAccountCreatorVault;
+  creatorVaultTokenAccount?: TAccountCreatorVaultTokenAccount;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export async function getCollectCreatorFeeV2InstructionAsync<
-  TAccountCreator extends string,
-  TAccountCreatorTokenAccount extends string,
-  TAccountCreatorVault extends string,
-  TAccountCreatorVaultTokenAccount extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountCreator extends InstructionAccountInput,
+  TAccountCreatorTokenAccount extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
+  TAccountCreatorVaultTokenAccount extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: CollectCreatorFeeV2AsyncInput<
@@ -184,183 +196,296 @@ export async function getCollectCreatorFeeV2InstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   CollectCreatorFeeV2Instruction<
     TProgramAddress,
-    TAccountCreator,
-    TAccountCreatorTokenAccount,
-    TAccountCreatorVault,
-    TAccountCreatorVaultTokenAccount,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVaultTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorVaultTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    creator: { value: input.creator ?? null, isWritable: true },
+    creator: {
+      value: input.creator ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     creatorTokenAccount: {
       value: input.creatorTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: true },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     creatorVaultTokenAccount: {
       value: input.creatorVaultTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
-  if (!accounts.creatorTokenAccount.value) {
-    accounts.creatorTokenAccount.value = await getProgramDerivedAddress({
-      programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-      seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.creator.value)),
-        getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
-        ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-      ],
-    });
-  }
-  if (!accounts.creatorVault.value) {
-    accounts.creatorVault.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            99, 114, 101, 97, 116, 111, 114, 45, 118, 97, 117, 108, 116,
-          ])
-        ),
-        getAddressEncoder().encode(expectAddress(accounts.creator.value)),
-      ],
-    });
-  }
-  if (!accounts.creatorVaultTokenAccount.value) {
-    accounts.creatorVaultTokenAccount.value = await getProgramDerivedAddress({
-      programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
-      seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.creatorVault.value)),
-        getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
-        ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
-      ],
-    });
-  }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.creatorTokenAccount.value) {
+    accounts.creatorTokenAccount.value = await findCreatorTokenAccountPda(
+      {
+        creator: getAddressFromResolvedInstructionAccount(
+          "creator",
+          accounts.creator.value,
+        ),
+        quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+          "quoteTokenProgram",
+          accounts.quoteTokenProgram.value,
+        ),
+        quoteMint: getAddressFromResolvedInstructionAccount(
+          "quoteMint",
+          accounts.quoteMint.value,
+        ),
+      },
+      {
+        programAddress: getAddressFromResolvedInstructionAccount(
+          "associatedTokenProgram",
+          accounts.associatedTokenProgram.value,
+        ),
+      },
+    );
+  }
+  if (!accounts.creatorVault.value) {
+    accounts.creatorVault.value = await findCollectCreatorFeeCreatorVaultPda(
+      {
+        creator: getAddressFromResolvedInstructionAccount(
+          "creator",
+          accounts.creator.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.creatorVaultTokenAccount.value) {
+    accounts.creatorVaultTokenAccount.value =
+      await findCreatorVaultQuoteTokenAccountPda(
+        {
+          creatorVault: getAddressFromResolvedInstructionAccount(
+            "creatorVault",
+            accounts.creatorVault.value,
+          ),
+          quoteTokenProgram: getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
+          ),
+          quoteMint: getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        },
+        {
+          programAddress: getAddressFromResolvedInstructionAccount(
+            "associatedTokenProgram",
+            accounts.associatedTokenProgram.value,
+          ),
+        },
+      );
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.creator),
-      getAccountMeta(accounts.creatorTokenAccount),
-      getAccountMeta(accounts.creatorVault),
-      getAccountMeta(accounts.creatorVaultTokenAccount),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("creator", accounts.creator),
+      getAccountMeta("creatorTokenAccount", accounts.creatorTokenAccount),
+      getAccountMeta("creatorVault", accounts.creatorVault),
+      getAccountMeta(
+        "creatorVaultTokenAccount",
+        accounts.creatorVaultTokenAccount,
+      ),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getCollectCreatorFeeV2InstructionDataEncoder().encode({}),
     programAddress,
   } as CollectCreatorFeeV2Instruction<
     TProgramAddress,
-    TAccountCreator,
-    TAccountCreatorTokenAccount,
-    TAccountCreatorVault,
-    TAccountCreatorVaultTokenAccount,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVaultTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorVaultTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type CollectCreatorFeeV2Input<
-  TAccountCreator extends string = string,
-  TAccountCreatorTokenAccount extends string = string,
-  TAccountCreatorVault extends string = string,
-  TAccountCreatorVaultTokenAccount extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountCreator extends InstructionAccountInput = InstructionAccountInput,
+  TAccountCreatorTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVaultTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  creator: Address<TAccountCreator>;
-  creatorTokenAccount: Address<TAccountCreatorTokenAccount>;
-  creatorVault: Address<TAccountCreatorVault>;
-  creatorVaultTokenAccount: Address<TAccountCreatorVaultTokenAccount>;
-  quoteMint: Address<TAccountQuoteMint>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  creator: TAccountCreator;
+  creatorTokenAccount: TAccountCreatorTokenAccount;
+  creatorVault: TAccountCreatorVault;
+  creatorVaultTokenAccount: TAccountCreatorVaultTokenAccount;
+  quoteMint: TAccountQuoteMint;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export function getCollectCreatorFeeV2Instruction<
-  TAccountCreator extends string,
-  TAccountCreatorTokenAccount extends string,
-  TAccountCreatorVault extends string,
-  TAccountCreatorVaultTokenAccount extends string,
-  TAccountQuoteMint extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountCreator extends InstructionAccountInput,
+  TAccountCreatorTokenAccount extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
+  TAccountCreatorVaultTokenAccount extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: CollectCreatorFeeV2Input<
@@ -375,91 +500,184 @@ export function getCollectCreatorFeeV2Instruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): CollectCreatorFeeV2Instruction<
   TProgramAddress,
-  TAccountCreator,
-  TAccountCreatorTokenAccount,
-  TAccountCreatorVault,
-  TAccountCreatorVaultTokenAccount,
-  TAccountQuoteMint,
-  TAccountQuoteTokenProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountCreator,
+    InstructionAccountInputAddress<TAccountCreator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorTokenAccount,
+    InstructionAccountInputAddress<TAccountCreatorTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorVault,
+    InstructionAccountInputAddress<TAccountCreatorVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorVaultTokenAccount,
+    InstructionAccountInputAddress<TAccountCreatorVaultTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    creator: { value: input.creator ?? null, isWritable: true },
+    creator: {
+      value: input.creator ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     creatorTokenAccount: {
       value: input.creatorTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: true },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     creatorVaultTokenAccount: {
       value: input.creatorVaultTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.creator),
-      getAccountMeta(accounts.creatorTokenAccount),
-      getAccountMeta(accounts.creatorVault),
-      getAccountMeta(accounts.creatorVaultTokenAccount),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("creator", accounts.creator),
+      getAccountMeta("creatorTokenAccount", accounts.creatorTokenAccount),
+      getAccountMeta("creatorVault", accounts.creatorVault),
+      getAccountMeta(
+        "creatorVaultTokenAccount",
+        accounts.creatorVaultTokenAccount,
+      ),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getCollectCreatorFeeV2InstructionDataEncoder().encode({}),
     programAddress,
   } as CollectCreatorFeeV2Instruction<
     TProgramAddress,
-    TAccountCreator,
-    TAccountCreatorTokenAccount,
-    TAccountCreatorVault,
-    TAccountCreatorVaultTokenAccount,
-    TAccountQuoteMint,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVaultTokenAccount,
+      InstructionAccountInputAddress<TAccountCreatorVaultTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -489,11 +707,16 @@ export function parseCollectCreatorFeeV2Instruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCollectCreatorFeeV2Instruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 10) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 10,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -516,7 +739,7 @@ export function parseCollectCreatorFeeV2Instruction<
       program: getNextAccount(),
     },
     data: getCollectCreatorFeeV2InstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

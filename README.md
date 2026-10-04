@@ -1,16 +1,15 @@
 # Pump Kit
 
-![Pump Kit - Solana Kit 6](https://amaranth-manual-buzzard-640.mypinata.cloud/ipfs/bafkreif6akiu636nsc53bkexhuxoy3ddscyjepsbjdzldf3wxyl6rl4tqm)
-
 [![npm version](https://img.shields.io/npm/v/pump-kit.svg?logo=npm&label=npm)](https://www.npmjs.com/package/pump-kit)
 ![Bun >= 1.3.0](https://img.shields.io/badge/bun-%3E%3D1.3.0-000000?logo=bun&logoColor=fff)
-![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-43853d?logo=node.js&logoColor=fff)
+![Node.js >= 20.18.0](https://img.shields.io/badge/node-%3E%3D20.18.0-43853d?logo=node.js&logoColor=fff)
 
-A TypeScript SDK for Pump.fun built on **Solana Kit 6**. Designed for high-performance applications including launch bots, bundlers, and low-latency trading systems using latest Solana best practices.
+A TypeScript SDK for Pump.fun built on **Solana Kit 8.4**. Launch SOL-paired Token-2022 coins, optionally include an atomic bonding-curve first buy, and build protected bonding-curve trades. Applications using Jupiter Metis for subsequent swaps can import the focused `pump-kit/launch` entry point.
 
 ## Features
 
-- **Solana Kit 6** – Built on the latest Solana development framework
+- **Solana Kit 8** – Compatible Kit program clients and regenerated Codama bindings
+- **Launch sessions** – Create-only or atomic first buy, preview, simulation, priority fees, and durable submission records
 - **Modern transaction patterns** – Optimized for speed and reliability
 - **Unified swaps** – `buy`/`sell` auto-route between bonding curves and AMM pools
 - **Curve helpers** – Direct access to bonding-curve instructions when you need them (`curveBuy`, `curveSell`)
@@ -23,7 +22,7 @@ A TypeScript SDK for Pump.fun built on **Solana Kit 6**. Designed for high-perfo
 Swap plans trade existing coins. Launch helpers have their own preparation and
 submission workflow described below. Custom AMM pool creation remains
 unimplemented. Liquidity helpers are separate from swap planning; their deposit
-deposit contract requests an exact `lpTokenAmountOut`, subject to maximum base
+contract requests an exact `lpTokenAmountOut`, subject to maximum base
 and quote inputs. Custom pool creation is not needed to trade existing pools.
 
 ---
@@ -36,7 +35,230 @@ bun add pump-kit
 
 ---
 
-## Quick Start
+## Launch quick start
+
+```ts
+import { createPump } from "pump-kit/launch";
+import { createFileLaunchStore, readLaunchKeypair } from "pump-kit/launch/store";
+
+const pump = createPump({ rpcUrl }); // defaults to devnet
+const mint = await readLaunchKeypair("/path/to/your-pump-mint.json");
+const store = createFileLaunchStore("launch-record.json"); // a fresh path per launch
+const launch = await pump.launch.prepare({
+  schemaVersion: 1,
+  quote: "SOL",
+  token: { name: "Example", symbol: "EX", metadataUri },
+  // Omit firstBuy for create-only; submit later swaps through your router.
+}, {
+  signer: wallet,
+  mint, // your pre-generated mint keypair; required
+  priorityFees: { computeUnitLimit: 300_000, computeUnitPriceMicroLamports: 5_000n },
+  saveRecord: record => store.save(record),
+});
+const simulation = await launch.simulate();
+if (simulation.value.err) throw new Error("Launch simulation failed");
+const result = await launch.send();
+console.log(launch.addresses.mint, result.signature);
+```
+
+Supply an existing metadata URI; upload token images and JSON before preparing the launch. The Node/Bun file store is a separate entry point so browser SDK imports do not depend on filesystem APIs.
+
+### Passing a specific contract address and dry-running
+
+On Solana, the coin's contract address (CA) is its mint public key. For a new coin,
+pass your corresponding mint **signer**, including your pre-generated vanity
+mint keypair. Every launch API requires it; the SDK never generates or substitutes
+a token address. A public address alone cannot sign creation. The SDK invokes the fixed
+Pump program `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`, derives its protocol
+accounts, and creates the mint under Token-2022. You do not supply a custom program
+or deploy a separate smart contract.
+
+```ts
+import { createPump } from "pump-kit/launch";
+import { readLaunchKeypair } from "pump-kit/launch/store";
+
+const wallet = await readLaunchKeypair(walletKeypairPath);
+const mint = await readLaunchKeypair(mintKeypairPath);
+const launch = await createPump({ rpcUrl }).launch.prepare(config, {
+  signer: wallet, // fee payer and launch wallet
+  mint,           // signer for the exact new token address
+  expectedMint: expectedContractAddress, // fails before RPC if the key does not match
+});
+const simulation = await launch.simulate(); // verifies both signatures; no broadcast
+if (simulation.value.err) throw new Error("Launch simulation failed");
+console.log(launch.addresses.mint, simulation.value.unitsConsumed);
+// Keep this session and call launch.send() only when ready to submit.
+```
+
+Use the same mint keypair for preview, setup, dry-run, and run. Omit `firstBuy`
+for create-only launches with later swaps routed externally. Dry-run returns
+program logs and compute usage, and changes no balances or accounts. It still
+requires a funded wallet on the selected network. The URI must reference metadata
+uploaded beforehand. Simulation does not reserve the mint or guarantee a later
+transaction succeeds if chain state changes.
+
+For atomic first buys, supply `addressLookupTables` from an active on-chain table.
+`launch.setup()` is a separate operation that submits table transactions and costs
+rent. `simulate()` and CLI `dry-run` never perform that setup automatically.
+An executable SDK example is [examples/launch-dry-run.ts](examples/launch-dry-run.ts).
+
+### Atomic first buy and launch lifecycle
+
+The session API builds `create_v2` and, when requested, an atomic first buy from
+an exact decimal SOL budget. The budget covers the swap input including protocol
+and creator fees; account rent and transaction fees are additional.
+
+```ts
+import { createPump } from "pump-kit/launch";
+import { readLaunchKeypair } from "pump-kit/launch/store";
+
+const pump = createPump({ rpcUrl }); // defaults to devnet when omitted
+const mint = await readLaunchKeypair("/path/to/your-pump-mint.json");
+const launch = await pump.launch.prepare({
+  schemaVersion: 1,
+  token: { name: "Example", symbol: "EX", metadataUri: "ipfs://..." },
+  quote: "SOL",
+  firstBuy: { amount: "0.25", slippageBps: 100 }, // optional
+}, {
+  signer: wallet,
+  mint,
+  saveRecord: async (record) => {
+    // Persist durably in your application's store before broadcast.
+    await launchStore.save(record);
+  },
+});
+console.log(launch.addresses, launch.preview);
+await launch.setup(); // sends lookup-table setup transactions when needed
+const simulation = await launch.simulate();
+if (simulation.value.err) throw new Error("Launch simulation failed");
+await launch.send();
+```
+
+`creatorFees.recipient` defaults to the signer. Set
+`creatorFees: { holderReward: true }` to permanently direct creator fees to
+holders instead; this cannot be combined with a creator fee recipient. Mayhem
+and cashback creation are disabled in this session API. Cashback creation is
+deprecated by the program.
+
+`PrepareLaunchOptions` also accepts `priorityFees`, `prependInstructions`, and `appendInstructions`. The returned instruction list, simulation, and submission all include these hooks; lookup-table setup transactions also receive the priority fees. Invalid fee values fail before any RPC request. For an atomic first buy, call `setup()` or supply an active lookup table before `simulate()`. A create-only launch needs no lookup table.
+
+The persistence callback receives the mint, signed transaction signature,
+blockhash lifetime, and submission/confirmation state. A failed persistence
+write prevents broadcast. After submission begins, the session refuses another
+send: reconcile the saved signature before taking further action. Without a
+persistence callback this protection lasts only for the session's lifetime;
+applications performing repeated launches must supply a durable store.
+
+Signed local validator verification covers create-only, atomic first buy,
+subsequent trading, curve completion, migration, and AMM trading. See
+[the validator instructions](tests/validator/README.md).
+
+### Bun launch CLI
+
+The package includes a Bun CLI. Keep your wallet keypair and RPC credentials
+outside the portable JSON config.
+
+```sh
+bunx pump-kit validate launch.json
+bunx pump-kit preview launch.json --signer-address YOUR_ADDRESS --mint-address YOUR_CA
+bunx pump-kit setup launch.json --keypair wallet.json --mint-keypair mint.json --mint-address YOUR_CA
+# Use the table address printed by setup for a read-only atomic dry-run.
+bunx pump-kit dry-run launch.json --keypair wallet.json --mint-keypair mint.json --mint-address YOUR_CA --lookup-table TABLE_ADDRESS
+bunx pump-kit run launch.json --keypair wallet.json --mint-keypair mint.json --mint-address YOUR_CA --lookup-table TABLE_ADDRESS --record launch-record.json
+bunx pump-kit status --record launch-record.json
+```
+
+`--mint-keypair` is required for setup, dry-run, and run. Pass
+`--mint-address YOUR_CA` as an additional mismatch guard. For example, a create-only dry-run:
+
+```sh
+bunx pump-kit dry-run launch.json --keypair wallet.json --mint-keypair mint.json --mint-address YOUR_CA
+```
+
+Atomic launches use `setup` with these same mint flags first, then pass the
+returned `--lookup-table` to `dry-run` and `run`. `--mint-address` alone supports
+address-only previews. For signed commands, it must match `--mint-keypair`.
+CLI output is one JSON object per command; dry-run sets `dryRun: true` and includes
+the CA, preview, logs, and simulation result. Program rejection returns a nonzero
+exit code. `run` stops before launch submission if simulation fails.
+
+Use `--rpc-url` (or `SOLANA_RPC`) and `--websocket-url` to supply endpoint
+credentials separately. Defaults target devnet. `run` performs a signed
+simulation and stops on simulation failure. Each run requires a fresh record
+path; records are written with owner-only permissions and flushed to disk before
+submission. Reusing a record path fails before broadcast. `status` reads the
+saved signature from transaction history without submitting anything. An unknown
+signature remains uncertain and does not authorize another launch.
+
+`mintWithFirstBuy` now builds `create_v2`, Token-2022 ATA setup, and a unified v2
+buy. Prefer `firstBuyAmountSol: "0.25"` to derive the first-buy quote internally.
+Use the returned `instructions` array in full and in order. The returned
+`createInstruction` and `buyInstruction` are convenient references, not a complete
+transaction by themselves. `createAndBuy` submits the full instruction array.
+Omit `mintAuthority`; a supplied value must match the program's derived PDA.
+
+`launch.setup()` sends lookup-table setup transactions and costs rent; preview
+reports whether it is needed. `launch.send()` performs setup automatically if no
+active table is supplied. `simulate()` never broadcasts setup transactions.
+Existing tables can be passed through `addressLookupTables` or the CLI's
+`--lookup-table`. CLI `run` sets up a table before its preflight simulation.
+
+Transaction lifetime overrides use one `lifetime: { blockhash, lastValidBlockHeight }`
+object, with a `bigint` expiration height from the same RPC response. Omit it to
+fetch a fresh pair. `TransactionExecutionError` exposes `outcome`, `signature`,
+and `lifetime`: `failed` means the signature has an execution error; `unknown`
+means confirmation was not established. Reconcile that signature before signing
+another order. Program logs are retained when diagnostic reads succeed.
+
+
+ATA and WSOL instruction helpers are asynchronous Kit-native builders; await
+`buildCreateAtaInstruction`, `buildWrapSolInstructions`, and
+`buildUnwrapSolInstructions`. They keep lamports as `bigint` and retain supplied
+signers. ATA creation is idempotent and supports Token-2022 and PDA owners.
+AMM plans retain WSOL by default; use `wsolStrategy: "inline"` to close it after
+the swap. Rent and transaction fees are separate from the swap budget.
+
+
+`resolveSwapVenue({ rpc, mint })` returns `curve`, `migrationPending`, or `amm`.
+A completed curve with no canonical pool is pending migration; convenience swaps
+throw `MigrationPendingError` with its pool address. RPC failures remain errors.
+The default AMM is the canonical index-0 pool derived from the mint's Pump pool
+authority and WSOL. Explicit pool addresses or creator/index options select other
+pools; the owner and mint pair are validated. There is no program-account scan.
+For repeated trading, retain the resolved pool address and call the explicit
+venue helper, refreshing mutable state for each quote.
+
+
+Event managers now take a Kit RPC subscriptions client with `logsNotifications`
+(for example, `createSolanaRpcSubscriptions(wsUrl)`). Removing the last listener
+aborts the subscription; an optional `onError` callback receives subscription
+failures. Lookup-table setup also uses Kit builders and keeps slot values as
+`bigint`. Legacy web3.js and SPL Token are absent from runtime dependencies.
+
+
+## Release
+
+Use one entry point: `bun run release patch` (or `minor`, `major`, or an explicit
+`x.y.z`). It requires a clean worktree, runs CI, bumps the package version,
+creates a release commit and tag, and pushes them to trigger the GitHub release
+workflow. That workflow publishes npm and release assets. `--no-push` prepares
+the commit and tag locally. Release commands are for publication; ordinary
+verification uses `bun run ci` and `bun run test:package`.
+
+## Existing-coin swaps
+
+Regular `buy`, `sell`, `curveBuy`, `curveSell`, `ammBuy`, and `ammSell` accept
+decimal strings for `solAmount` and `tokenAmount`. Strings preserve exact base
+units, reject excess decimal precision, and enforce positive u64 trade inputs.
+Existing number inputs remain supported when their base-unit values are safe.
+
+Liquidity helpers accept `baseTokenProgram` and `quoteTokenProgram` independently.
+Pass `rpc` to `addLiquidity` / `removeLiquidity` to resolve each mint's owner, or
+pass both program hints to build without RPC. This supports Token-2022 tokens
+paired with legacy WSOL. Liquidity instructions still require funded token
+accounts and an LP ATA; use the exported ATA and WSOL builders when assembling
+the transaction. The required `lpTokenAmountOut` field is the exact LP quantity
+requested by the deposit instruction.
 
 ### Setup
 
@@ -199,140 +421,13 @@ simulateTransaction({ instructions, payer, rpc, options? })
 
 MIT
 
-### Prepare a Token-2022 launch
+## Protocol updates
 
-Regular `buy`, `sell`, `curveBuy`, `curveSell`, `ammBuy`, and `ammSell` accept
-decimal strings for `solAmount` and `tokenAmount`. Strings preserve exact base
-units, reject excess decimal precision, and enforce positive u64 trade inputs.
-Existing number inputs remain supported when their base-unit values are safe.
+The three official IDLs are pinned to one upstream commit in `idl/manifest.json`, with immutable source URLs and SHA-256 hashes. `bun run idl:check` checks against the latest official snapshot without modifying files. `bun run idl:update` downloads and validates all three snapshots, updates the manifest, and regenerates the clients. `bun run codegen` regenerates offline from the checked-in snapshots. Commit the IDLs, manifest, and generated source together.
 
-Liquidity helpers accept `baseTokenProgram` and `quoteTokenProgram` independently.
-Pass `rpc` to `addLiquidity` / `removeLiquidity` to resolve each mint's owner, or
-pass both program hints to build without RPC. This supports Token-2022 tokens
-paired with legacy WSOL. Liquidity instructions still require funded token
-accounts and an LP ATA; use the exported ATA and WSOL builders when assembling
-the transaction. The required `lpTokenAmountOut` field is the exact LP quantity
-requested by the deposit instruction.
+Codegen preserves historical account decoding and corrects the upstream legacy migration IDL's duplicated mint seed in ATA resolvers. Kit 8 requires Node 20.18 or newer.
 
-The session API builds `create_v2` and, when requested, an atomic first buy from
-an exact decimal SOL budget. The budget covers the swap input including protocol
-and creator fees; account rent and transaction fees are additional.
-
-```ts
-import { createPump } from "pump-kit";
-
-const pump = createPump({ rpcUrl }); // defaults to devnet when omitted
-const launch = await pump.launch.prepare({
-  schemaVersion: 1,
-  token: { name: "Example", symbol: "EX", metadataUri: "ipfs://..." },
-  quote: "SOL",
-  firstBuy: { amount: "0.25", slippageBps: 100 }, // optional
-}, {
-  signer: wallet,
-  saveRecord: async (record) => {
-    // Persist durably in your application's store before broadcast.
-    await launchStore.save(record);
-  },
-});
-console.log(launch.addresses, launch.preview);
-await launch.setup(); // sends lookup-table setup transactions when needed
-const simulation = await launch.simulate();
-if (simulation.value.err) throw new Error("Launch simulation failed");
-await launch.send();
-```
-
-`creatorFees.recipient` defaults to the signer. Set
-`creatorFees: { holderReward: true }` to permanently direct creator fees to
-holders instead; this cannot be combined with a creator fee recipient. Mayhem
-and cashback creation are disabled in this session API. Cashback creation is
-deprecated by the program.
-
-The persistence callback receives the mint, signed transaction signature,
-blockhash lifetime, and submission/confirmation state. A failed persistence
-write prevents broadcast. After submission begins, the session refuses another
-send: reconcile the saved signature before taking further action. Without a
-persistence callback this protection lasts only for the session's lifetime;
-applications performing repeated launches must supply a durable store.
-
-Signed local validator verification covers create-only, atomic first buy,
-subsequent trading, curve completion, migration, and AMM trading. See
-[the validator instructions](tests/validator/README.md). A separately authorized
-live launch remains required before calling the package launch-ready.
-
-### Bun launch CLI
-
-The package includes a Bun CLI. Keep your wallet keypair and RPC credentials
-outside the portable JSON config.
-
-```sh
-bunx pump-kit validate launch.json
-bunx pump-kit preview launch.json --signer-address YOUR_ADDRESS
-bunx pump-kit setup launch.json --keypair /path/to/wallet.json
-# Use the table address printed by setup for a read-only atomic dry-run.
-bunx pump-kit dry-run launch.json --keypair /path/to/wallet.json --lookup-table TABLE_ADDRESS
-bunx pump-kit run launch.json --keypair /path/to/wallet.json --record launch-record.json
-bunx pump-kit status --record launch-record.json
-```
-
-Use `--rpc-url` (or `SOLANA_RPC`) and `--websocket-url` to supply endpoint
-credentials separately. Defaults target devnet. `run` performs a signed
-simulation and stops on simulation failure. Each run requires a fresh record
-path; records are written with owner-only permissions and flushed to disk before
-submission. Reusing a record path fails before broadcast. `status` reads the
-saved signature from transaction history without submitting anything. An unknown
-signature remains uncertain and does not authorize another launch.
-
-`mintWithFirstBuy` now builds `create_v2`, Token-2022 ATA setup, and a unified v2
-buy. Prefer `firstBuyAmountSol: "0.25"` to derive the first-buy quote internally.
-Use the returned `instructions` array in full and in order. The returned
-`createInstruction` and `buyInstruction` are convenient references, not a complete
-transaction by themselves. `createAndBuy` submits the full instruction array.
-Omit `mintAuthority`; a supplied value must match the program's derived PDA.
-
-`launch.setup()` sends lookup-table setup transactions and costs rent; preview
-reports whether it is needed. `launch.send()` performs setup automatically if no
-active table is supplied. `simulate()` never broadcasts setup transactions.
-Existing tables can be passed through `addressLookupTables` or the CLI's
-`--lookup-table`. CLI `run` sets up a table before its preflight simulation.
-
-Transaction lifetime overrides use one `lifetime: { blockhash, lastValidBlockHeight }`
-object, with a `bigint` expiration height from the same RPC response. Omit it to
-fetch a fresh pair. `TransactionExecutionError` exposes `outcome`, `signature`,
-and `lifetime`: `failed` means the signature has an execution error; `unknown`
-means confirmation was not established. Reconcile that signature before signing
-another order. Program logs are retained when diagnostic reads succeed.
-
-
-ATA and WSOL instruction helpers are asynchronous Kit-native builders; await
-`buildCreateAtaInstruction`, `buildWrapSolInstructions`, and
-`buildUnwrapSolInstructions`. They keep lamports as `bigint` and retain supplied
-signers. ATA creation is idempotent and supports Token-2022 and PDA owners.
-AMM plans retain WSOL by default; use `wsolStrategy: "inline"` to close it after
-the swap. Rent and transaction fees are separate from the swap budget.
-
-
-`resolveSwapVenue({ rpc, mint })` returns `curve`, `migrationPending`, or `amm`.
-A completed curve with no canonical pool is pending migration; convenience swaps
-throw `MigrationPendingError` with its pool address. RPC failures remain errors.
-The default AMM is the canonical index-0 pool derived from the mint's Pump pool
-authority and WSOL. Explicit pool addresses or creator/index options select other
-pools; the owner and mint pair are validated. There is no program-account scan.
-For repeated trading, retain the resolved pool address and call the explicit
-venue helper, refreshing mutable state for each quote.
-
-
-Event managers now take a Kit RPC subscriptions client with `logsNotifications`
-(for example, `createSolanaRpcSubscriptions(wsUrl)`). Removing the last listener
-aborts the subscription; an optional `onError` callback receives subscription
-failures. Lookup-table setup also uses Kit builders and keeps slot values as
-`bigint`. Legacy web3.js and SPL Token are absent from runtime dependencies.
-
-
-## Release
-
-Use one entry point: `bun run release patch` (or `minor`, `major`, or an explicit
-`x.y.z`). It requires a clean worktree, runs CI, bumps the package version,
-creates a release commit and tag, and pushes them to trigger the GitHub release
-workflow. That workflow publishes npm and release assets. `--no-push` prepares
-the commit and tag locally. Release commands are for publication; ordinary
-verification uses `bun run ci` and `bun run test:package`.
+Library builds keep dependencies external so Solana Kit loads the correct crypto
+implementation for the consumer's runtime. Package verification performs real
+mint/PDA derivation under Bun and Node, plus signed SDK and CLI simulations when
+a local validator is supplied.

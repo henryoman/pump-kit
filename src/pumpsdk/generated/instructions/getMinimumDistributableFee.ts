@@ -16,6 +16,8 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -27,21 +29,24 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findBondingCurvePda } from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const GET_MINIMUM_DISTRIBUTABLE_FEE_DISCRIMINATOR = new Uint8Array([
-  117, 225, 127, 202, 134, 95, 68, 35,
-]);
+export const GET_MINIMUM_DISTRIBUTABLE_FEE_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([117, 225, 127, 202, 134, 95, 68, 35]);
 
-export function getGetMinimumDistributableFeeDiscriminatorBytes() {
+export function getGetMinimumDistributableFeeDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    GET_MINIMUM_DISTRIBUTABLE_FEE_DISCRIMINATOR
+    GET_MINIMUM_DISTRIBUTABLE_FEE_DISCRIMINATOR,
   );
 }
 
@@ -80,17 +85,17 @@ export type GetMinimumDistributableFeeInstructionDataArgs = {};
 
 export function getGetMinimumDistributableFeeInstructionDataEncoder(): FixedSizeEncoder<GetMinimumDistributableFeeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: GET_MINIMUM_DISTRIBUTABLE_FEE_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getGetMinimumDistributableFeeInstructionDataDecoder(): FixedSizeDecoder<GetMinimumDistributableFeeInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -100,27 +105,30 @@ export function getGetMinimumDistributableFeeInstructionDataCodec(): FixedSizeCo
 > {
   return combineCodec(
     getGetMinimumDistributableFeeInstructionDataEncoder(),
-    getGetMinimumDistributableFeeInstructionDataDecoder()
+    getGetMinimumDistributableFeeInstructionDataDecoder(),
   );
 }
 
 export type GetMinimumDistributableFeeAsyncInput<
-  TAccountMint extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountCreatorVault extends string = string,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
 > = {
-  mint: Address<TAccountMint>;
-  bondingCurve?: Address<TAccountBondingCurve>;
-  sharingConfig?: Address<TAccountSharingConfig>;
-  creatorVault: Address<TAccountCreatorVault>;
+  mint: TAccountMint;
+  bondingCurve?: TAccountBondingCurve;
+  sharingConfig?: TAccountSharingConfig;
+  creatorVault: TAccountCreatorVault;
 };
 
 export async function getGetMinimumDistributableFeeInstructionAsync<
-  TAccountMint extends string,
-  TAccountBondingCurve extends string,
-  TAccountSharingConfig extends string,
-  TAccountCreatorVault extends string,
+  TAccountMint extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: GetMinimumDistributableFeeAsyncInput<
@@ -129,96 +137,137 @@ export async function getGetMinimumDistributableFeeInstructionAsync<
     TAccountSharingConfig,
     TAccountCreatorVault
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   GetMinimumDistributableFeeInstruction<
     TProgramAddress,
-    TAccountMint,
-    TAccountBondingCurve,
-    TAccountSharingConfig,
-    TAccountCreatorVault
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    mint: { value: input.mint ?? null, isWritable: false },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: false },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: false },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: false },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.bondingCurve.value) {
-    accounts.bondingCurve.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            98, 111, 110, 100, 105, 110, 103, 45, 99, 117, 114, 118, 101,
-          ])
+    accounts.bondingCurve.value = await findBondingCurvePda(
+      {
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.sharingConfig.value) {
     accounts.sharingConfig.value = await getProgramDerivedAddress({
       programAddress:
-        'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>,
+        "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ" as Address<"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ">,
       seeds: [
         getBytesEncoder().encode(
           new Uint8Array([
             115, 104, 97, 114, 105, 110, 103, 45, 99, 111, 110, 102, 105, 103,
-          ])
+          ]),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount("mint", accounts.mint.value),
+        ),
       ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.creatorVault),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("creatorVault", accounts.creatorVault),
     ],
     data: getGetMinimumDistributableFeeInstructionDataEncoder().encode({}),
     programAddress,
   } as GetMinimumDistributableFeeInstruction<
     TProgramAddress,
-    TAccountMint,
-    TAccountBondingCurve,
-    TAccountSharingConfig,
-    TAccountCreatorVault
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >
   >);
 }
 
 export type GetMinimumDistributableFeeInput<
-  TAccountMint extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountCreatorVault extends string = string,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
 > = {
-  mint: Address<TAccountMint>;
-  bondingCurve: Address<TAccountBondingCurve>;
-  sharingConfig: Address<TAccountSharingConfig>;
-  creatorVault: Address<TAccountCreatorVault>;
+  mint: TAccountMint;
+  bondingCurve: TAccountBondingCurve;
+  sharingConfig: TAccountSharingConfig;
+  creatorVault: TAccountCreatorVault;
 };
 
 export function getGetMinimumDistributableFeeInstruction<
-  TAccountMint extends string,
-  TAccountBondingCurve extends string,
-  TAccountSharingConfig extends string,
-  TAccountCreatorVault extends string,
+  TAccountMint extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: GetMinimumDistributableFeeInput<
@@ -227,45 +276,83 @@ export function getGetMinimumDistributableFeeInstruction<
     TAccountSharingConfig,
     TAccountCreatorVault
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): GetMinimumDistributableFeeInstruction<
   TProgramAddress,
-  TAccountMint,
-  TAccountBondingCurve,
-  TAccountSharingConfig,
-  TAccountCreatorVault
+  ResolvedInstructionAccountMeta<
+    TAccountMint,
+    InstructionAccountInputAddress<TAccountMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBondingCurve,
+    InstructionAccountInputAddress<TAccountBondingCurve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSharingConfig,
+    InstructionAccountInputAddress<TAccountSharingConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorVault,
+    InstructionAccountInputAddress<TAccountCreatorVault>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    mint: { value: input.mint ?? null, isWritable: false },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: false },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: false },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: false },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.creatorVault),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("creatorVault", accounts.creatorVault),
     ],
     data: getGetMinimumDistributableFeeInstructionDataEncoder().encode({}),
     programAddress,
   } as GetMinimumDistributableFeeInstruction<
     TProgramAddress,
-    TAccountMint,
-    TAccountBondingCurve,
-    TAccountSharingConfig,
-    TAccountCreatorVault
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >
   >);
 }
 
@@ -289,11 +376,16 @@ export function parseGetMinimumDistributableFeeInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedGetMinimumDistributableFeeInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 4,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -310,7 +402,7 @@ export function parseGetMinimumDistributableFeeInstruction<
       creatorVault: getNextAccount(),
     },
     data: getGetMinimumDistributableFeeInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

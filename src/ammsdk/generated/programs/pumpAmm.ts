@@ -7,13 +7,138 @@
  */
 
 import {
+  assertIsInstructionWithAccounts,
   containsBytes,
+  extendClient,
   fixEncoderSize,
   getBytesEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+  SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+  SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+  SolanaError,
   type Address,
+  type ClientWithPayer,
+  type ClientWithRpc,
+  type ClientWithTransactionPlanning,
+  type ClientWithTransactionSending,
+  type ExtendedClient,
+  type GetAccountInfoApi,
+  type GetMultipleAccountsApi,
+  type Instruction,
+  type InstructionWithData,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 import {
+  addSelfFetchFunctions,
+  addSelfPlanAndSendFunctions,
+  type SelfFetchFunctions,
+  type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+  getBondingCurveCodec,
+  getFeeConfigCodec,
+  getGlobalConfigCodec,
+  getGlobalVolumeAccumulatorCodec,
+  getPoolCodec,
+  getSharingConfigCodec,
+  getUserVolumeAccumulatorCodec,
+  type BondingCurve,
+  type BondingCurveArgs,
+  type FeeConfig,
+  type FeeConfigArgs,
+  type GlobalConfig,
+  type GlobalConfigArgs,
+  type GlobalVolumeAccumulator,
+  type GlobalVolumeAccumulatorArgs,
+  type Pool,
+  type PoolArgs,
+  type SharingConfig,
+  type SharingConfigArgs,
+  type UserVolumeAccumulator,
+  type UserVolumeAccumulatorArgs,
+} from "../accounts";
+import {
+  getAdminCtoPoolInstructionAsync,
+  getAdminUpdateTokenIncentivesInstructionAsync,
+  getBoostBuyAndBurnInstructionAsync,
+  getBuyExactQuoteInInstructionAsync,
+  getBuyInstructionAsync,
+  getClaimCashbackInstructionAsync,
+  getClaimTokenIncentivesInstructionAsync,
+  getCloseUserVolumeAccumulatorInstructionAsync,
+  getCollectCoinCreatorFeeInstructionAsync,
+  getCreateConfigInstructionAsync,
+  getCreatePoolInstructionAsync,
+  getDepositInstructionAsync,
+  getDisableInstructionAsync,
+  getExtendAccountInstructionAsync,
+  getInitBoostInstructionAsync,
+  getInitUserVolumeAccumulatorInstructionAsync,
+  getMigratePoolCoinCreatorInstructionAsync,
+  getSellInstructionAsync,
+  getSetBoostAuthorityInstructionAsync,
+  getSetCoinCreatorInstructionAsync,
+  getSetReservedFeeRecipientsInstructionAsync,
+  getSyncUserVolumeAccumulatorInstructionAsync,
+  getToggleBoostInstruction,
+  getToggleCashbackEnabledInstructionAsync,
+  getToggleMayhemModeInstructionAsync,
+  getTransferCreatorFeesToPumpInstructionAsync,
+  getTransferCreatorFeesToPumpV2InstructionAsync,
+  getUpdateAdminInstructionAsync,
+  getUpdateBuybackConfigInstructionAsync,
+  getUpdateCreatorFeeConfigInstructionAsync,
+  getUpdateFeeConfigInstructionAsync,
+  getWithdrawInstructionAsync,
+  parseAdminCtoPoolInstruction,
+  parseAdminUpdateTokenIncentivesInstruction,
+  parseBoostBuyAndBurnInstruction,
+  parseBuyExactQuoteInInstruction,
+  parseBuyInstruction,
+  parseClaimCashbackInstruction,
+  parseClaimTokenIncentivesInstruction,
+  parseCloseUserVolumeAccumulatorInstruction,
+  parseCollectCoinCreatorFeeInstruction,
+  parseCreateConfigInstruction,
+  parseCreatePoolInstruction,
+  parseDepositInstruction,
+  parseDisableInstruction,
+  parseExtendAccountInstruction,
+  parseInitBoostInstruction,
+  parseInitUserVolumeAccumulatorInstruction,
+  parseMigratePoolCoinCreatorInstruction,
+  parseSellInstruction,
+  parseSetBoostAuthorityInstruction,
+  parseSetCoinCreatorInstruction,
+  parseSetReservedFeeRecipientsInstruction,
+  parseSyncUserVolumeAccumulatorInstruction,
+  parseToggleBoostInstruction,
+  parseToggleCashbackEnabledInstruction,
+  parseToggleMayhemModeInstruction,
+  parseTransferCreatorFeesToPumpInstruction,
+  parseTransferCreatorFeesToPumpV2Instruction,
+  parseUpdateAdminInstruction,
+  parseUpdateBuybackConfigInstruction,
+  parseUpdateCreatorFeeConfigInstruction,
+  parseUpdateFeeConfigInstruction,
+  parseWithdrawInstruction,
+  type AdminCtoPoolAsyncInput,
+  type AdminUpdateTokenIncentivesAsyncInput,
+  type BoostBuyAndBurnAsyncInput,
+  type BuyAsyncInput,
+  type BuyExactQuoteInAsyncInput,
+  type ClaimCashbackAsyncInput,
+  type ClaimTokenIncentivesAsyncInput,
+  type CloseUserVolumeAccumulatorAsyncInput,
+  type CollectCoinCreatorFeeAsyncInput,
+  type CreateConfigAsyncInput,
+  type CreatePoolAsyncInput,
+  type DepositAsyncInput,
+  type DisableAsyncInput,
+  type ExtendAccountAsyncInput,
+  type InitBoostAsyncInput,
+  type InitUserVolumeAccumulatorAsyncInput,
+  type MigratePoolCoinCreatorAsyncInput,
   type ParsedAdminCtoPoolInstruction,
   type ParsedAdminUpdateTokenIncentivesInstruction,
   type ParsedBoostBuyAndBurnInstruction,
@@ -46,10 +171,37 @@ import {
   type ParsedUpdateCreatorFeeConfigInstruction,
   type ParsedUpdateFeeConfigInstruction,
   type ParsedWithdrawInstruction,
-} from '../instructions';
+  type SellAsyncInput,
+  type SetBoostAuthorityAsyncInput,
+  type SetCoinCreatorAsyncInput,
+  type SetReservedFeeRecipientsAsyncInput,
+  type SyncUserVolumeAccumulatorAsyncInput,
+  type ToggleBoostInput,
+  type ToggleCashbackEnabledAsyncInput,
+  type ToggleMayhemModeAsyncInput,
+  type TransferCreatorFeesToPumpAsyncInput,
+  type TransferCreatorFeesToPumpV2AsyncInput,
+  type UpdateAdminAsyncInput,
+  type UpdateBuybackConfigAsyncInput,
+  type UpdateCreatorFeeConfigAsyncInput,
+  type UpdateFeeConfigAsyncInput,
+  type WithdrawAsyncInput,
+} from "../instructions";
+import {
+  findBoostVaultAuthorityPda,
+  findCoinCreatorVaultAuthorityPda,
+  findEventAuthorityPda,
+  findFeeConfigPda,
+  findGlobalConfigPda,
+  findGlobalVolumeAccumulatorPda,
+  findLpMintPda,
+  findPoolPda,
+  findPumpCreatorVaultAtaPda,
+  findUserVolumeAccumulatorPda,
+} from "../pdas";
 
 export const PUMP_AMM_PROGRAM_ADDRESS =
-  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA' as Address<'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'>;
+  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" as Address<"pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA">;
 
 export enum PumpAmmAccount {
   BondingCurve,
@@ -62,16 +214,16 @@ export enum PumpAmmAccount {
 }
 
 export function identifyPumpAmmAccount(
-  account: { data: ReadonlyUint8Array } | ReadonlyUint8Array
+  account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PumpAmmAccount {
-  const data = 'data' in account ? account.data : account;
+  const data = "data" in account ? account.data : account;
   if (
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([23, 183, 248, 55, 96, 216, 172, 96])
+        new Uint8Array([23, 183, 248, 55, 96, 216, 172, 96]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.BondingCurve;
@@ -80,9 +232,9 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([143, 52, 146, 187, 219, 123, 76, 155])
+        new Uint8Array([143, 52, 146, 187, 219, 123, 76, 155]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.FeeConfig;
@@ -91,9 +243,9 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([149, 8, 156, 202, 160, 252, 176, 217])
+        new Uint8Array([149, 8, 156, 202, 160, 252, 176, 217]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.GlobalConfig;
@@ -102,9 +254,9 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255])
+        new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.GlobalVolumeAccumulator;
@@ -113,9 +265,9 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188])
+        new Uint8Array([241, 154, 109, 4, 17, 177, 109, 188]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.Pool;
@@ -124,9 +276,9 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75])
+        new Uint8Array([216, 74, 9, 0, 56, 140, 93, 75]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.SharingConfig;
@@ -135,15 +287,340 @@ export function identifyPumpAmmAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250])
+        new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmAccount.UserVolumeAccumulator;
   }
+  throw new SolanaError(
+    SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+    { accountData: data, programName: "pumpAmm" },
+  );
+}
+
+export enum PumpAmmEvent {
+  AdminCtoPoolEvent,
+  AdminUpdateTokenIncentivesEvent,
+  BoostBuyAndBurnEvent,
+  BuyEvent,
+  ClaimCashbackEvent,
+  ClaimTokenIncentivesEvent,
+  CloseUserVolumeAccumulatorEvent,
+  CollectCoinCreatorFeeEvent,
+  CreateConfigEvent,
+  CreatePoolEvent,
+  DepositEvent,
+  DisableEvent,
+  ExtendAccountEvent,
+  InitBoostEvent,
+  InitUserVolumeAccumulatorEvent,
+  MigratePoolCoinCreatorEvent,
+  ReservedFeeRecipientsEvent,
+  SellEvent,
+  SetBondingCurveCoinCreatorEvent,
+  SetBoostAuthorityEvent,
+  SetMetaplexCoinCreatorEvent,
+  SyncUserVolumeAccumulatorEvent,
+  UpdateAdminEvent,
+  UpdateCreatorFeeConfigEvent,
+  UpdateFeeConfigEvent,
+  WithdrawEvent,
+}
+
+export function identifyPumpAmmEvent(
+  event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): PumpAmmEvent {
+  const data = "data" in event ? event.data : event;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([47, 35, 163, 249, 150, 157, 147, 122]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.AdminCtoPoolEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([147, 250, 108, 120, 247, 29, 67, 222]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.AdminUpdateTokenIncentivesEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([63, 69, 28, 22, 48, 92, 194, 185]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.BoostBuyAndBurnEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([103, 244, 82, 31, 44, 245, 119, 119]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.BuyEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([226, 214, 246, 33, 7, 242, 147, 229]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.ClaimCashbackEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([79, 172, 246, 49, 205, 91, 206, 232]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.ClaimTokenIncentivesEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([146, 159, 189, 172, 146, 88, 56, 244]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.CloseUserVolumeAccumulatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([232, 245, 194, 238, 234, 218, 58, 89]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.CollectCoinCreatorFeeEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([107, 52, 89, 129, 55, 226, 81, 22]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.CreateConfigEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([177, 49, 12, 210, 160, 118, 167, 116]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.CreatePoolEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([120, 248, 61, 83, 31, 142, 107, 144]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.DepositEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([107, 253, 193, 76, 228, 202, 27, 104]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.DisableEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([97, 97, 215, 144, 93, 146, 22, 124]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.ExtendAccountEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([174, 124, 74, 249, 4, 81, 246, 17]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.InitBoostEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([134, 36, 13, 72, 232, 101, 130, 216]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.InitUserVolumeAccumulatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([170, 221, 82, 199, 147, 165, 247, 46]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.MigratePoolCoinCreatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([43, 188, 250, 18, 221, 75, 187, 95]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.ReservedFeeRecipientsEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([62, 47, 55, 10, 165, 3, 220, 42]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.SellEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([242, 231, 235, 102, 65, 99, 189, 211]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.SetBondingCurveCoinCreatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([89, 128, 240, 141, 91, 202, 71, 105]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.SetBoostAuthorityEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([150, 107, 199, 123, 124, 207, 102, 228]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.SetMetaplexCoinCreatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([197, 122, 167, 124, 116, 81, 91, 255]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.SyncUserVolumeAccumulatorEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([225, 152, 171, 87, 246, 63, 66, 234]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.UpdateAdminEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([152, 198, 124, 124, 106, 246, 127, 191]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.UpdateCreatorFeeConfigEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([90, 23, 65, 35, 62, 244, 188, 208]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.UpdateFeeConfigEvent;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([22, 9, 133, 26, 160, 44, 71, 192]),
+      ),
+      0,
+    )
+  ) {
+    return PumpAmmEvent.WithdrawEvent;
+  }
   throw new Error(
-    'The provided account could not be identified as a pumpAmm account.'
+    "The provided event could not be identified as a pumpAmm event.",
   );
 }
 
@@ -183,16 +660,16 @@ export enum PumpAmmInstruction {
 }
 
 export function identifyPumpAmmInstruction(
-  instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array
+  instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PumpAmmInstruction {
-  const data = 'data' in instruction ? instruction.data : instruction;
+  const data = "data" in instruction ? instruction.data : instruction;
   if (
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([45, 61, 165, 151, 104, 0, 49, 189])
+        new Uint8Array([45, 61, 165, 151, 104, 0, 49, 189]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.AdminCtoPool;
@@ -201,9 +678,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([209, 11, 115, 87, 213, 23, 124, 204])
+        new Uint8Array([209, 11, 115, 87, 213, 23, 124, 204]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.AdminUpdateTokenIncentives;
@@ -212,9 +689,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([105, 68, 6, 175, 0, 7, 35, 162])
+        new Uint8Array([105, 68, 6, 175, 0, 7, 35, 162]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.BoostBuyAndBurn;
@@ -223,9 +700,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([102, 6, 61, 18, 1, 218, 235, 234])
+        new Uint8Array([102, 6, 61, 18, 1, 218, 235, 234]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.Buy;
@@ -234,9 +711,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([198, 46, 21, 82, 180, 217, 232, 112])
+        new Uint8Array([198, 46, 21, 82, 180, 217, 232, 112]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.BuyExactQuoteIn;
@@ -245,9 +722,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197])
+        new Uint8Array([37, 58, 35, 126, 190, 53, 228, 197]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.ClaimCashback;
@@ -256,9 +733,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27])
+        new Uint8Array([16, 4, 71, 28, 204, 1, 40, 27]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.ClaimTokenIncentives;
@@ -267,9 +744,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138])
+        new Uint8Array([249, 69, 164, 218, 150, 103, 84, 138]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.CloseUserVolumeAccumulator;
@@ -278,9 +755,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([160, 57, 89, 42, 181, 139, 43, 66])
+        new Uint8Array([160, 57, 89, 42, 181, 139, 43, 66]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.CollectCoinCreatorFee;
@@ -289,9 +766,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([201, 207, 243, 114, 75, 111, 47, 189])
+        new Uint8Array([201, 207, 243, 114, 75, 111, 47, 189]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.CreateConfig;
@@ -300,9 +777,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([233, 146, 209, 142, 207, 104, 64, 188])
+        new Uint8Array([233, 146, 209, 142, 207, 104, 64, 188]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.CreatePool;
@@ -311,9 +788,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([242, 35, 198, 137, 82, 225, 242, 182])
+        new Uint8Array([242, 35, 198, 137, 82, 225, 242, 182]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.Deposit;
@@ -322,9 +799,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([185, 173, 187, 90, 216, 15, 238, 233])
+        new Uint8Array([185, 173, 187, 90, 216, 15, 238, 233]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.Disable;
@@ -333,9 +810,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([234, 102, 194, 203, 150, 72, 62, 229])
+        new Uint8Array([234, 102, 194, 203, 150, 72, 62, 229]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.ExtendAccount;
@@ -344,9 +821,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([140, 233, 33, 94, 132, 90, 194, 143])
+        new Uint8Array([140, 233, 33, 94, 132, 90, 194, 143]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.InitBoost;
@@ -355,9 +832,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183])
+        new Uint8Array([94, 6, 202, 115, 255, 96, 232, 183]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.InitUserVolumeAccumulator;
@@ -366,9 +843,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([208, 8, 159, 4, 74, 175, 16, 58])
+        new Uint8Array([208, 8, 159, 4, 74, 175, 16, 58]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.MigratePoolCoinCreator;
@@ -377,9 +854,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173])
+        new Uint8Array([51, 230, 133, 164, 1, 127, 131, 173]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.Sell;
@@ -388,9 +865,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([227, 149, 76, 42, 130, 39, 234, 205])
+        new Uint8Array([227, 149, 76, 42, 130, 39, 234, 205]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.SetBoostAuthority;
@@ -399,9 +876,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([210, 149, 128, 45, 188, 58, 78, 175])
+        new Uint8Array([210, 149, 128, 45, 188, 58, 78, 175]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.SetCoinCreator;
@@ -410,9 +887,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142])
+        new Uint8Array([111, 172, 162, 232, 114, 89, 213, 142]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.SetReservedFeeRecipients;
@@ -421,9 +898,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238])
+        new Uint8Array([86, 31, 192, 87, 163, 87, 79, 238]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.SyncUserVolumeAccumulator;
@@ -432,9 +909,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([117, 161, 160, 74, 223, 137, 118, 99])
+        new Uint8Array([117, 161, 160, 74, 223, 137, 118, 99]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.ToggleBoost;
@@ -443,9 +920,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195])
+        new Uint8Array([115, 103, 224, 255, 189, 89, 86, 195]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.ToggleCashbackEnabled;
@@ -454,9 +931,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([1, 9, 111, 208, 100, 31, 255, 163])
+        new Uint8Array([1, 9, 111, 208, 100, 31, 255, 163]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.ToggleMayhemMode;
@@ -465,9 +942,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([139, 52, 134, 85, 228, 229, 108, 241])
+        new Uint8Array([139, 52, 134, 85, 228, 229, 108, 241]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.TransferCreatorFeesToPump;
@@ -476,9 +953,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([1, 33, 78, 185, 33, 67, 44, 92])
+        new Uint8Array([1, 33, 78, 185, 33, 67, 44, 92]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.TransferCreatorFeesToPumpV2;
@@ -487,9 +964,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([161, 176, 40, 213, 60, 184, 179, 228])
+        new Uint8Array([161, 176, 40, 213, 60, 184, 179, 228]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.UpdateAdmin;
@@ -498,9 +975,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([251, 224, 171, 146, 160, 26, 113, 233])
+        new Uint8Array([251, 224, 171, 146, 160, 26, 113, 233]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.UpdateBuybackConfig;
@@ -509,9 +986,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175])
+        new Uint8Array([61, 175, 160, 249, 66, 66, 136, 175]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.UpdateCreatorFeeConfig;
@@ -520,9 +997,9 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([104, 184, 103, 242, 88, 151, 107, 20])
+        new Uint8Array([104, 184, 103, 242, 88, 151, 107, 20]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.UpdateFeeConfig;
@@ -531,20 +1008,21 @@ export function identifyPumpAmmInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([183, 18, 70, 156, 148, 109, 161, 34])
+        new Uint8Array([183, 18, 70, 156, 148, 109, 161, 34]),
       ),
-      0
+      0,
     )
   ) {
     return PumpAmmInstruction.Withdraw;
   }
-  throw new Error(
-    'The provided instruction could not be identified as a pumpAmm instruction.'
+  throw new SolanaError(
+    SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+    { instructionData: data, programName: "pumpAmm" },
   );
 }
 
 export type ParsedPumpAmmInstruction<
-  TProgram extends string = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
+  TProgram extends string = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
 > =
   | ({
       instructionType: PumpAmmInstruction.AdminCtoPool;
@@ -642,3 +1120,622 @@ export type ParsedPumpAmmInstruction<
   | ({
       instructionType: PumpAmmInstruction.Withdraw;
     } & ParsedWithdrawInstruction<TProgram>);
+
+export function parsePumpAmmInstruction<TProgram extends string>(
+  instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
+): ParsedPumpAmmInstruction<TProgram> {
+  const instructionType = identifyPumpAmmInstruction(instruction);
+  switch (instructionType) {
+    case PumpAmmInstruction.AdminCtoPool: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.AdminCtoPool,
+        ...parseAdminCtoPoolInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.AdminUpdateTokenIncentives: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.AdminUpdateTokenIncentives,
+        ...parseAdminUpdateTokenIncentivesInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.BoostBuyAndBurn: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.BoostBuyAndBurn,
+        ...parseBoostBuyAndBurnInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.Buy: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.Buy,
+        ...parseBuyInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.BuyExactQuoteIn: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.BuyExactQuoteIn,
+        ...parseBuyExactQuoteInInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.ClaimCashback: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.ClaimCashback,
+        ...parseClaimCashbackInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.ClaimTokenIncentives: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.ClaimTokenIncentives,
+        ...parseClaimTokenIncentivesInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.CloseUserVolumeAccumulator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.CloseUserVolumeAccumulator,
+        ...parseCloseUserVolumeAccumulatorInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.CollectCoinCreatorFee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.CollectCoinCreatorFee,
+        ...parseCollectCoinCreatorFeeInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.CreateConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.CreateConfig,
+        ...parseCreateConfigInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.CreatePool: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.CreatePool,
+        ...parseCreatePoolInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.Deposit: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.Deposit,
+        ...parseDepositInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.Disable: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.Disable,
+        ...parseDisableInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.ExtendAccount: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.ExtendAccount,
+        ...parseExtendAccountInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.InitBoost: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.InitBoost,
+        ...parseInitBoostInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.InitUserVolumeAccumulator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.InitUserVolumeAccumulator,
+        ...parseInitUserVolumeAccumulatorInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.MigratePoolCoinCreator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.MigratePoolCoinCreator,
+        ...parseMigratePoolCoinCreatorInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.Sell: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.Sell,
+        ...parseSellInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.SetBoostAuthority: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.SetBoostAuthority,
+        ...parseSetBoostAuthorityInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.SetCoinCreator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.SetCoinCreator,
+        ...parseSetCoinCreatorInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.SetReservedFeeRecipients: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.SetReservedFeeRecipients,
+        ...parseSetReservedFeeRecipientsInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.SyncUserVolumeAccumulator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.SyncUserVolumeAccumulator,
+        ...parseSyncUserVolumeAccumulatorInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.ToggleBoost: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.ToggleBoost,
+        ...parseToggleBoostInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.ToggleCashbackEnabled: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.ToggleCashbackEnabled,
+        ...parseToggleCashbackEnabledInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.ToggleMayhemMode: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.ToggleMayhemMode,
+        ...parseToggleMayhemModeInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.TransferCreatorFeesToPump: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.TransferCreatorFeesToPump,
+        ...parseTransferCreatorFeesToPumpInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.TransferCreatorFeesToPumpV2: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.TransferCreatorFeesToPumpV2,
+        ...parseTransferCreatorFeesToPumpV2Instruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.UpdateAdmin: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.UpdateAdmin,
+        ...parseUpdateAdminInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.UpdateBuybackConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.UpdateBuybackConfig,
+        ...parseUpdateBuybackConfigInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.UpdateCreatorFeeConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.UpdateCreatorFeeConfig,
+        ...parseUpdateCreatorFeeConfigInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.UpdateFeeConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.UpdateFeeConfig,
+        ...parseUpdateFeeConfigInstruction(instruction),
+      };
+    }
+    case PumpAmmInstruction.Withdraw: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: PumpAmmInstruction.Withdraw,
+        ...parseWithdrawInstruction(instruction),
+      };
+    }
+    default:
+      throw new SolanaError(
+        SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+        { instructionType: instructionType as string, programName: "pumpAmm" },
+      );
+  }
+}
+
+export type PumpAmmPlugin = {
+  accounts: PumpAmmPluginAccounts;
+  instructions: PumpAmmPluginInstructions;
+  pdas: PumpAmmPluginPdas;
+  identifyAccount: typeof identifyPumpAmmAccount;
+  identifyInstruction: typeof identifyPumpAmmInstruction;
+  parseInstruction: typeof parsePumpAmmInstruction;
+};
+
+export type PumpAmmPluginAccounts = {
+  bondingCurve: ReturnType<typeof getBondingCurveCodec> &
+    SelfFetchFunctions<BondingCurveArgs, BondingCurve>;
+  feeConfig: ReturnType<typeof getFeeConfigCodec> &
+    SelfFetchFunctions<FeeConfigArgs, FeeConfig>;
+  globalConfig: ReturnType<typeof getGlobalConfigCodec> &
+    SelfFetchFunctions<GlobalConfigArgs, GlobalConfig>;
+  globalVolumeAccumulator: ReturnType<typeof getGlobalVolumeAccumulatorCodec> &
+    SelfFetchFunctions<GlobalVolumeAccumulatorArgs, GlobalVolumeAccumulator>;
+  pool: ReturnType<typeof getPoolCodec> & SelfFetchFunctions<PoolArgs, Pool>;
+  sharingConfig: ReturnType<typeof getSharingConfigCodec> &
+    SelfFetchFunctions<SharingConfigArgs, SharingConfig>;
+  userVolumeAccumulator: ReturnType<typeof getUserVolumeAccumulatorCodec> &
+    SelfFetchFunctions<UserVolumeAccumulatorArgs, UserVolumeAccumulator>;
+};
+
+export type PumpAmmPluginInstructions = {
+  adminCtoPool: (
+    input: MakeOptional<AdminCtoPoolAsyncInput, "payer">,
+  ) => ReturnType<typeof getAdminCtoPoolInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  adminUpdateTokenIncentives: (
+    input: AdminUpdateTokenIncentivesAsyncInput,
+  ) => ReturnType<typeof getAdminUpdateTokenIncentivesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  boostBuyAndBurn: (
+    input: BoostBuyAndBurnAsyncInput,
+  ) => ReturnType<typeof getBoostBuyAndBurnInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  buy: (
+    input: BuyAsyncInput,
+  ) => ReturnType<typeof getBuyInstructionAsync> & SelfPlanAndSendFunctions;
+  buyExactQuoteIn: (
+    input: BuyExactQuoteInAsyncInput,
+  ) => ReturnType<typeof getBuyExactQuoteInInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  claimCashback: (
+    input: ClaimCashbackAsyncInput,
+  ) => ReturnType<typeof getClaimCashbackInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  claimTokenIncentives: (
+    input: MakeOptional<ClaimTokenIncentivesAsyncInput, "payer">,
+  ) => ReturnType<typeof getClaimTokenIncentivesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  closeUserVolumeAccumulator: (
+    input: CloseUserVolumeAccumulatorAsyncInput,
+  ) => ReturnType<typeof getCloseUserVolumeAccumulatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  collectCoinCreatorFee: (
+    input: CollectCoinCreatorFeeAsyncInput,
+  ) => ReturnType<typeof getCollectCoinCreatorFeeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  createConfig: (
+    input: CreateConfigAsyncInput,
+  ) => ReturnType<typeof getCreateConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  createPool: (
+    input: CreatePoolAsyncInput,
+  ) => ReturnType<typeof getCreatePoolInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  deposit: (
+    input: DepositAsyncInput,
+  ) => ReturnType<typeof getDepositInstructionAsync> & SelfPlanAndSendFunctions;
+  disable: (
+    input: DisableAsyncInput,
+  ) => ReturnType<typeof getDisableInstructionAsync> & SelfPlanAndSendFunctions;
+  extendAccount: (
+    input: ExtendAccountAsyncInput,
+  ) => ReturnType<typeof getExtendAccountInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  initBoost: (
+    input: InitBoostAsyncInput,
+  ) => ReturnType<typeof getInitBoostInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  initUserVolumeAccumulator: (
+    input: MakeOptional<InitUserVolumeAccumulatorAsyncInput, "payer">,
+  ) => ReturnType<typeof getInitUserVolumeAccumulatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  migratePoolCoinCreator: (
+    input: MigratePoolCoinCreatorAsyncInput,
+  ) => ReturnType<typeof getMigratePoolCoinCreatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  sell: (
+    input: SellAsyncInput,
+  ) => ReturnType<typeof getSellInstructionAsync> & SelfPlanAndSendFunctions;
+  setBoostAuthority: (
+    input: SetBoostAuthorityAsyncInput,
+  ) => ReturnType<typeof getSetBoostAuthorityInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setCoinCreator: (
+    input: SetCoinCreatorAsyncInput,
+  ) => ReturnType<typeof getSetCoinCreatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setReservedFeeRecipients: (
+    input: SetReservedFeeRecipientsAsyncInput,
+  ) => ReturnType<typeof getSetReservedFeeRecipientsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  syncUserVolumeAccumulator: (
+    input: SyncUserVolumeAccumulatorAsyncInput,
+  ) => ReturnType<typeof getSyncUserVolumeAccumulatorInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  toggleBoost: (
+    input: ToggleBoostInput,
+  ) => ReturnType<typeof getToggleBoostInstruction> & SelfPlanAndSendFunctions;
+  toggleCashbackEnabled: (
+    input: ToggleCashbackEnabledAsyncInput,
+  ) => ReturnType<typeof getToggleCashbackEnabledInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  toggleMayhemMode: (
+    input: ToggleMayhemModeAsyncInput,
+  ) => ReturnType<typeof getToggleMayhemModeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  transferCreatorFeesToPump: (
+    input: TransferCreatorFeesToPumpAsyncInput,
+  ) => ReturnType<typeof getTransferCreatorFeesToPumpInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  transferCreatorFeesToPumpV2: (
+    input: MakeOptional<TransferCreatorFeesToPumpV2AsyncInput, "payer">,
+  ) => ReturnType<typeof getTransferCreatorFeesToPumpV2InstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateAdmin: (
+    input: UpdateAdminAsyncInput,
+  ) => ReturnType<typeof getUpdateAdminInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateBuybackConfig: (
+    input: UpdateBuybackConfigAsyncInput,
+  ) => ReturnType<typeof getUpdateBuybackConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateCreatorFeeConfig: (
+    input: UpdateCreatorFeeConfigAsyncInput,
+  ) => ReturnType<typeof getUpdateCreatorFeeConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  updateFeeConfig: (
+    input: UpdateFeeConfigAsyncInput,
+  ) => ReturnType<typeof getUpdateFeeConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  withdraw: (
+    input: WithdrawAsyncInput,
+  ) => ReturnType<typeof getWithdrawInstructionAsync> &
+    SelfPlanAndSendFunctions;
+};
+
+export type PumpAmmPluginPdas = {
+  eventAuthority: typeof findEventAuthorityPda;
+  globalConfig: typeof findGlobalConfigPda;
+  globalVolumeAccumulator: typeof findGlobalVolumeAccumulatorPda;
+  boostVaultAuthority: typeof findBoostVaultAuthorityPda;
+  userVolumeAccumulator: typeof findUserVolumeAccumulatorPda;
+  feeConfig: typeof findFeeConfigPda;
+  coinCreatorVaultAuthority: typeof findCoinCreatorVaultAuthorityPda;
+  pool: typeof findPoolPda;
+  lpMint: typeof findLpMintPda;
+  pumpCreatorVaultAta: typeof findPumpCreatorVaultAtaPda;
+};
+
+export type PumpAmmPluginRequirements = ClientWithRpc<
+  GetAccountInfoApi & GetMultipleAccountsApi
+> &
+  ClientWithPayer &
+  ClientWithTransactionPlanning &
+  ClientWithTransactionSending;
+
+export function pumpAmmProgram() {
+  return <T extends PumpAmmPluginRequirements>(
+    client: T,
+  ): ExtendedClient<T, { pumpAmm: PumpAmmPlugin }> => {
+    return extendClient(client, {
+      pumpAmm: <PumpAmmPlugin>{
+        accounts: {
+          bondingCurve: addSelfFetchFunctions(client, getBondingCurveCodec()),
+          feeConfig: addSelfFetchFunctions(client, getFeeConfigCodec()),
+          globalConfig: addSelfFetchFunctions(client, getGlobalConfigCodec()),
+          globalVolumeAccumulator: addSelfFetchFunctions(
+            client,
+            getGlobalVolumeAccumulatorCodec(),
+          ),
+          pool: addSelfFetchFunctions(client, getPoolCodec()),
+          sharingConfig: addSelfFetchFunctions(client, getSharingConfigCodec()),
+          userVolumeAccumulator: addSelfFetchFunctions(
+            client,
+            getUserVolumeAccumulatorCodec(),
+          ),
+        },
+        instructions: {
+          adminCtoPool: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdminCtoPoolInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          adminUpdateTokenIncentives: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdminUpdateTokenIncentivesInstructionAsync(input),
+            ),
+          boostBuyAndBurn: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getBoostBuyAndBurnInstructionAsync(input),
+            ),
+          buy: (input) =>
+            addSelfPlanAndSendFunctions(client, getBuyInstructionAsync(input)),
+          buyExactQuoteIn: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getBuyExactQuoteInInstructionAsync(input),
+            ),
+          claimCashback: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimCashbackInstructionAsync(input),
+            ),
+          claimTokenIncentives: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimTokenIncentivesInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          closeUserVolumeAccumulator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCloseUserVolumeAccumulatorInstructionAsync(input),
+            ),
+          collectCoinCreatorFee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCollectCoinCreatorFeeInstructionAsync(input),
+            ),
+          createConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCreateConfigInstructionAsync(input),
+            ),
+          createPool: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCreatePoolInstructionAsync(input),
+            ),
+          deposit: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getDepositInstructionAsync(input),
+            ),
+          disable: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getDisableInstructionAsync(input),
+            ),
+          extendAccount: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getExtendAccountInstructionAsync(input),
+            ),
+          initBoost: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitBoostInstructionAsync(input),
+            ),
+          initUserVolumeAccumulator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitUserVolumeAccumulatorInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          migratePoolCoinCreator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getMigratePoolCoinCreatorInstructionAsync(input),
+            ),
+          sell: (input) =>
+            addSelfPlanAndSendFunctions(client, getSellInstructionAsync(input)),
+          setBoostAuthority: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetBoostAuthorityInstructionAsync(input),
+            ),
+          setCoinCreator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetCoinCreatorInstructionAsync(input),
+            ),
+          setReservedFeeRecipients: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetReservedFeeRecipientsInstructionAsync(input),
+            ),
+          syncUserVolumeAccumulator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSyncUserVolumeAccumulatorInstructionAsync(input),
+            ),
+          toggleBoost: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleBoostInstruction(input),
+            ),
+          toggleCashbackEnabled: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleCashbackEnabledInstructionAsync(input),
+            ),
+          toggleMayhemMode: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleMayhemModeInstructionAsync(input),
+            ),
+          transferCreatorFeesToPump: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getTransferCreatorFeesToPumpInstructionAsync(input),
+            ),
+          transferCreatorFeesToPumpV2: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getTransferCreatorFeesToPumpV2InstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          updateAdmin: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateAdminInstructionAsync(input),
+            ),
+          updateBuybackConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateBuybackConfigInstructionAsync(input),
+            ),
+          updateCreatorFeeConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateCreatorFeeConfigInstructionAsync(input),
+            ),
+          updateFeeConfig: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getUpdateFeeConfigInstructionAsync(input),
+            ),
+          withdraw: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getWithdrawInstructionAsync(input),
+            ),
+        },
+        pdas: {
+          eventAuthority: findEventAuthorityPda,
+          globalConfig: findGlobalConfigPda,
+          globalVolumeAccumulator: findGlobalVolumeAccumulatorPda,
+          boostVaultAuthority: findBoostVaultAuthorityPda,
+          userVolumeAccumulator: findUserVolumeAccumulatorPda,
+          feeConfig: findFeeConfigPda,
+          coinCreatorVaultAuthority: findCoinCreatorVaultAuthorityPda,
+          pool: findPoolPda,
+          lpMint: findLpMintPda,
+          pumpCreatorVaultAta: findPumpCreatorVaultAtaPda,
+        },
+        identifyAccount: identifyPumpAmmAccount,
+        identifyInstruction: identifyPumpAmmInstruction,
+        parseInstruction: parsePumpAmmInstruction,
+      },
+    });
+  };
+}
+
+type MakeOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;

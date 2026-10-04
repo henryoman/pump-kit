@@ -37,7 +37,7 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 import {
   getFeesDecoder,
   getFeesEncoder,
@@ -47,13 +47,13 @@ import {
   type FeesArgs,
   type FeeTier,
   type FeeTierArgs,
-} from '../types';
+} from "../types";
 
-export const FEE_CONFIG_DISCRIMINATOR = new Uint8Array([
+export const FEE_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   143, 52, 146, 187, 219, 123, 76, 155,
 ]);
 
-export function getFeeConfigDiscriminatorBytes() {
+export function getFeeConfigDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(FEE_CONFIG_DISCRIMINATOR);
 }
 
@@ -76,56 +76,59 @@ export type FeeConfigArgs = {
   exoticFlatFees: FeesArgs;
 };
 
+/** Gets the encoder for {@link FeeConfigArgs} account data. */
 export function getFeeConfigEncoder(): Encoder<FeeConfigArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['bump', getU8Encoder()],
-      ['admin', getAddressEncoder()],
-      ['flatFees', getFeesEncoder()],
-      ['feeTiers', getArrayEncoder(getFeeTierEncoder())],
-      ['stableFeeTiers', getArrayEncoder(getFeeTierEncoder())],
-      ['exoticFlatFees', getFeesEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["bump", getU8Encoder()],
+      ["admin", getAddressEncoder()],
+      ["flatFees", getFeesEncoder()],
+      ["feeTiers", getArrayEncoder(getFeeTierEncoder())],
+      ["stableFeeTiers", getArrayEncoder(getFeeTierEncoder())],
+      ["exoticFlatFees", getFeesEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: FEE_CONFIG_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: FEE_CONFIG_DISCRIMINATOR }),
   );
 }
 
+/** Gets the decoder for {@link FeeConfig} account data. */
 export function getFeeConfigDecoder(): Decoder<FeeConfig> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['bump', getU8Decoder()],
-    ['admin', getAddressDecoder()],
-    ['flatFees', getFeesDecoder()],
-    ['feeTiers', getArrayDecoder(getFeeTierDecoder())],
-    ['stableFeeTiers', getArrayDecoder(getFeeTierDecoder())],
-    ['exoticFlatFees', getFeesDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["bump", getU8Decoder()],
+    ["admin", getAddressDecoder()],
+    ["flatFees", getFeesDecoder()],
+    ["feeTiers", getArrayDecoder(getFeeTierDecoder())],
+    ["stableFeeTiers", getArrayDecoder(getFeeTierDecoder())],
+    ["exoticFlatFees", getFeesDecoder()],
   ]);
 }
 
+/** Gets the codec for {@link FeeConfig} account data. */
 export function getFeeConfigCodec(): Codec<FeeConfigArgs, FeeConfig> {
   return combineCodec(getFeeConfigEncoder(), getFeeConfigDecoder());
 }
 
 export function decodeFeeConfig<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<FeeConfig, TAddress>;
 export function decodeFeeConfig<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<FeeConfig, TAddress>;
 export function decodeFeeConfig<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ): Account<FeeConfig, TAddress> | MaybeAccount<FeeConfig, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getFeeConfigDecoder()
+    getFeeConfigDecoder(),
   );
 }
 
 export async function fetchFeeConfig<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<FeeConfig, TAddress>> {
   const maybeAccount = await fetchMaybeFeeConfig(rpc, address, config);
   assertAccountExists(maybeAccount);
@@ -135,7 +138,7 @@ export async function fetchFeeConfig<TAddress extends string = string>(
 export async function fetchMaybeFeeConfig<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<FeeConfig, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeFeeConfig(maybeAccount);
@@ -144,7 +147,7 @@ export async function fetchMaybeFeeConfig<TAddress extends string = string>(
 export async function fetchAllFeeConfig(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<FeeConfig>[]> {
   const maybeAccounts = await fetchAllMaybeFeeConfig(rpc, addresses, config);
   assertAccountsExist(maybeAccounts);
@@ -154,7 +157,7 @@ export async function fetchAllFeeConfig(
 export async function fetchAllMaybeFeeConfig(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<FeeConfig>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodeFeeConfig(maybeAccount));

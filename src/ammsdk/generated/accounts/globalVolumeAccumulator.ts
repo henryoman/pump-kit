@@ -39,15 +39,14 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 
-export const GLOBAL_VOLUME_ACCUMULATOR_DISCRIMINATOR = new Uint8Array([
-  202, 42, 246, 43, 142, 190, 30, 255,
-]);
+export const GLOBAL_VOLUME_ACCUMULATOR_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([202, 42, 246, 43, 142, 190, 30, 255]);
 
-export function getGlobalVolumeAccumulatorDiscriminatorBytes() {
+export function getGlobalVolumeAccumulatorDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    GLOBAL_VOLUME_ACCUMULATOR_DISCRIMINATOR
+    GLOBAL_VOLUME_ACCUMULATOR_DISCRIMINATOR,
   );
 }
 
@@ -70,60 +69,63 @@ export type GlobalVolumeAccumulatorArgs = {
   solVolumes: Array<number | bigint>;
 };
 
+/** Gets the encoder for {@link GlobalVolumeAccumulatorArgs} account data. */
 export function getGlobalVolumeAccumulatorEncoder(): FixedSizeEncoder<GlobalVolumeAccumulatorArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['startTime', getI64Encoder()],
-      ['endTime', getI64Encoder()],
-      ['secondsInADay', getI64Encoder()],
-      ['mint', getAddressEncoder()],
-      ['totalTokenSupply', getArrayEncoder(getU64Encoder(), { size: 30 })],
-      ['solVolumes', getArrayEncoder(getU64Encoder(), { size: 30 })],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["startTime", getI64Encoder()],
+      ["endTime", getI64Encoder()],
+      ["secondsInADay", getI64Encoder()],
+      ["mint", getAddressEncoder()],
+      ["totalTokenSupply", getArrayEncoder(getU64Encoder(), { size: 30 })],
+      ["solVolumes", getArrayEncoder(getU64Encoder(), { size: 30 })],
     ]),
     (value) => ({
       ...value,
       discriminator: GLOBAL_VOLUME_ACCUMULATOR_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
+/** Gets the decoder for {@link GlobalVolumeAccumulator} account data. */
 export function getGlobalVolumeAccumulatorDecoder(): FixedSizeDecoder<GlobalVolumeAccumulator> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['startTime', getI64Decoder()],
-    ['endTime', getI64Decoder()],
-    ['secondsInADay', getI64Decoder()],
-    ['mint', getAddressDecoder()],
-    ['totalTokenSupply', getArrayDecoder(getU64Decoder(), { size: 30 })],
-    ['solVolumes', getArrayDecoder(getU64Decoder(), { size: 30 })],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["startTime", getI64Decoder()],
+    ["endTime", getI64Decoder()],
+    ["secondsInADay", getI64Decoder()],
+    ["mint", getAddressDecoder()],
+    ["totalTokenSupply", getArrayDecoder(getU64Decoder(), { size: 30 })],
+    ["solVolumes", getArrayDecoder(getU64Decoder(), { size: 30 })],
   ]);
 }
 
+/** Gets the codec for {@link GlobalVolumeAccumulator} account data. */
 export function getGlobalVolumeAccumulatorCodec(): FixedSizeCodec<
   GlobalVolumeAccumulatorArgs,
   GlobalVolumeAccumulator
 > {
   return combineCodec(
     getGlobalVolumeAccumulatorEncoder(),
-    getGlobalVolumeAccumulatorDecoder()
+    getGlobalVolumeAccumulatorDecoder(),
   );
 }
 
 export function decodeGlobalVolumeAccumulator<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<GlobalVolumeAccumulator, TAddress>;
 export function decodeGlobalVolumeAccumulator<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<GlobalVolumeAccumulator, TAddress>;
 export function decodeGlobalVolumeAccumulator<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ):
   | Account<GlobalVolumeAccumulator, TAddress>
   | MaybeAccount<GlobalVolumeAccumulator, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getGlobalVolumeAccumulatorDecoder()
+    getGlobalVolumeAccumulatorDecoder(),
   );
 }
 
@@ -132,12 +134,12 @@ export async function fetchGlobalVolumeAccumulator<
 >(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<GlobalVolumeAccumulator, TAddress>> {
   const maybeAccount = await fetchMaybeGlobalVolumeAccumulator(
     rpc,
     address,
-    config
+    config,
   );
   assertAccountExists(maybeAccount);
   return maybeAccount;
@@ -148,7 +150,7 @@ export async function fetchMaybeGlobalVolumeAccumulator<
 >(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<GlobalVolumeAccumulator, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeGlobalVolumeAccumulator(maybeAccount);
@@ -157,12 +159,12 @@ export async function fetchMaybeGlobalVolumeAccumulator<
 export async function fetchAllGlobalVolumeAccumulator(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<GlobalVolumeAccumulator>[]> {
   const maybeAccounts = await fetchAllMaybeGlobalVolumeAccumulator(
     rpc,
     addresses,
-    config
+    config,
   );
   assertAccountsExist(maybeAccounts);
   return maybeAccounts;
@@ -171,11 +173,11 @@ export async function fetchAllGlobalVolumeAccumulator(
 export async function fetchAllMaybeGlobalVolumeAccumulator(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<GlobalVolumeAccumulator>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) =>
-    decodeGlobalVolumeAccumulator(maybeAccount)
+    decodeGlobalVolumeAccumulator(maybeAccount),
   );
 }
 

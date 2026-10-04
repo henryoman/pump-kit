@@ -18,6 +18,8 @@ import {
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -30,22 +32,32 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findBuyExactQuoteInV2BondingCurvePda,
+  findEventAuthorityPda,
+  findFeeConfigPda,
+  findGlobalPda,
+  findUserVolumeAccumulatorPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const SELL_V2_DISCRIMINATOR = new Uint8Array([
+export const SELL_V2_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   93, 246, 130, 60, 231, 233, 64, 178,
 ]);
 
-export function getSellV2DiscriminatorBytes() {
+export function getSellV2DiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(SELL_V2_DISCRIMINATOR);
 }
 
@@ -56,24 +68,19 @@ export type SellV2Instruction<
   TAccountQuoteMint extends string | AccountMeta<string> = string,
   TAccountBaseTokenProgram extends string | AccountMeta<string> = string,
   TAccountQuoteTokenProgram extends string | AccountMeta<string> = string,
-  TAccountAssociatedTokenProgram extends
-    | string
-    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountFeeRecipient extends string | AccountMeta<string> = string,
-  TAccountAssociatedQuoteFeeRecipient extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountAssociatedQuoteFeeRecipient extends string | AccountMeta<string> =
+    string,
   TAccountBuybackFeeRecipient extends string | AccountMeta<string> = string,
   TAccountAssociatedQuoteBuybackFeeRecipient extends
-    | string
-    | AccountMeta<string> = string,
+    string | AccountMeta<string> = string,
   TAccountBondingCurve extends string | AccountMeta<string> = string,
-  TAccountAssociatedBaseBondingCurve extends
-    | string
-    | AccountMeta<string> = string,
-  TAccountAssociatedQuoteBondingCurve extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountAssociatedBaseBondingCurve extends string | AccountMeta<string> =
+    string,
+  TAccountAssociatedQuoteBondingCurve extends string | AccountMeta<string> =
+    string,
   TAccountUser extends string | AccountMeta<string> = string,
   TAccountAssociatedBaseUser extends string | AccountMeta<string> = string,
   TAccountAssociatedQuoteUser extends string | AccountMeta<string> = string,
@@ -81,20 +88,16 @@ export type SellV2Instruction<
   TAccountAssociatedCreatorVault extends string | AccountMeta<string> = string,
   TAccountSharingConfig extends string | AccountMeta<string> = string,
   TAccountUserVolumeAccumulator extends string | AccountMeta<string> = string,
-  TAccountAssociatedUserVolumeAccumulator extends
-    | string
-    | AccountMeta<string> = string,
+  TAccountAssociatedUserVolumeAccumulator extends string | AccountMeta<string> =
+    string,
   TAccountFeeConfig extends string | AccountMeta<string> = string,
-  TAccountFeeProgram extends
-    | string
-    | AccountMeta<string> = 'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ',
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountFeeProgram extends string | AccountMeta<string> =
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
-  TAccountProgram extends
-    | string
-    | AccountMeta<string> = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  TAccountProgram extends string | AccountMeta<string> =
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -196,19 +199,19 @@ export type SellV2InstructionDataArgs = {
 export function getSellV2InstructionDataEncoder(): FixedSizeEncoder<SellV2InstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['amount', getU64Encoder()],
-      ['minSolOutput', getU64Encoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["amount", getU64Encoder()],
+      ["minSolOutput", getU64Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: SELL_V2_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: SELL_V2_DISCRIMINATOR }),
   );
 }
 
 export function getSellV2InstructionDataDecoder(): FixedSizeDecoder<SellV2InstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['amount', getU64Decoder()],
-    ['minSolOutput', getU64Decoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["amount", getU64Decoder()],
+    ["minSolOutput", getU64Decoder()],
   ]);
 }
 
@@ -218,104 +221,123 @@ export function getSellV2InstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getSellV2InstructionDataEncoder(),
-    getSellV2InstructionDataDecoder()
+    getSellV2InstructionDataDecoder(),
   );
 }
 
 export type SellV2AsyncInput<
-  TAccountGlobal extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountBaseTokenProgram extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountFeeRecipient extends string = string,
-  TAccountAssociatedQuoteFeeRecipient extends string = string,
-  TAccountBuybackFeeRecipient extends string = string,
-  TAccountAssociatedQuoteBuybackFeeRecipient extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountAssociatedBaseBondingCurve extends string = string,
-  TAccountAssociatedQuoteBondingCurve extends string = string,
-  TAccountUser extends string = string,
-  TAccountAssociatedBaseUser extends string = string,
-  TAccountAssociatedQuoteUser extends string = string,
-  TAccountCreatorVault extends string = string,
-  TAccountAssociatedCreatorVault extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountAssociatedUserVolumeAccumulator extends string = string,
-  TAccountFeeConfig extends string = string,
-  TAccountFeeProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBuybackFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteBuybackFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedBaseBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountAssociatedBaseUser extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountFeeConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountFeeProgram extends InstructionAccountInput = InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global?: Address<TAccountGlobal>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  baseTokenProgram: Address<TAccountBaseTokenProgram>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  feeRecipient: Address<TAccountFeeRecipient>;
-  associatedQuoteFeeRecipient?: Address<TAccountAssociatedQuoteFeeRecipient>;
-  buybackFeeRecipient: Address<TAccountBuybackFeeRecipient>;
-  associatedQuoteBuybackFeeRecipient?: Address<TAccountAssociatedQuoteBuybackFeeRecipient>;
-  bondingCurve?: Address<TAccountBondingCurve>;
-  associatedBaseBondingCurve?: Address<TAccountAssociatedBaseBondingCurve>;
-  associatedQuoteBondingCurve?: Address<TAccountAssociatedQuoteBondingCurve>;
-  user: TransactionSigner<TAccountUser>;
-  associatedBaseUser: Address<TAccountAssociatedBaseUser>;
+  global?: TAccountGlobal;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  baseTokenProgram: TAccountBaseTokenProgram;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  feeRecipient: TAccountFeeRecipient;
+  associatedQuoteFeeRecipient?: TAccountAssociatedQuoteFeeRecipient;
+  buybackFeeRecipient: TAccountBuybackFeeRecipient;
+  associatedQuoteBuybackFeeRecipient?: TAccountAssociatedQuoteBuybackFeeRecipient;
+  bondingCurve?: TAccountBondingCurve;
+  associatedBaseBondingCurve?: TAccountAssociatedBaseBondingCurve;
+  associatedQuoteBondingCurve?: TAccountAssociatedQuoteBondingCurve;
+  user: TAccountUser;
+  associatedBaseUser: TAccountAssociatedBaseUser;
   /**
    * canonical SPL associated-token PDA. Validated in `sell_v2_ix` via
    * `validate_user_quote_token_account` for non-legacy mints; ignored for legacy (SOL) trades.
    */
-  associatedQuoteUser: Address<TAccountAssociatedQuoteUser>;
-  creatorVault: Address<TAccountCreatorVault>;
-  associatedCreatorVault?: Address<TAccountAssociatedCreatorVault>;
+  associatedQuoteUser: TAccountAssociatedQuoteUser;
+  creatorVault: TAccountCreatorVault;
+  associatedCreatorVault?: TAccountAssociatedCreatorVault;
   /**
    * seeds; the account is intentionally not deserialized here because it may be uninitialized
    * for mints that have not created a fee sharing config. Handlers must check
    * `data_is_empty()` / owner before reading.
    */
-  sharingConfig?: Address<TAccountSharingConfig>;
-  userVolumeAccumulator?: Address<TAccountUserVolumeAccumulator>;
-  associatedUserVolumeAccumulator?: Address<TAccountAssociatedUserVolumeAccumulator>;
-  feeConfig?: Address<TAccountFeeConfig>;
-  feeProgram?: Address<TAccountFeeProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program?: Address<TAccountProgram>;
-  amount: SellV2InstructionDataArgs['amount'];
-  minSolOutput: SellV2InstructionDataArgs['minSolOutput'];
+  sharingConfig?: TAccountSharingConfig;
+  userVolumeAccumulator?: TAccountUserVolumeAccumulator;
+  associatedUserVolumeAccumulator?: TAccountAssociatedUserVolumeAccumulator;
+  feeConfig?: TAccountFeeConfig;
+  feeProgram?: TAccountFeeProgram;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program?: TAccountProgram;
+  amount: SellV2InstructionDataArgs["amount"];
+  minSolOutput: SellV2InstructionDataArgs["minSolOutput"];
 };
 
 export async function getSellV2InstructionAsync<
-  TAccountGlobal extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountBaseTokenProgram extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountFeeRecipient extends string,
-  TAccountAssociatedQuoteFeeRecipient extends string,
-  TAccountBuybackFeeRecipient extends string,
-  TAccountAssociatedQuoteBuybackFeeRecipient extends string,
-  TAccountBondingCurve extends string,
-  TAccountAssociatedBaseBondingCurve extends string,
-  TAccountAssociatedQuoteBondingCurve extends string,
-  TAccountUser extends string,
-  TAccountAssociatedBaseUser extends string,
-  TAccountAssociatedQuoteUser extends string,
-  TAccountCreatorVault extends string,
-  TAccountAssociatedCreatorVault extends string,
-  TAccountSharingConfig extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountAssociatedUserVolumeAccumulator extends string,
-  TAccountFeeConfig extends string,
-  TAccountFeeProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountFeeRecipient extends InstructionAccountInput,
+  TAccountAssociatedQuoteFeeRecipient extends InstructionAccountInput,
+  TAccountBuybackFeeRecipient extends InstructionAccountInput,
+  TAccountAssociatedQuoteBuybackFeeRecipient extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountAssociatedBaseBondingCurve extends InstructionAccountInput,
+  TAccountAssociatedQuoteBondingCurve extends InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput,
+  TAccountAssociatedBaseUser extends InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
+  TAccountAssociatedCreatorVault extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountFeeConfig extends InstructionAccountInput,
+  TAccountFeeProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: SellV2AsyncInput<
@@ -346,112 +368,250 @@ export async function getSellV2InstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   SellV2Instruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountFeeRecipient,
-    TAccountAssociatedQuoteFeeRecipient,
-    TAccountBuybackFeeRecipient,
-    TAccountAssociatedQuoteBuybackFeeRecipient,
-    TAccountBondingCurve,
-    TAccountAssociatedBaseBondingCurve,
-    TAccountAssociatedQuoteBondingCurve,
-    TAccountUser,
-    TAccountAssociatedBaseUser,
-    TAccountAssociatedQuoteUser,
-    TAccountCreatorVault,
-    TAccountAssociatedCreatorVault,
-    TAccountSharingConfig,
-    TAccountUserVolumeAccumulator,
-    TAccountAssociatedUserVolumeAccumulator,
-    TAccountFeeConfig,
-    TAccountFeeProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeRecipient,
+      InstructionAccountInputAddress<TAccountFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteFeeRecipient,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBuybackFeeRecipient,
+      InstructionAccountInputAddress<TAccountBuybackFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteBuybackFeeRecipient,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteBuybackFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedBaseBondingCurve,
+      InstructionAccountInputAddress<TAccountAssociatedBaseBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteBondingCurve,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedBaseUser,
+      InstructionAccountInputAddress<TAccountAssociatedBaseUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteUser,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedCreatorVault,
+      InstructionAccountInputAddress<TAccountAssociatedCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeConfig,
+      InstructionAccountInputAddress<TAccountFeeConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeProgram,
+      InstructionAccountInputAddress<TAccountFeeProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    feeRecipient: { value: input.feeRecipient ?? null, isWritable: true },
+    feeRecipient: {
+      value: input.feeRecipient ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     associatedQuoteFeeRecipient: {
       value: input.associatedQuoteFeeRecipient ?? null,
+      isSigner: false,
       isWritable: true,
     },
     buybackFeeRecipient: {
       value: input.buybackFeeRecipient ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteBuybackFeeRecipient: {
       value: input.associatedQuoteBuybackFeeRecipient ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: true },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     associatedBaseBondingCurve: {
       value: input.associatedBaseBondingCurve ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteBondingCurve: {
       value: input.associatedQuoteBondingCurve ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    user: { value: input.user ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: true, isWritable: true },
     associatedBaseUser: {
       value: input.associatedBaseUser ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteUser: {
       value: input.associatedQuoteUser ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: true },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     associatedCreatorVault: {
       value: input.associatedCreatorVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: false },
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedUserVolumeAccumulator: {
       value: input.associatedUserVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    feeConfig: { value: input.feeConfig ?? null, isWritable: false },
-    feeProgram: { value: input.feeProgram ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    feeConfig: {
+      value: input.feeConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    feeProgram: {
+      value: input.feeProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -459,73 +619,101 @@ export async function getSellV2InstructionAsync<
 
   // Resolve default values.
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.associatedQuoteFeeRecipient.value) {
     accounts.associatedQuoteFeeRecipient.value = await getProgramDerivedAddress(
       {
         programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
         seeds: [
           getAddressEncoder().encode(
-            expectAddress(accounts.feeRecipient.value)
+            getAddressFromResolvedInstructionAccount(
+              "feeRecipient",
+              accounts.feeRecipient.value,
+            ),
           ),
           getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+            getAddressFromResolvedInstructionAccount(
+              "quoteTokenProgram",
+              accounts.quoteTokenProgram.value,
+            ),
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+          getAddressEncoder().encode(
+            getAddressFromResolvedInstructionAccount(
+              "quoteMint",
+              accounts.quoteMint.value,
+            ),
+          ),
         ],
-      }
+      },
     );
   }
   if (!accounts.associatedQuoteBuybackFeeRecipient.value) {
     accounts.associatedQuoteBuybackFeeRecipient.value =
       await getProgramDerivedAddress({
         programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
         seeds: [
           getAddressEncoder().encode(
-            expectAddress(accounts.buybackFeeRecipient.value)
+            getAddressFromResolvedInstructionAccount(
+              "buybackFeeRecipient",
+              accounts.buybackFeeRecipient.value,
+            ),
           ),
           getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+            getAddressFromResolvedInstructionAccount(
+              "quoteTokenProgram",
+              accounts.quoteTokenProgram.value,
+            ),
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+          getAddressEncoder().encode(
+            getAddressFromResolvedInstructionAccount(
+              "quoteMint",
+              accounts.quoteMint.value,
+            ),
+          ),
         ],
       });
   }
   if (!accounts.bondingCurve.value) {
-    accounts.bondingCurve.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            98, 111, 110, 100, 105, 110, 103, 45, 99, 117, 114, 118, 101,
-          ])
+    accounts.bondingCurve.value = await findBuyExactQuoteInV2BondingCurvePda(
+      {
+        baseMint: getAddressFromResolvedInstructionAccount(
+          "baseMint",
+          accounts.baseMint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.associatedBaseBondingCurve.value) {
     accounts.associatedBaseBondingCurve.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.bondingCurve.value)),
         getAddressEncoder().encode(
-          expectAddress(accounts.baseTokenProgram.value)
+          getAddressFromResolvedInstructionAccount(
+            "bondingCurve",
+            accounts.bondingCurve.value,
+          ),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "baseTokenProgram",
+            accounts.baseTokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "baseMint",
+            accounts.baseMint.value,
+          ),
+        ),
       ],
     });
   }
@@ -533,279 +721,409 @@ export async function getSellV2InstructionAsync<
     accounts.associatedQuoteBondingCurve.value = await getProgramDerivedAddress(
       {
         programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
         seeds: [
           getAddressEncoder().encode(
-            expectAddress(accounts.bondingCurve.value)
+            getAddressFromResolvedInstructionAccount(
+              "bondingCurve",
+              accounts.bondingCurve.value,
+            ),
           ),
           getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+            getAddressFromResolvedInstructionAccount(
+              "quoteTokenProgram",
+              accounts.quoteTokenProgram.value,
+            ),
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+          getAddressEncoder().encode(
+            getAddressFromResolvedInstructionAccount(
+              "quoteMint",
+              accounts.quoteMint.value,
+            ),
+          ),
         ],
-      }
+      },
     );
   }
   if (!accounts.associatedCreatorVault.value) {
     accounts.associatedCreatorVault.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
-        getAddressEncoder().encode(expectAddress(accounts.creatorVault.value)),
         getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
+          getAddressFromResolvedInstructionAccount(
+            "creatorVault",
+            accounts.creatorVault.value,
+          ),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.sharingConfig.value) {
     accounts.sharingConfig.value = await getProgramDerivedAddress({
       programAddress:
-        'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>,
+        "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ" as Address<"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ">,
       seeds: [
         getBytesEncoder().encode(
           new Uint8Array([
             115, 104, 97, 114, 105, 110, 103, 45, 99, 111, 110, 102, 105, 103,
-          ])
+          ]),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.baseMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "baseMint",
+            accounts.baseMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.userVolumeAccumulator.value) {
-    accounts.userVolumeAccumulator.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            117, 115, 101, 114, 95, 118, 111, 108, 117, 109, 101, 95, 97, 99,
-            99, 117, 109, 117, 108, 97, 116, 111, 114,
-          ])
+    accounts.userVolumeAccumulator.value = await findUserVolumeAccumulatorPda(
+      {
+        user: getAddressFromResolvedInstructionAccount(
+          "user",
+          accounts.user.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.associatedUserVolumeAccumulator.value) {
     accounts.associatedUserVolumeAccumulator.value =
       await getProgramDerivedAddress({
         programAddress:
-          'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
         seeds: [
           getAddressEncoder().encode(
-            expectAddress(accounts.userVolumeAccumulator.value)
+            getAddressFromResolvedInstructionAccount(
+              "userVolumeAccumulator",
+              accounts.userVolumeAccumulator.value,
+            ),
           ),
           getAddressEncoder().encode(
-            expectAddress(accounts.quoteTokenProgram.value)
+            getAddressFromResolvedInstructionAccount(
+              "quoteTokenProgram",
+              accounts.quoteTokenProgram.value,
+            ),
           ),
-          getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+          getAddressEncoder().encode(
+            getAddressFromResolvedInstructionAccount(
+              "quoteMint",
+              accounts.quoteMint.value,
+            ),
+          ),
         ],
       });
   }
-  if (!accounts.feeConfig.value) {
-    accounts.feeConfig.value = await getProgramDerivedAddress({
-      programAddress:
-        'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([102, 101, 101, 95, 99, 111, 110, 102, 105, 103])
-        ),
-        getBytesEncoder().encode(
-          new Uint8Array([
-            1, 86, 224, 246, 147, 102, 90, 207, 68, 219, 21, 104, 191, 23, 91,
-            170, 81, 137, 203, 151, 245, 210, 255, 59, 101, 93, 43, 182, 253,
-            109, 24, 176,
-          ])
-        ),
-      ],
-    });
-  }
   if (!accounts.feeProgram.value) {
     accounts.feeProgram.value =
-      'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>;
+      "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ" as Address<"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ">;
+  }
+  if (!accounts.feeConfig.value) {
+    accounts.feeConfig.value = await findFeeConfigPda({
+      programAddress: getAddressFromResolvedInstructionAccount(
+        "feeProgram",
+        accounts.feeProgram.value,
+      ),
+    });
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
   if (!accounts.program.value) {
     accounts.program.value =
-      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.baseTokenProgram),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.feeRecipient),
-      getAccountMeta(accounts.associatedQuoteFeeRecipient),
-      getAccountMeta(accounts.buybackFeeRecipient),
-      getAccountMeta(accounts.associatedQuoteBuybackFeeRecipient),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.associatedBaseBondingCurve),
-      getAccountMeta(accounts.associatedQuoteBondingCurve),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.associatedBaseUser),
-      getAccountMeta(accounts.associatedQuoteUser),
-      getAccountMeta(accounts.creatorVault),
-      getAccountMeta(accounts.associatedCreatorVault),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.associatedUserVolumeAccumulator),
-      getAccountMeta(accounts.feeConfig),
-      getAccountMeta(accounts.feeProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("baseTokenProgram", accounts.baseTokenProgram),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("feeRecipient", accounts.feeRecipient),
+      getAccountMeta(
+        "associatedQuoteFeeRecipient",
+        accounts.associatedQuoteFeeRecipient,
+      ),
+      getAccountMeta("buybackFeeRecipient", accounts.buybackFeeRecipient),
+      getAccountMeta(
+        "associatedQuoteBuybackFeeRecipient",
+        accounts.associatedQuoteBuybackFeeRecipient,
+      ),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta(
+        "associatedBaseBondingCurve",
+        accounts.associatedBaseBondingCurve,
+      ),
+      getAccountMeta(
+        "associatedQuoteBondingCurve",
+        accounts.associatedQuoteBondingCurve,
+      ),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("associatedBaseUser", accounts.associatedBaseUser),
+      getAccountMeta("associatedQuoteUser", accounts.associatedQuoteUser),
+      getAccountMeta("creatorVault", accounts.creatorVault),
+      getAccountMeta("associatedCreatorVault", accounts.associatedCreatorVault),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta(
+        "associatedUserVolumeAccumulator",
+        accounts.associatedUserVolumeAccumulator,
+      ),
+      getAccountMeta("feeConfig", accounts.feeConfig),
+      getAccountMeta("feeProgram", accounts.feeProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSellV2InstructionDataEncoder().encode(
-      args as SellV2InstructionDataArgs
+      args as SellV2InstructionDataArgs,
     ),
     programAddress,
   } as SellV2Instruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountFeeRecipient,
-    TAccountAssociatedQuoteFeeRecipient,
-    TAccountBuybackFeeRecipient,
-    TAccountAssociatedQuoteBuybackFeeRecipient,
-    TAccountBondingCurve,
-    TAccountAssociatedBaseBondingCurve,
-    TAccountAssociatedQuoteBondingCurve,
-    TAccountUser,
-    TAccountAssociatedBaseUser,
-    TAccountAssociatedQuoteUser,
-    TAccountCreatorVault,
-    TAccountAssociatedCreatorVault,
-    TAccountSharingConfig,
-    TAccountUserVolumeAccumulator,
-    TAccountAssociatedUserVolumeAccumulator,
-    TAccountFeeConfig,
-    TAccountFeeProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeRecipient,
+      InstructionAccountInputAddress<TAccountFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteFeeRecipient,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBuybackFeeRecipient,
+      InstructionAccountInputAddress<TAccountBuybackFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteBuybackFeeRecipient,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteBuybackFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedBaseBondingCurve,
+      InstructionAccountInputAddress<TAccountAssociatedBaseBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteBondingCurve,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedBaseUser,
+      InstructionAccountInputAddress<TAccountAssociatedBaseUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteUser,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedCreatorVault,
+      InstructionAccountInputAddress<TAccountAssociatedCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeConfig,
+      InstructionAccountInputAddress<TAccountFeeConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeProgram,
+      InstructionAccountInputAddress<TAccountFeeProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type SellV2Input<
-  TAccountGlobal extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountBaseTokenProgram extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountAssociatedTokenProgram extends string = string,
-  TAccountFeeRecipient extends string = string,
-  TAccountAssociatedQuoteFeeRecipient extends string = string,
-  TAccountBuybackFeeRecipient extends string = string,
-  TAccountAssociatedQuoteBuybackFeeRecipient extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountAssociatedBaseBondingCurve extends string = string,
-  TAccountAssociatedQuoteBondingCurve extends string = string,
-  TAccountUser extends string = string,
-  TAccountAssociatedBaseUser extends string = string,
-  TAccountAssociatedQuoteUser extends string = string,
-  TAccountCreatorVault extends string = string,
-  TAccountAssociatedCreatorVault extends string = string,
-  TAccountSharingConfig extends string = string,
-  TAccountUserVolumeAccumulator extends string = string,
-  TAccountAssociatedUserVolumeAccumulator extends string = string,
-  TAccountFeeConfig extends string = string,
-  TAccountFeeProgram extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBuybackFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteBuybackFeeRecipient extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedBaseBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput = InstructionSignerInput,
+  TAccountAssociatedBaseUser extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedCreatorVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountFeeConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountFeeProgram extends InstructionAccountInput = InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  global: Address<TAccountGlobal>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  baseTokenProgram: Address<TAccountBaseTokenProgram>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
-  feeRecipient: Address<TAccountFeeRecipient>;
-  associatedQuoteFeeRecipient: Address<TAccountAssociatedQuoteFeeRecipient>;
-  buybackFeeRecipient: Address<TAccountBuybackFeeRecipient>;
-  associatedQuoteBuybackFeeRecipient: Address<TAccountAssociatedQuoteBuybackFeeRecipient>;
-  bondingCurve: Address<TAccountBondingCurve>;
-  associatedBaseBondingCurve: Address<TAccountAssociatedBaseBondingCurve>;
-  associatedQuoteBondingCurve: Address<TAccountAssociatedQuoteBondingCurve>;
-  user: TransactionSigner<TAccountUser>;
-  associatedBaseUser: Address<TAccountAssociatedBaseUser>;
+  global: TAccountGlobal;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  baseTokenProgram: TAccountBaseTokenProgram;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  feeRecipient: TAccountFeeRecipient;
+  associatedQuoteFeeRecipient: TAccountAssociatedQuoteFeeRecipient;
+  buybackFeeRecipient: TAccountBuybackFeeRecipient;
+  associatedQuoteBuybackFeeRecipient: TAccountAssociatedQuoteBuybackFeeRecipient;
+  bondingCurve: TAccountBondingCurve;
+  associatedBaseBondingCurve: TAccountAssociatedBaseBondingCurve;
+  associatedQuoteBondingCurve: TAccountAssociatedQuoteBondingCurve;
+  user: TAccountUser;
+  associatedBaseUser: TAccountAssociatedBaseUser;
   /**
    * canonical SPL associated-token PDA. Validated in `sell_v2_ix` via
    * `validate_user_quote_token_account` for non-legacy mints; ignored for legacy (SOL) trades.
    */
-  associatedQuoteUser: Address<TAccountAssociatedQuoteUser>;
-  creatorVault: Address<TAccountCreatorVault>;
-  associatedCreatorVault: Address<TAccountAssociatedCreatorVault>;
+  associatedQuoteUser: TAccountAssociatedQuoteUser;
+  creatorVault: TAccountCreatorVault;
+  associatedCreatorVault: TAccountAssociatedCreatorVault;
   /**
    * seeds; the account is intentionally not deserialized here because it may be uninitialized
    * for mints that have not created a fee sharing config. Handlers must check
    * `data_is_empty()` / owner before reading.
    */
-  sharingConfig: Address<TAccountSharingConfig>;
-  userVolumeAccumulator: Address<TAccountUserVolumeAccumulator>;
-  associatedUserVolumeAccumulator: Address<TAccountAssociatedUserVolumeAccumulator>;
-  feeConfig: Address<TAccountFeeConfig>;
-  feeProgram?: Address<TAccountFeeProgram>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program?: Address<TAccountProgram>;
-  amount: SellV2InstructionDataArgs['amount'];
-  minSolOutput: SellV2InstructionDataArgs['minSolOutput'];
+  sharingConfig: TAccountSharingConfig;
+  userVolumeAccumulator: TAccountUserVolumeAccumulator;
+  associatedUserVolumeAccumulator: TAccountAssociatedUserVolumeAccumulator;
+  feeConfig: TAccountFeeConfig;
+  feeProgram?: TAccountFeeProgram;
+  systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program?: TAccountProgram;
+  amount: SellV2InstructionDataArgs["amount"];
+  minSolOutput: SellV2InstructionDataArgs["minSolOutput"];
 };
 
 export function getSellV2Instruction<
-  TAccountGlobal extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountBaseTokenProgram extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountAssociatedTokenProgram extends string,
-  TAccountFeeRecipient extends string,
-  TAccountAssociatedQuoteFeeRecipient extends string,
-  TAccountBuybackFeeRecipient extends string,
-  TAccountAssociatedQuoteBuybackFeeRecipient extends string,
-  TAccountBondingCurve extends string,
-  TAccountAssociatedBaseBondingCurve extends string,
-  TAccountAssociatedQuoteBondingCurve extends string,
-  TAccountUser extends string,
-  TAccountAssociatedBaseUser extends string,
-  TAccountAssociatedQuoteUser extends string,
-  TAccountCreatorVault extends string,
-  TAccountAssociatedCreatorVault extends string,
-  TAccountSharingConfig extends string,
-  TAccountUserVolumeAccumulator extends string,
-  TAccountAssociatedUserVolumeAccumulator extends string,
-  TAccountFeeConfig extends string,
-  TAccountFeeProgram extends string,
-  TAccountSystemProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountFeeRecipient extends InstructionAccountInput,
+  TAccountAssociatedQuoteFeeRecipient extends InstructionAccountInput,
+  TAccountBuybackFeeRecipient extends InstructionAccountInput,
+  TAccountAssociatedQuoteBuybackFeeRecipient extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountAssociatedBaseBondingCurve extends InstructionAccountInput,
+  TAccountAssociatedQuoteBondingCurve extends InstructionAccountInput,
+  TAccountUser extends InstructionSignerInput,
+  TAccountAssociatedBaseUser extends InstructionAccountInput,
+  TAccountAssociatedQuoteUser extends InstructionAccountInput,
+  TAccountCreatorVault extends InstructionAccountInput,
+  TAccountAssociatedCreatorVault extends InstructionAccountInput,
+  TAccountSharingConfig extends InstructionAccountInput,
+  TAccountUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountAssociatedUserVolumeAccumulator extends InstructionAccountInput,
+  TAccountFeeConfig extends InstructionAccountInput,
+  TAccountFeeProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: SellV2Input<
@@ -836,110 +1154,248 @@ export function getSellV2Instruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): SellV2Instruction<
   TProgramAddress,
-  TAccountGlobal,
-  TAccountBaseMint,
-  TAccountQuoteMint,
-  TAccountBaseTokenProgram,
-  TAccountQuoteTokenProgram,
-  TAccountAssociatedTokenProgram,
-  TAccountFeeRecipient,
-  TAccountAssociatedQuoteFeeRecipient,
-  TAccountBuybackFeeRecipient,
-  TAccountAssociatedQuoteBuybackFeeRecipient,
-  TAccountBondingCurve,
-  TAccountAssociatedBaseBondingCurve,
-  TAccountAssociatedQuoteBondingCurve,
-  TAccountUser,
-  TAccountAssociatedBaseUser,
-  TAccountAssociatedQuoteUser,
-  TAccountCreatorVault,
-  TAccountAssociatedCreatorVault,
-  TAccountSharingConfig,
-  TAccountUserVolumeAccumulator,
-  TAccountAssociatedUserVolumeAccumulator,
-  TAccountFeeConfig,
-  TAccountFeeProgram,
-  TAccountSystemProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseMint,
+    InstructionAccountInputAddress<TAccountBaseMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseTokenProgram,
+    InstructionAccountInputAddress<TAccountBaseTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountFeeRecipient,
+    InstructionAccountInputAddress<TAccountFeeRecipient>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedQuoteFeeRecipient,
+    InstructionAccountInputAddress<TAccountAssociatedQuoteFeeRecipient>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBuybackFeeRecipient,
+    InstructionAccountInputAddress<TAccountBuybackFeeRecipient>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedQuoteBuybackFeeRecipient,
+    InstructionAccountInputAddress<TAccountAssociatedQuoteBuybackFeeRecipient>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBondingCurve,
+    InstructionAccountInputAddress<TAccountBondingCurve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedBaseBondingCurve,
+    InstructionAccountInputAddress<TAccountAssociatedBaseBondingCurve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedQuoteBondingCurve,
+    InstructionAccountInputAddress<TAccountAssociatedQuoteBondingCurve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUser,
+    InstructionAccountInputAddress<TAccountUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedBaseUser,
+    InstructionAccountInputAddress<TAccountAssociatedBaseUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedQuoteUser,
+    InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountCreatorVault,
+    InstructionAccountInputAddress<TAccountCreatorVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedCreatorVault,
+    InstructionAccountInputAddress<TAccountAssociatedCreatorVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSharingConfig,
+    InstructionAccountInputAddress<TAccountSharingConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUserVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedUserVolumeAccumulator,
+    InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountFeeConfig,
+    InstructionAccountInputAddress<TAccountFeeConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountFeeProgram,
+    InstructionAccountInputAddress<TAccountFeeProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    global: { value: input.global ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: false },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    feeRecipient: { value: input.feeRecipient ?? null, isWritable: true },
+    feeRecipient: {
+      value: input.feeRecipient ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     associatedQuoteFeeRecipient: {
       value: input.associatedQuoteFeeRecipient ?? null,
+      isSigner: false,
       isWritable: true,
     },
     buybackFeeRecipient: {
       value: input.buybackFeeRecipient ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteBuybackFeeRecipient: {
       value: input.associatedQuoteBuybackFeeRecipient ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: true },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     associatedBaseBondingCurve: {
       value: input.associatedBaseBondingCurve ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteBondingCurve: {
       value: input.associatedQuoteBondingCurve ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    user: { value: input.user ?? null, isWritable: true },
+    user: { value: input.user ?? null, isSigner: true, isWritable: true },
     associatedBaseUser: {
       value: input.associatedBaseUser ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedQuoteUser: {
       value: input.associatedQuoteUser ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    creatorVault: { value: input.creatorVault ?? null, isWritable: true },
+    creatorVault: {
+      value: input.creatorVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     associatedCreatorVault: {
       value: input.associatedCreatorVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    sharingConfig: { value: input.sharingConfig ?? null, isWritable: false },
+    sharingConfig: {
+      value: input.sharingConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     userVolumeAccumulator: {
       value: input.userVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
     associatedUserVolumeAccumulator: {
       value: input.associatedUserVolumeAccumulator ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    feeConfig: { value: input.feeConfig ?? null, isWritable: false },
-    feeProgram: { value: input.feeProgram ?? null, isWritable: false },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    feeConfig: {
+      value: input.feeConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    feeProgram: {
+      value: input.feeProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -948,83 +1404,175 @@ export function getSellV2Instruction<
   // Resolve default values.
   if (!accounts.associatedTokenProgram.value) {
     accounts.associatedTokenProgram.value =
-      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.feeProgram.value) {
     accounts.feeProgram.value =
-      'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ' as Address<'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'>;
+      "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ" as Address<"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
   if (!accounts.program.value) {
     accounts.program.value =
-      '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P' as Address<'6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'>;
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" as Address<"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.baseTokenProgram),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.associatedTokenProgram),
-      getAccountMeta(accounts.feeRecipient),
-      getAccountMeta(accounts.associatedQuoteFeeRecipient),
-      getAccountMeta(accounts.buybackFeeRecipient),
-      getAccountMeta(accounts.associatedQuoteBuybackFeeRecipient),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.associatedBaseBondingCurve),
-      getAccountMeta(accounts.associatedQuoteBondingCurve),
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.associatedBaseUser),
-      getAccountMeta(accounts.associatedQuoteUser),
-      getAccountMeta(accounts.creatorVault),
-      getAccountMeta(accounts.associatedCreatorVault),
-      getAccountMeta(accounts.sharingConfig),
-      getAccountMeta(accounts.userVolumeAccumulator),
-      getAccountMeta(accounts.associatedUserVolumeAccumulator),
-      getAccountMeta(accounts.feeConfig),
-      getAccountMeta(accounts.feeProgram),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("baseTokenProgram", accounts.baseTokenProgram),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("feeRecipient", accounts.feeRecipient),
+      getAccountMeta(
+        "associatedQuoteFeeRecipient",
+        accounts.associatedQuoteFeeRecipient,
+      ),
+      getAccountMeta("buybackFeeRecipient", accounts.buybackFeeRecipient),
+      getAccountMeta(
+        "associatedQuoteBuybackFeeRecipient",
+        accounts.associatedQuoteBuybackFeeRecipient,
+      ),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta(
+        "associatedBaseBondingCurve",
+        accounts.associatedBaseBondingCurve,
+      ),
+      getAccountMeta(
+        "associatedQuoteBondingCurve",
+        accounts.associatedQuoteBondingCurve,
+      ),
+      getAccountMeta("user", accounts.user),
+      getAccountMeta("associatedBaseUser", accounts.associatedBaseUser),
+      getAccountMeta("associatedQuoteUser", accounts.associatedQuoteUser),
+      getAccountMeta("creatorVault", accounts.creatorVault),
+      getAccountMeta("associatedCreatorVault", accounts.associatedCreatorVault),
+      getAccountMeta("sharingConfig", accounts.sharingConfig),
+      getAccountMeta("userVolumeAccumulator", accounts.userVolumeAccumulator),
+      getAccountMeta(
+        "associatedUserVolumeAccumulator",
+        accounts.associatedUserVolumeAccumulator,
+      ),
+      getAccountMeta("feeConfig", accounts.feeConfig),
+      getAccountMeta("feeProgram", accounts.feeProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSellV2InstructionDataEncoder().encode(
-      args as SellV2InstructionDataArgs
+      args as SellV2InstructionDataArgs,
     ),
     programAddress,
   } as SellV2Instruction<
     TProgramAddress,
-    TAccountGlobal,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountAssociatedTokenProgram,
-    TAccountFeeRecipient,
-    TAccountAssociatedQuoteFeeRecipient,
-    TAccountBuybackFeeRecipient,
-    TAccountAssociatedQuoteBuybackFeeRecipient,
-    TAccountBondingCurve,
-    TAccountAssociatedBaseBondingCurve,
-    TAccountAssociatedQuoteBondingCurve,
-    TAccountUser,
-    TAccountAssociatedBaseUser,
-    TAccountAssociatedQuoteUser,
-    TAccountCreatorVault,
-    TAccountAssociatedCreatorVault,
-    TAccountSharingConfig,
-    TAccountUserVolumeAccumulator,
-    TAccountAssociatedUserVolumeAccumulator,
-    TAccountFeeConfig,
-    TAccountFeeProgram,
-    TAccountSystemProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeRecipient,
+      InstructionAccountInputAddress<TAccountFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteFeeRecipient,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBuybackFeeRecipient,
+      InstructionAccountInputAddress<TAccountBuybackFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteBuybackFeeRecipient,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteBuybackFeeRecipient>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedBaseBondingCurve,
+      InstructionAccountInputAddress<TAccountAssociatedBaseBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteBondingCurve,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUser,
+      InstructionAccountInputAddress<TAccountUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedBaseUser,
+      InstructionAccountInputAddress<TAccountAssociatedBaseUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedQuoteUser,
+      InstructionAccountInputAddress<TAccountAssociatedQuoteUser>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountCreatorVault,
+      InstructionAccountInputAddress<TAccountCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedCreatorVault,
+      InstructionAccountInputAddress<TAccountAssociatedCreatorVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSharingConfig,
+      InstructionAccountInputAddress<TAccountSharingConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedUserVolumeAccumulator,
+      InstructionAccountInputAddress<TAccountAssociatedUserVolumeAccumulator>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeConfig,
+      InstructionAccountInputAddress<TAccountFeeConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountFeeProgram,
+      InstructionAccountInputAddress<TAccountFeeProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -1079,11 +1627,16 @@ export function parseSellV2Instruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSellV2Instruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 26) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 26,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

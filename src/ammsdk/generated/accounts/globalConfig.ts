@@ -41,15 +41,15 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 
-export const GLOBAL_CONFIG_DISCRIMINATOR = new Uint8Array([
+export const GLOBAL_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   149, 8, 156, 202, 160, 252, 176, 217,
 ]);
 
-export function getGlobalConfigDiscriminatorBytes() {
+export function getGlobalConfigDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    GLOBAL_CONFIG_DISCRIMINATOR
+    GLOBAL_CONFIG_DISCRIMINATOR,
   );
 }
 
@@ -118,72 +118,75 @@ export type GlobalConfigArgs = {
   maxConfigurableCreatorFeeBps: number | bigint;
 };
 
+/** Gets the encoder for {@link GlobalConfigArgs} account data. */
 export function getGlobalConfigEncoder(): FixedSizeEncoder<GlobalConfigArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['admin', getAddressEncoder()],
-      ['lpFeeBasisPoints', getU64Encoder()],
-      ['protocolFeeBasisPoints', getU64Encoder()],
-      ['disableFlags', getU8Encoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["admin", getAddressEncoder()],
+      ["lpFeeBasisPoints", getU64Encoder()],
+      ["protocolFeeBasisPoints", getU64Encoder()],
+      ["disableFlags", getU8Encoder()],
       [
-        'protocolFeeRecipients',
+        "protocolFeeRecipients",
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
-      ['coinCreatorFeeBasisPoints', getU64Encoder()],
-      ['adminSetCoinCreatorAuthority', getAddressEncoder()],
-      ['whitelistPda', getAddressEncoder()],
-      ['reservedFeeRecipient', getAddressEncoder()],
-      ['mayhemModeEnabled', getBooleanEncoder()],
+      ["coinCreatorFeeBasisPoints", getU64Encoder()],
+      ["adminSetCoinCreatorAuthority", getAddressEncoder()],
+      ["whitelistPda", getAddressEncoder()],
+      ["reservedFeeRecipient", getAddressEncoder()],
+      ["mayhemModeEnabled", getBooleanEncoder()],
       [
-        'reservedFeeRecipients',
+        "reservedFeeRecipients",
         getArrayEncoder(getAddressEncoder(), { size: 7 }),
       ],
-      ['isCashbackEnabled', getBooleanEncoder()],
+      ["isCashbackEnabled", getBooleanEncoder()],
       [
-        'buybackFeeRecipients',
+        "buybackFeeRecipients",
         getArrayEncoder(getAddressEncoder(), { size: 8 }),
       ],
-      ['buybackBasisPoints', getU64Encoder()],
-      ['boostAuthority', getAddressEncoder()],
-      ['boostEnabled', getBooleanEncoder()],
-      ['creatorFeeConfigurable', getBooleanEncoder()],
-      ['maxConfigurableCreatorFeeBps', getU64Encoder()],
+      ["buybackBasisPoints", getU64Encoder()],
+      ["boostAuthority", getAddressEncoder()],
+      ["boostEnabled", getBooleanEncoder()],
+      ["creatorFeeConfigurable", getBooleanEncoder()],
+      ["maxConfigurableCreatorFeeBps", getU64Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: GLOBAL_CONFIG_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: GLOBAL_CONFIG_DISCRIMINATOR }),
   );
 }
 
+/** Gets the decoder for {@link GlobalConfig} account data. */
 export function getGlobalConfigDecoder(): FixedSizeDecoder<GlobalConfig> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['admin', getAddressDecoder()],
-    ['lpFeeBasisPoints', getU64Decoder()],
-    ['protocolFeeBasisPoints', getU64Decoder()],
-    ['disableFlags', getU8Decoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["admin", getAddressDecoder()],
+    ["lpFeeBasisPoints", getU64Decoder()],
+    ["protocolFeeBasisPoints", getU64Decoder()],
+    ["disableFlags", getU8Decoder()],
     [
-      'protocolFeeRecipients',
+      "protocolFeeRecipients",
       getArrayDecoder(getAddressDecoder(), { size: 8 }),
     ],
-    ['coinCreatorFeeBasisPoints', getU64Decoder()],
-    ['adminSetCoinCreatorAuthority', getAddressDecoder()],
-    ['whitelistPda', getAddressDecoder()],
-    ['reservedFeeRecipient', getAddressDecoder()],
-    ['mayhemModeEnabled', getBooleanDecoder()],
+    ["coinCreatorFeeBasisPoints", getU64Decoder()],
+    ["adminSetCoinCreatorAuthority", getAddressDecoder()],
+    ["whitelistPda", getAddressDecoder()],
+    ["reservedFeeRecipient", getAddressDecoder()],
+    ["mayhemModeEnabled", getBooleanDecoder()],
     [
-      'reservedFeeRecipients',
+      "reservedFeeRecipients",
       getArrayDecoder(getAddressDecoder(), { size: 7 }),
     ],
-    ['isCashbackEnabled', getBooleanDecoder()],
-    ['buybackFeeRecipients', getArrayDecoder(getAddressDecoder(), { size: 8 })],
-    ['buybackBasisPoints', getU64Decoder()],
-    ['boostAuthority', getAddressDecoder()],
-    ['boostEnabled', getBooleanDecoder()],
-    ['creatorFeeConfigurable', getBooleanDecoder()],
-    ['maxConfigurableCreatorFeeBps', getU64Decoder()],
+    ["isCashbackEnabled", getBooleanDecoder()],
+    ["buybackFeeRecipients", getArrayDecoder(getAddressDecoder(), { size: 8 })],
+    ["buybackBasisPoints", getU64Decoder()],
+    ["boostAuthority", getAddressDecoder()],
+    ["boostEnabled", getBooleanDecoder()],
+    ["creatorFeeConfigurable", getBooleanDecoder()],
+    ["maxConfigurableCreatorFeeBps", getU64Decoder()],
   ]);
 }
 
+/** Gets the codec for {@link GlobalConfig} account data. */
 export function getGlobalConfigCodec(): FixedSizeCodec<
   GlobalConfigArgs,
   GlobalConfig
@@ -192,24 +195,24 @@ export function getGlobalConfigCodec(): FixedSizeCodec<
 }
 
 export function decodeGlobalConfig<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<GlobalConfig, TAddress>;
 export function decodeGlobalConfig<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<GlobalConfig, TAddress>;
 export function decodeGlobalConfig<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ): Account<GlobalConfig, TAddress> | MaybeAccount<GlobalConfig, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getGlobalConfigDecoder()
+    getGlobalConfigDecoder(),
   );
 }
 
 export async function fetchGlobalConfig<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<GlobalConfig, TAddress>> {
   const maybeAccount = await fetchMaybeGlobalConfig(rpc, address, config);
   assertAccountExists(maybeAccount);
@@ -219,7 +222,7 @@ export async function fetchGlobalConfig<TAddress extends string = string>(
 export async function fetchMaybeGlobalConfig<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<GlobalConfig, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeGlobalConfig(maybeAccount);
@@ -228,7 +231,7 @@ export async function fetchMaybeGlobalConfig<TAddress extends string = string>(
 export async function fetchAllGlobalConfig(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<GlobalConfig>[]> {
   const maybeAccounts = await fetchAllMaybeGlobalConfig(rpc, addresses, config);
   assertAccountsExist(maybeAccounts);
@@ -238,7 +241,7 @@ export async function fetchAllGlobalConfig(
 export async function fetchAllMaybeGlobalConfig(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<GlobalConfig>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodeGlobalConfig(maybeAccount));

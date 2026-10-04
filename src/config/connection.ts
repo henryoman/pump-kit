@@ -1,15 +1,14 @@
-import type { Rpc } from "@solana/rpc-spec";
-import type { SolanaRpcApi } from "@solana/rpc-api";
 import type {
+  Rpc,
+  SolanaRpcApi,
   RpcSubscriptions,
   SignatureNotificationsApi,
   SlotNotificationsApi,
-} from "@solana/rpc-subscriptions";
+} from "@solana/kit";
 
 /**
- * Pump Kit does not ship a default RPC connection.
- * Provide your own `rpc` and `rpcSubscriptions` clients created via
- * `@solana/kit` factories like `createSolanaRpc` / `createSolanaRpcFromTransport`.
+ * Low-level helpers accept clients created by Solana Kit. The launch factory
+ * creates devnet clients when no endpoint or client is supplied.
  */
 export type RpcClient = Rpc<SolanaRpcApi>;
 export type RpcSubscriptionsClient = RpcSubscriptions<SignatureNotificationsApi & SlotNotificationsApi>;

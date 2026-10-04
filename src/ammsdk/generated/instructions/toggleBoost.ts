@@ -16,6 +16,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -28,19 +30,25 @@ import {
   type InstructionWithData,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+} from "@solana/kit";
+import {
+  getAccountMetaFactory,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const TOGGLE_BOOST_DISCRIMINATOR = new Uint8Array([
+export const TOGGLE_BOOST_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   117, 161, 160, 74, 223, 137, 118, 99,
 ]);
 
-export function getToggleBoostDiscriminatorBytes() {
+export function getToggleBoostDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    TOGGLE_BOOST_DISCRIMINATOR
+    TOGGLE_BOOST_DISCRIMINATOR,
   );
 }
 
@@ -74,17 +82,17 @@ export type ToggleBoostInstructionDataArgs = { enabled: boolean };
 export function getToggleBoostInstructionDataEncoder(): FixedSizeEncoder<ToggleBoostInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['enabled', getBooleanEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["enabled", getBooleanEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: TOGGLE_BOOST_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: TOGGLE_BOOST_DISCRIMINATOR }),
   );
 }
 
 export function getToggleBoostInstructionDataDecoder(): FixedSizeDecoder<ToggleBoostInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['enabled', getBooleanDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["enabled", getBooleanDecoder()],
   ]);
 }
 
@@ -94,61 +102,80 @@ export function getToggleBoostInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getToggleBoostInstructionDataEncoder(),
-    getToggleBoostInstructionDataDecoder()
+    getToggleBoostInstructionDataDecoder(),
   );
 }
 
 export type ToggleBoostInput<
-  TAccountAdmin extends string = string,
-  TAccountGlobalConfig extends string = string,
+  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
 > = {
-  admin: TransactionSigner<TAccountAdmin>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  enabled: ToggleBoostInstructionDataArgs['enabled'];
+  admin: TAccountAdmin;
+  globalConfig: TAccountGlobalConfig;
+  enabled: ToggleBoostInstructionDataArgs["enabled"];
 };
 
 export function getToggleBoostInstruction<
-  TAccountAdmin extends string,
-  TAccountGlobalConfig extends string,
+  TAccountAdmin extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: ToggleBoostInput<TAccountAdmin, TAccountGlobalConfig>,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): ToggleBoostInstruction<
   TProgramAddress,
-  TAccountAdmin,
-  TAccountGlobalConfig
+  ResolvedInstructionAccountMeta<
+    TAccountAdmin,
+    InstructionAccountInputAddress<TAccountAdmin>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: false },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: true },
+    admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.globalConfig),
+      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("globalConfig", accounts.globalConfig),
     ],
     data: getToggleBoostInstructionDataEncoder().encode(
-      args as ToggleBoostInstructionDataArgs
+      args as ToggleBoostInstructionDataArgs,
     ),
     programAddress,
   } as ToggleBoostInstruction<
     TProgramAddress,
-    TAccountAdmin,
-    TAccountGlobalConfig
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >
   >);
 }
 
@@ -170,11 +197,16 @@ export function parseToggleBoostInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedToggleBoostInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 2) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 2,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

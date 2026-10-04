@@ -16,6 +16,8 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -28,24 +30,31 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findBondingCurvePda,
+  findEventAuthorityPda,
+  findGlobalPda,
+} from "../pdas";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
-export const SET_MAYHEM_VIRTUAL_PARAMS_DISCRIMINATOR = new Uint8Array([
-  61, 169, 188, 191, 153, 149, 42, 97,
-]);
+export const SET_MAYHEM_VIRTUAL_PARAMS_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([61, 169, 188, 191, 153, 149, 42, 97]);
 
-export function getSetMayhemVirtualParamsDiscriminatorBytes() {
+export function getSetMayhemVirtualParamsDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    SET_MAYHEM_VIRTUAL_PARAMS_DISCRIMINATOR
+    SET_MAYHEM_VIRTUAL_PARAMS_DISCRIMINATOR,
   );
 }
 
@@ -56,9 +65,8 @@ export type SetMayhemVirtualParamsInstruction<
   TAccountMint extends string | AccountMeta<string> = string,
   TAccountGlobal extends string | AccountMeta<string> = string,
   TAccountBondingCurve extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends
-    | string
-    | AccountMeta<string> = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  TAccountTokenProgram extends string | AccountMeta<string> =
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -103,17 +111,17 @@ export type SetMayhemVirtualParamsInstructionDataArgs = {};
 
 export function getSetMayhemVirtualParamsInstructionDataEncoder(): FixedSizeEncoder<SetMayhemVirtualParamsInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({
       ...value,
       discriminator: SET_MAYHEM_VIRTUAL_PARAMS_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
 export function getSetMayhemVirtualParamsInstructionDataDecoder(): FixedSizeDecoder<SetMayhemVirtualParamsInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
@@ -123,39 +131,44 @@ export function getSetMayhemVirtualParamsInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getSetMayhemVirtualParamsInstructionDataEncoder(),
-    getSetMayhemVirtualParamsInstructionDataDecoder()
+    getSetMayhemVirtualParamsInstructionDataDecoder(),
   );
 }
 
 export type SetMayhemVirtualParamsAsyncInput<
-  TAccountSolVaultAuthority extends string = string,
-  TAccountMayhemTokenVault extends string = string,
-  TAccountMint extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountSolVaultAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountMayhemTokenVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  solVaultAuthority?: TransactionSigner<TAccountSolVaultAuthority>;
-  mayhemTokenVault?: Address<TAccountMayhemTokenVault>;
-  mint: Address<TAccountMint>;
-  global?: Address<TAccountGlobal>;
-  bondingCurve?: Address<TAccountBondingCurve>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  solVaultAuthority?: TAccountSolVaultAuthority;
+  mayhemTokenVault?: TAccountMayhemTokenVault;
+  mint: TAccountMint;
+  global?: TAccountGlobal;
+  bondingCurve?: TAccountBondingCurve;
+  tokenProgram?: TAccountTokenProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export async function getSetMayhemVirtualParamsInstructionAsync<
-  TAccountSolVaultAuthority extends string,
-  TAccountMayhemTokenVault extends string,
-  TAccountMint extends string,
-  TAccountGlobal extends string,
-  TAccountBondingCurve extends string,
-  TAccountTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountSolVaultAuthority extends InstructionSignerInput,
+  TAccountMayhemTokenVault extends InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: SetMayhemVirtualParamsAsyncInput<
@@ -168,165 +181,233 @@ export async function getSetMayhemVirtualParamsInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   SetMayhemVirtualParamsInstruction<
     TProgramAddress,
-    TAccountSolVaultAuthority,
-    TAccountMayhemTokenVault,
-    TAccountMint,
-    TAccountGlobal,
-    TAccountBondingCurve,
-    TAccountTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountSolVaultAuthority,
+      InstructionAccountInputAddress<TAccountSolVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMayhemTokenVault,
+      InstructionAccountInputAddress<TAccountMayhemTokenVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
     solVaultAuthority: {
       value: input.solVaultAuthority ?? null,
+      isSigner: "either",
       isWritable: true,
     },
     mayhemTokenVault: {
       value: input.mayhemTokenVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    mint: { value: input.mint ?? null, isWritable: false },
-    global: { value: input.global ?? null, isWritable: false },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.solVaultAuthority.value) {
     accounts.solVaultAuthority.value = await getProgramDerivedAddress({
       programAddress:
-        'MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e' as Address<'MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e'>,
+        "MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e" as Address<"MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e">,
       seeds: [
         getBytesEncoder().encode(
-          new Uint8Array([115, 111, 108, 45, 118, 97, 117, 108, 116])
+          new Uint8Array([115, 111, 108, 45, 118, 97, 117, 108, 116]),
         ),
       ],
     });
   }
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" as Address<"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb">;
   }
   if (!accounts.mayhemTokenVault.value) {
     accounts.mayhemTokenVault.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
         getAddressEncoder().encode(
-          expectAddress(accounts.solVaultAuthority.value)
+          getAddressFromResolvedInstructionAccount(
+            "solVaultAuthority",
+            accounts.solVaultAuthority.value,
+          ),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.tokenProgram.value)),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "tokenProgram",
+            accounts.tokenProgram.value,
+          ),
+        ),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount("mint", accounts.mint.value),
+        ),
       ],
     });
   }
   if (!accounts.global.value) {
-    accounts.global.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([103, 108, 111, 98, 97, 108])),
-      ],
-    });
+    accounts.global.value = await findGlobalPda({ programAddress });
   }
   if (!accounts.bondingCurve.value) {
-    accounts.bondingCurve.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            98, 111, 110, 100, 105, 110, 103, 45, 99, 117, 114, 118, 101,
-          ])
+    accounts.bondingCurve.value = await findBondingCurvePda(
+      {
+        mint: getAddressFromResolvedInstructionAccount(
+          "mint",
+          accounts.mint.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.solVaultAuthority),
-      getAccountMeta(accounts.mayhemTokenVault),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("solVaultAuthority", accounts.solVaultAuthority),
+      getAccountMeta("mayhemTokenVault", accounts.mayhemTokenVault),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSetMayhemVirtualParamsInstructionDataEncoder().encode({}),
     programAddress,
   } as SetMayhemVirtualParamsInstruction<
     TProgramAddress,
-    TAccountSolVaultAuthority,
-    TAccountMayhemTokenVault,
-    TAccountMint,
-    TAccountGlobal,
-    TAccountBondingCurve,
-    TAccountTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountSolVaultAuthority,
+      InstructionAccountInputAddress<TAccountSolVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMayhemTokenVault,
+      InstructionAccountInputAddress<TAccountMayhemTokenVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type SetMayhemVirtualParamsInput<
-  TAccountSolVaultAuthority extends string = string,
-  TAccountMayhemTokenVault extends string = string,
-  TAccountMint extends string = string,
-  TAccountGlobal extends string = string,
-  TAccountBondingCurve extends string = string,
-  TAccountTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountSolVaultAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountMayhemTokenVault extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountGlobal extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  solVaultAuthority: TransactionSigner<TAccountSolVaultAuthority>;
-  mayhemTokenVault: Address<TAccountMayhemTokenVault>;
-  mint: Address<TAccountMint>;
-  global: Address<TAccountGlobal>;
-  bondingCurve: Address<TAccountBondingCurve>;
-  tokenProgram?: Address<TAccountTokenProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
+  solVaultAuthority: TAccountSolVaultAuthority;
+  mayhemTokenVault: TAccountMayhemTokenVault;
+  mint: TAccountMint;
+  global: TAccountGlobal;
+  bondingCurve: TAccountBondingCurve;
+  tokenProgram?: TAccountTokenProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
 };
 
 export function getSetMayhemVirtualParamsInstruction<
-  TAccountSolVaultAuthority extends string,
-  TAccountMayhemTokenVault extends string,
-  TAccountMint extends string,
-  TAccountGlobal extends string,
-  TAccountBondingCurve extends string,
-  TAccountTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountSolVaultAuthority extends InstructionSignerInput,
+  TAccountMayhemTokenVault extends InstructionAccountInput,
+  TAccountMint extends InstructionAccountInput,
+  TAccountGlobal extends InstructionAccountInput,
+  TAccountBondingCurve extends InstructionAccountInput,
+  TAccountTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_PROGRAM_ADDRESS,
 >(
   input: SetMayhemVirtualParamsInput<
@@ -339,73 +420,141 @@ export function getSetMayhemVirtualParamsInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): SetMayhemVirtualParamsInstruction<
   TProgramAddress,
-  TAccountSolVaultAuthority,
-  TAccountMayhemTokenVault,
-  TAccountMint,
-  TAccountGlobal,
-  TAccountBondingCurve,
-  TAccountTokenProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountSolVaultAuthority,
+    InstructionAccountInputAddress<TAccountSolVaultAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountMayhemTokenVault,
+    InstructionAccountInputAddress<TAccountMayhemTokenVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountMint,
+    InstructionAccountInputAddress<TAccountMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobal,
+    InstructionAccountInputAddress<TAccountGlobal>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBondingCurve,
+    InstructionAccountInputAddress<TAccountBondingCurve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountTokenProgram,
+    InstructionAccountInputAddress<TAccountTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_PROGRAM_ADDRESS;
+
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 
   // Original accounts.
   const originalAccounts = {
     solVaultAuthority: {
       value: input.solVaultAuthority ?? null,
+      isSigner: "either",
       isWritable: true,
     },
     mayhemTokenVault: {
       value: input.mayhemTokenVault ?? null,
+      isSigner: false,
       isWritable: true,
     },
-    mint: { value: input.mint ?? null, isWritable: false },
-    global: { value: input.global ?? null, isWritable: false },
-    bondingCurve: { value: input.bondingCurve ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    global: { value: input.global ?? null, isSigner: false, isWritable: false },
+    bondingCurve: {
+      value: input.bondingCurve ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    tokenProgram: {
+      value: input.tokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Resolve default values.
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
-      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' as Address<'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'>;
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" as Address<"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb">;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.solVaultAuthority),
-      getAccountMeta(accounts.mayhemTokenVault),
-      getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.global),
-      getAccountMeta(accounts.bondingCurve),
-      getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("solVaultAuthority", accounts.solVaultAuthority),
+      getAccountMeta("mayhemTokenVault", accounts.mayhemTokenVault),
+      getAccountMeta("mint", accounts.mint),
+      getAccountMeta("global", accounts.global),
+      getAccountMeta("bondingCurve", accounts.bondingCurve),
+      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getSetMayhemVirtualParamsInstructionDataEncoder().encode({}),
     programAddress,
   } as SetMayhemVirtualParamsInstruction<
     TProgramAddress,
-    TAccountSolVaultAuthority,
-    TAccountMayhemTokenVault,
-    TAccountMint,
-    TAccountGlobal,
-    TAccountBondingCurve,
-    TAccountTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountSolVaultAuthority,
+      InstructionAccountInputAddress<TAccountSolVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMayhemTokenVault,
+      InstructionAccountInputAddress<TAccountMayhemTokenVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountMint,
+      InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobal,
+      InstructionAccountInputAddress<TAccountGlobal>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBondingCurve,
+      InstructionAccountInputAddress<TAccountBondingCurve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTokenProgram,
+      InstructionAccountInputAddress<TAccountTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -433,11 +582,16 @@ export function parseSetMayhemVirtualParamsInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSetMayhemVirtualParamsInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 8) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 8,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {
@@ -458,7 +612,7 @@ export function parseSetMayhemVirtualParamsInstruction<
       program: getNextAccount(),
     },
     data: getSetMayhemVirtualParamsInstructionDataDecoder().decode(
-      instruction.data
+      instruction.data,
     ),
   };
 }

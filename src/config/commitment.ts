@@ -1,4 +1,4 @@
-import type { Commitment } from "@solana/rpc-types";
+import type { Commitment } from "@solana/kit";
 
 export type CommitmentLevel = Extract<Commitment, "processed" | "confirmed" | "finalized">;
 

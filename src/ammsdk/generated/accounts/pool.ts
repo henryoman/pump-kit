@@ -44,13 +44,13 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 
-export const POOL_DISCRIMINATOR = new Uint8Array([
+export const POOL_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   241, 154, 109, 4, 17, 177, 109, 188,
 ]);
 
-export function getPoolDiscriminatorBytes() {
+export function getPoolDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(POOL_DISCRIMINATOR);
 }
 
@@ -97,76 +97,79 @@ export type PoolArgs = {
   isHolderReward: boolean;
 };
 
+/** Gets the encoder for {@link PoolArgs} account data. */
 export function getPoolEncoder(): FixedSizeEncoder<PoolArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['poolBump', getU8Encoder()],
-      ['index', getU16Encoder()],
-      ['creator', getAddressEncoder()],
-      ['baseMint', getAddressEncoder()],
-      ['quoteMint', getAddressEncoder()],
-      ['lpMint', getAddressEncoder()],
-      ['poolBaseTokenAccount', getAddressEncoder()],
-      ['poolQuoteTokenAccount', getAddressEncoder()],
-      ['lpSupply', getU64Encoder()],
-      ['coinCreator', getAddressEncoder()],
-      ['isMayhemMode', getBooleanEncoder()],
-      ['isCashbackCoin', getBooleanEncoder()],
-      ['virtualQuoteReserves', getI128Encoder()],
-      ['creatorFeeBps', getU64Encoder()],
-      ['canEditCreatorFee', getBooleanEncoder()],
-      ['isHolderReward', getBooleanEncoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["poolBump", getU8Encoder()],
+      ["index", getU16Encoder()],
+      ["creator", getAddressEncoder()],
+      ["baseMint", getAddressEncoder()],
+      ["quoteMint", getAddressEncoder()],
+      ["lpMint", getAddressEncoder()],
+      ["poolBaseTokenAccount", getAddressEncoder()],
+      ["poolQuoteTokenAccount", getAddressEncoder()],
+      ["lpSupply", getU64Encoder()],
+      ["coinCreator", getAddressEncoder()],
+      ["isMayhemMode", getBooleanEncoder()],
+      ["isCashbackCoin", getBooleanEncoder()],
+      ["virtualQuoteReserves", getI128Encoder()],
+      ["creatorFeeBps", getU64Encoder()],
+      ["canEditCreatorFee", getBooleanEncoder()],
+      ["isHolderReward", getBooleanEncoder()],
     ]),
-    (value) => ({ ...value, discriminator: POOL_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: POOL_DISCRIMINATOR }),
   );
 }
 
+/** Gets the decoder for {@link Pool} account data. */
 export function getPoolDecoder(): FixedSizeDecoder<Pool> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['poolBump', getU8Decoder()],
-    ['index', getU16Decoder()],
-    ['creator', getAddressDecoder()],
-    ['baseMint', getAddressDecoder()],
-    ['quoteMint', getAddressDecoder()],
-    ['lpMint', getAddressDecoder()],
-    ['poolBaseTokenAccount', getAddressDecoder()],
-    ['poolQuoteTokenAccount', getAddressDecoder()],
-    ['lpSupply', getU64Decoder()],
-    ['coinCreator', getAddressDecoder()],
-    ['isMayhemMode', getBooleanDecoder()],
-    ['isCashbackCoin', getBooleanDecoder()],
-    ['virtualQuoteReserves', getI128Decoder()],
-    ['creatorFeeBps', getU64Decoder()],
-    ['canEditCreatorFee', getBooleanDecoder()],
-    ['isHolderReward', getBooleanDecoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["poolBump", getU8Decoder()],
+    ["index", getU16Decoder()],
+    ["creator", getAddressDecoder()],
+    ["baseMint", getAddressDecoder()],
+    ["quoteMint", getAddressDecoder()],
+    ["lpMint", getAddressDecoder()],
+    ["poolBaseTokenAccount", getAddressDecoder()],
+    ["poolQuoteTokenAccount", getAddressDecoder()],
+    ["lpSupply", getU64Decoder()],
+    ["coinCreator", getAddressDecoder()],
+    ["isMayhemMode", getBooleanDecoder()],
+    ["isCashbackCoin", getBooleanDecoder()],
+    ["virtualQuoteReserves", getI128Decoder()],
+    ["creatorFeeBps", getU64Decoder()],
+    ["canEditCreatorFee", getBooleanDecoder()],
+    ["isHolderReward", getBooleanDecoder()],
   ]);
 }
 
+/** Gets the codec for {@link Pool} account data. */
 export function getPoolCodec(): FixedSizeCodec<PoolArgs, Pool> {
   return combineCodec(getPoolEncoder(), getPoolDecoder());
 }
 
 export function decodePool<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<Pool, TAddress>;
 export function decodePool<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<Pool, TAddress>;
 export function decodePool<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ): Account<Pool, TAddress> | MaybeAccount<Pool, TAddress> {
   return decodeAccount(
     normalizeProtocolAccount(encodedAccount as MaybeEncodedAccount<TAddress>, POOL_DISCRIMINATOR, [211,243,244,245,261,269,270], 271),
-    getPoolDecoder()
+    getPoolDecoder(),
   );
 }
 
 export async function fetchPool<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<Pool, TAddress>> {
   const maybeAccount = await fetchMaybePool(rpc, address, config);
   assertAccountExists(maybeAccount);
@@ -176,7 +179,7 @@ export async function fetchPool<TAddress extends string = string>(
 export async function fetchMaybePool<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<Pool, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodePool(maybeAccount);
@@ -185,7 +188,7 @@ export async function fetchMaybePool<TAddress extends string = string>(
 export async function fetchAllPool(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<Pool>[]> {
   const maybeAccounts = await fetchAllMaybePool(rpc, addresses, config);
   assertAccountsExist(maybeAccounts);
@@ -195,7 +198,7 @@ export async function fetchAllPool(
 export async function fetchAllMaybePool(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<Pool>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodePool(maybeAccount));

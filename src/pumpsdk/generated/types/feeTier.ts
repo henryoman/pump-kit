@@ -15,8 +15,8 @@ import {
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
-} from '@solana/kit';
-import { getFeesDecoder, getFeesEncoder, type Fees, type FeesArgs } from '.';
+} from "@solana/kit";
+import { getFeesDecoder, getFeesEncoder, type Fees, type FeesArgs } from ".";
 
 export type FeeTier = { marketCapLamportsThreshold: bigint; fees: Fees };
 
@@ -27,15 +27,15 @@ export type FeeTierArgs = {
 
 export function getFeeTierEncoder(): FixedSizeEncoder<FeeTierArgs> {
   return getStructEncoder([
-    ['marketCapLamportsThreshold', getU128Encoder()],
-    ['fees', getFeesEncoder()],
+    ["marketCapLamportsThreshold", getU128Encoder()],
+    ["fees", getFeesEncoder()],
   ]);
 }
 
 export function getFeeTierDecoder(): FixedSizeDecoder<FeeTier> {
   return getStructDecoder([
-    ['marketCapLamportsThreshold', getU128Decoder()],
-    ['fees', getFeesDecoder()],
+    ["marketCapLamportsThreshold", getU128Decoder()],
+    ["fees", getFeesDecoder()],
   ]);
 }
 

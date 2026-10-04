@@ -1,10 +1,10 @@
 import type { TransactionSigner, Instruction, Address } from "@solana/kit";
 import { address } from "@solana/kit";
-import { createV2, mintAuthorityPda, validateCreateV2Params } from "../clients/create_v2";
+import { assertMintSigner, createV2, mintAuthorityPda, validateCreateV2Params } from "../clients/create_v2";
 import { buyV2 } from "../clients/trade_v2";
 import { createPump } from "../launch/session";
 import { fetchGlobal } from "../pumpsdk/generated/accounts/global";
-import { globalPda } from "../pda/pump";
+import { globalPda, holderRewardsPda } from "../pda/pump";
 import { buildCreateAtaInstruction } from "../utils/ata";
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../config/addresses";
 import { addSlippage, DEFAULT_SLIPPAGE_BPS, validateSlippage } from "../utils/slippage";
@@ -41,6 +41,7 @@ export interface MintWithFirstBuyInstructions {
 }
 
 export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<MintWithFirstBuyInstructions> {
+  assertMintSigner(params.mint);
   validateCreateV2Params(params);
   if (params.mintAuthority !== undefined && address(params.mintAuthority) !== await mintAuthorityPda()) {
     throw new Error("mintAuthority must be the program-derived mint authority; omit it for automatic derivation");
@@ -61,13 +62,14 @@ export async function mintWithFirstBuy(params: MintWithFirstBuyParams): Promise<
   if (params.firstBuyTokenAmount === undefined || params.firstBuyTokenAmount <= 0n || params.estimatedFirstBuyCost === undefined || params.estimatedFirstBuyCost <= 0n) {
     throw new Error("Provide firstBuyAmountSol or positive firstBuyTokenAmount and estimatedFirstBuyCost");
   }
-  const creator = address(params.bondingCurveCreator ?? params.user.address);
+  const creatorInput = address(params.bondingCurveCreator ?? params.user.address);
+  const creator = params.holderReward ? await holderRewardsPda(params.mint.address) : creatorInput;
   const global = (await fetchGlobal(params.rpc, await globalPda())).data;
   if (!global.createV2Enabled || (params.holderReward && !global.isHolderRewardEnabled)) throw new Error("Requested creation mode is disabled");
   const feeRecipient = address(params.feeRecipient ?? global.feeRecipient);
   const buybackFeeRecipient = params.buybackFeeRecipient ?? global.buybackFeeRecipients.find(value => value !== address("11111111111111111111111111111111"));
   if (!buybackFeeRecipient) throw new Error("No buyback fee recipient configured");
-  const createInstruction = await createV2({ ...params, creator });
+  const createInstruction = await createV2({ ...params, creator: creatorInput });
   const ataInstruction = await buildCreateAtaInstruction({ payer: params.user, owner: params.user, mint: params.mint.address, tokenProgram: TOKEN_2022_PROGRAM_ID });
   const buyInstruction = await buyV2({ user: params.user, mint: params.mint.address, rpc: params.rpc,
     bondingCurveCreator: creator, feeRecipient, buybackFeeRecipient, baseTokenProgram: TOKEN_2022_PROGRAM_ID,

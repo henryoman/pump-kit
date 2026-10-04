@@ -38,13 +38,17 @@ export async function bondingCurvePda(mint: Address | string): Promise<Address> 
 /**
  * Derives the ATA (Associated Token Account) for the bonding curve.
  * This is where the bonding curve holds its tokens.
- * Owner: bondingCurve, Mint: mint, TokenProgram: TOKEN_PROGRAM_ID
+ * Defaults to legacy SPL Token; pass Token-2022 for create_v2 coins.
  */
-export async function associatedBondingCurveAta(bondingCurve: Address | string, mint: Address | string): Promise<Address> {
+export async function associatedBondingCurveAta(
+  bondingCurve: Address | string,
+  mint: Address | string,
+  tokenProgram: Address | string = TOKEN_PROGRAM_ID,
+): Promise<Address> {
   const [address] = await findAssociatedTokenPda({
     owner: getAddress(bondingCurve),
     mint: getAddress(mint),
-    tokenProgram: getAddress(TOKEN_PROGRAM_ID),
+    tokenProgram: getAddress(tokenProgram),
   });
   return address;
 }
@@ -57,6 +61,15 @@ export async function creatorVaultPda(creator: Address | string): Promise<Addres
   const [address] = await getProgramDerivedAddress({
     programAddress: getAddress(PUMP_PROGRAM_ID),
     seeds: [enc.encode("creator-vault"), addressEncoder.encode(getAddress(creator))],
+  });
+  return address;
+}
+
+/** Effective creator for coins that permanently direct creator fees to holders. */
+export async function holderRewardsPda(mint: Address | string): Promise<Address> {
+  const [address] = await getProgramDerivedAddress({
+    programAddress: getAddress(PUMP_PROGRAM_ID),
+    seeds: [enc.encode("holder-rewards"), addressEncoder.encode(getAddress(mint))],
   });
   return address;
 }

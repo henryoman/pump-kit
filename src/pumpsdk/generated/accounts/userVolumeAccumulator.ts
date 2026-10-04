@@ -39,15 +39,14 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from '@solana/kit';
+} from "@solana/kit";
 
-export const USER_VOLUME_ACCUMULATOR_DISCRIMINATOR = new Uint8Array([
-  86, 255, 112, 14, 102, 53, 154, 250,
-]);
+export const USER_VOLUME_ACCUMULATOR_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([86, 255, 112, 14, 102, 53, 154, 250]);
 
-export function getUserVolumeAccumulatorDiscriminatorBytes() {
+export function getUserVolumeAccumulatorDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    USER_VOLUME_ACCUMULATOR_DISCRIMINATOR
+    USER_VOLUME_ACCUMULATOR_DISCRIMINATOR,
   );
 }
 
@@ -80,70 +79,73 @@ export type UserVolumeAccumulatorArgs = {
   totalStableCashbackClaimed: number | bigint;
 };
 
+/** Gets the encoder for {@link UserVolumeAccumulatorArgs} account data. */
 export function getUserVolumeAccumulatorEncoder(): FixedSizeEncoder<UserVolumeAccumulatorArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['user', getAddressEncoder()],
-      ['needsClaim', getBooleanEncoder()],
-      ['totalUnclaimedTokens', getU64Encoder()],
-      ['totalClaimedTokens', getU64Encoder()],
-      ['currentSolVolume', getU64Encoder()],
-      ['lastUpdateTimestamp', getI64Encoder()],
-      ['hasTotalClaimedTokens', getBooleanEncoder()],
-      ['cashbackEarned', getU64Encoder()],
-      ['totalCashbackClaimed', getU64Encoder()],
-      ['stableCashbackEarned', getU64Encoder()],
-      ['totalStableCashbackClaimed', getU64Encoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["user", getAddressEncoder()],
+      ["needsClaim", getBooleanEncoder()],
+      ["totalUnclaimedTokens", getU64Encoder()],
+      ["totalClaimedTokens", getU64Encoder()],
+      ["currentSolVolume", getU64Encoder()],
+      ["lastUpdateTimestamp", getI64Encoder()],
+      ["hasTotalClaimedTokens", getBooleanEncoder()],
+      ["cashbackEarned", getU64Encoder()],
+      ["totalCashbackClaimed", getU64Encoder()],
+      ["stableCashbackEarned", getU64Encoder()],
+      ["totalStableCashbackClaimed", getU64Encoder()],
     ]),
     (value) => ({
       ...value,
       discriminator: USER_VOLUME_ACCUMULATOR_DISCRIMINATOR,
-    })
+    }),
   );
 }
 
+/** Gets the decoder for {@link UserVolumeAccumulator} account data. */
 export function getUserVolumeAccumulatorDecoder(): FixedSizeDecoder<UserVolumeAccumulator> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['user', getAddressDecoder()],
-    ['needsClaim', getBooleanDecoder()],
-    ['totalUnclaimedTokens', getU64Decoder()],
-    ['totalClaimedTokens', getU64Decoder()],
-    ['currentSolVolume', getU64Decoder()],
-    ['lastUpdateTimestamp', getI64Decoder()],
-    ['hasTotalClaimedTokens', getBooleanDecoder()],
-    ['cashbackEarned', getU64Decoder()],
-    ['totalCashbackClaimed', getU64Decoder()],
-    ['stableCashbackEarned', getU64Decoder()],
-    ['totalStableCashbackClaimed', getU64Decoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["user", getAddressDecoder()],
+    ["needsClaim", getBooleanDecoder()],
+    ["totalUnclaimedTokens", getU64Decoder()],
+    ["totalClaimedTokens", getU64Decoder()],
+    ["currentSolVolume", getU64Decoder()],
+    ["lastUpdateTimestamp", getI64Decoder()],
+    ["hasTotalClaimedTokens", getBooleanDecoder()],
+    ["cashbackEarned", getU64Decoder()],
+    ["totalCashbackClaimed", getU64Decoder()],
+    ["stableCashbackEarned", getU64Decoder()],
+    ["totalStableCashbackClaimed", getU64Decoder()],
   ]);
 }
 
+/** Gets the codec for {@link UserVolumeAccumulator} account data. */
 export function getUserVolumeAccumulatorCodec(): FixedSizeCodec<
   UserVolumeAccumulatorArgs,
   UserVolumeAccumulator
 > {
   return combineCodec(
     getUserVolumeAccumulatorEncoder(),
-    getUserVolumeAccumulatorDecoder()
+    getUserVolumeAccumulatorDecoder(),
   );
 }
 
 export function decodeUserVolumeAccumulator<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress>,
 ): Account<UserVolumeAccumulator, TAddress>;
 export function decodeUserVolumeAccumulator<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+  encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<UserVolumeAccumulator, TAddress>;
 export function decodeUserVolumeAccumulator<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
+  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
 ):
   | Account<UserVolumeAccumulator, TAddress>
   | MaybeAccount<UserVolumeAccumulator, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getUserVolumeAccumulatorDecoder()
+    getUserVolumeAccumulatorDecoder(),
   );
 }
 
@@ -152,12 +154,12 @@ export async function fetchUserVolumeAccumulator<
 >(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<Account<UserVolumeAccumulator, TAddress>> {
   const maybeAccount = await fetchMaybeUserVolumeAccumulator(
     rpc,
     address,
-    config
+    config,
   );
   assertAccountExists(maybeAccount);
   return maybeAccount;
@@ -168,7 +170,7 @@ export async function fetchMaybeUserVolumeAccumulator<
 >(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
-  config?: FetchAccountConfig
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<UserVolumeAccumulator, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
   return decodeUserVolumeAccumulator(maybeAccount);
@@ -177,12 +179,12 @@ export async function fetchMaybeUserVolumeAccumulator<
 export async function fetchAllUserVolumeAccumulator(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<Account<UserVolumeAccumulator>[]> {
   const maybeAccounts = await fetchAllMaybeUserVolumeAccumulator(
     rpc,
     addresses,
-    config
+    config,
   );
   assertAccountsExist(maybeAccounts);
   return maybeAccounts;
@@ -191,11 +193,11 @@ export async function fetchAllUserVolumeAccumulator(
 export async function fetchAllMaybeUserVolumeAccumulator(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
-  config?: FetchAccountsConfig
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<UserVolumeAccumulator>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) =>
-    decodeUserVolumeAccumulator(maybeAccount)
+    decodeUserVolumeAccumulator(maybeAccount),
   );
 }
 

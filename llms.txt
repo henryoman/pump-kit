@@ -1,5 +1,5 @@
 # pump-kit
-> TypeScript SDK for Pump.fun built on Solana Kit 6.
+> TypeScript SDK for Pump.fun built on Solana Kit 8.4.
 
 Canonical docs: `README.md`
 Testing guide: `TESTING.md`
@@ -9,14 +9,26 @@ Machine-readable action registry: `metadata/actions-registry.json`
 Entry points:
 - `pump-kit` (full API)
 - `pump-kit/simple` (minimal API)
+- `pump-kit/launch` (launch sessions and low-level bonding-curve v2 instructions; excludes AMM swap builders)
+- `pump-kit/launch/store` (durable filesystem records for Node/Bun)
 
 Agent integration notes:
+- For launches with external swap routing, use `createPump` from `pump-kit/launch` and omit `firstBuy`.
+- Upload token metadata before preparing; provide its URI in the launch config.
+- A new coin's CA is its mint address. All launch APIs require your supplied mint signer and never generate a token address. Pass expectedMint as an optional mismatch guard; CLI requires --mint-keypair for setup/dry-run/run and accepts --mint-address as a guard or address-only preview.
+- Reuse the same mint keypair for preview, setup, dry-run, and run. Dry-run verifies signatures and never broadcasts; atomic mode requires an existing lookup table.
+- Supply a durable `saveRecord` callback before broadcast and reconcile uncertain signatures before any retry.
+- Set priority fees and instruction hooks on `PrepareLaunchOptions`; atomic first-buy simulation requires an active lookup table.
+- IDL provenance is recorded in `idl/manifest.json`; update with `bun run idl:update`.
 - Pass slippage in basis points (`slippageBps`), not percent.
 - For swap helpers, use either explicit lamport limits or estimate+`slippageBps` mode; do not mix modes.
 - JSON transports should encode bigint values as decimal strings and cast with `BigInt(...)` before calling SDK functions.
 - Provide `bondingCurveCreator`/`poolCreator` when known to avoid extra RPC lookups.
 
 High-value actions:
+- `createPump().launch.validate`, `.prepare`; session `.setup`, `.simulate`, `.send`
+- `createV2`, `buyV2`, `sellV2`, `buyExactQuoteInV2`
+- `reconcileLaunchRecord`, `createFileLaunchStore`
 - `curveBuy`, `curveSell`
 - `ammBuy`, `ammSell`
 - `addLiquidity`, `removeLiquidity`

@@ -18,6 +18,8 @@ import {
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
+  SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+  SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -30,24 +32,31 @@ import {
   type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
-  type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
-} from '@solana/kit';
-import { PUMP_AMM_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
 import {
-  expectAddress,
   getAccountMetaFactory,
-  type ResolvedAccount,
-} from '../shared';
+  getAddressFromResolvedInstructionAccount,
+  type InstructionAccountInput,
+  type InstructionAccountInputAddress,
+  type InstructionSignerInput,
+  type ResolvedInstructionAccount,
+  type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+  findBoostVaultAuthorityPda,
+  findEventAuthorityPda,
+  findGlobalConfigPda,
+} from "../pdas";
+import { PUMP_AMM_PROGRAM_ADDRESS } from "../programs";
 
-export const BOOST_BUY_AND_BURN_DISCRIMINATOR = new Uint8Array([
-  105, 68, 6, 175, 0, 7, 35, 162,
-]);
+export const BOOST_BUY_AND_BURN_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([105, 68, 6, 175, 0, 7, 35, 162]);
 
-export function getBoostBuyAndBurnDiscriminatorBytes() {
+export function getBoostBuyAndBurnDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    BOOST_BUY_AND_BURN_DISCRIMINATOR
+    BOOST_BUY_AND_BURN_DISCRIMINATOR,
   );
 }
 
@@ -129,19 +138,19 @@ export type BoostBuyAndBurnInstructionDataArgs = {
 export function getBoostBuyAndBurnInstructionDataEncoder(): FixedSizeEncoder<BoostBuyAndBurnInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['quoteAmountIn', getU64Encoder()],
-      ['minBaseAmountBurned', getU64Encoder()],
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["quoteAmountIn", getU64Encoder()],
+      ["minBaseAmountBurned", getU64Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: BOOST_BUY_AND_BURN_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: BOOST_BUY_AND_BURN_DISCRIMINATOR }),
   );
 }
 
 export function getBoostBuyAndBurnInstructionDataDecoder(): FixedSizeDecoder<BoostBuyAndBurnInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['quoteAmountIn', getU64Decoder()],
-    ['minBaseAmountBurned', getU64Decoder()],
+    ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["quoteAmountIn", getU64Decoder()],
+    ["minBaseAmountBurned", getU64Decoder()],
   ]);
 }
 
@@ -151,56 +160,63 @@ export function getBoostBuyAndBurnInstructionDataCodec(): FixedSizeCodec<
 > {
   return combineCodec(
     getBoostBuyAndBurnInstructionDataEncoder(),
-    getBoostBuyAndBurnInstructionDataDecoder()
+    getBoostBuyAndBurnInstructionDataDecoder(),
   );
 }
 
 export type BoostBuyAndBurnAsyncInput<
-  TAccountPool extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountBoostVaultAuthority extends string = string,
-  TAccountBoostVault extends string = string,
-  TAccountBaseTokenProgram extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBoostVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBoostVault extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  authority: TransactionSigner<TAccountAuthority>;
-  globalConfig?: Address<TAccountGlobalConfig>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
-  boostVaultAuthority?: Address<TAccountBoostVaultAuthority>;
-  boostVault?: Address<TAccountBoostVault>;
-  baseTokenProgram: Address<TAccountBaseTokenProgram>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  eventAuthority?: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  quoteAmountIn: BoostBuyAndBurnInstructionDataArgs['quoteAmountIn'];
-  minBaseAmountBurned: BoostBuyAndBurnInstructionDataArgs['minBaseAmountBurned'];
+  pool: TAccountPool;
+  authority: TAccountAuthority;
+  globalConfig?: TAccountGlobalConfig;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  poolBaseTokenAccount: TAccountPoolBaseTokenAccount;
+  poolQuoteTokenAccount: TAccountPoolQuoteTokenAccount;
+  boostVaultAuthority?: TAccountBoostVaultAuthority;
+  boostVault?: TAccountBoostVault;
+  baseTokenProgram: TAccountBaseTokenProgram;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  eventAuthority?: TAccountEventAuthority;
+  program: TAccountProgram;
+  quoteAmountIn: BoostBuyAndBurnInstructionDataArgs["quoteAmountIn"];
+  minBaseAmountBurned: BoostBuyAndBurnInstructionDataArgs["minBaseAmountBurned"];
 };
 
 export async function getBoostBuyAndBurnInstructionAsync<
-  TAccountPool extends string,
-  TAccountAuthority extends string,
-  TAccountGlobalConfig extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountBoostVaultAuthority extends string,
-  TAccountBoostVault extends string,
-  TAccountBaseTokenProgram extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput,
+  TAccountBoostVaultAuthority extends InstructionAccountInput,
+  TAccountBoostVault extends InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: BoostBuyAndBurnAsyncInput<
@@ -218,62 +234,137 @@ export async function getBoostBuyAndBurnInstructionAsync<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): Promise<
   BoostBuyAndBurnInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountAuthority,
-    TAccountGlobalConfig,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountBoostVaultAuthority,
-    TAccountBoostVault,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBoostVaultAuthority,
+      InstructionAccountInputAddress<TAccountBoostVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBoostVault,
+      InstructionAccountInputAddress<TAccountBoostVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
-    authority: { value: input.authority ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: true },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     boostVaultAuthority: {
       value: input.boostVaultAuthority ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    boostVault: { value: input.boostVault ?? null, isWritable: true },
+    boostVault: {
+      value: input.boostVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
@@ -281,142 +372,181 @@ export async function getBoostBuyAndBurnInstructionAsync<
 
   // Resolve default values.
   if (!accounts.globalConfig.value) {
-    accounts.globalConfig.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            103, 108, 111, 98, 97, 108, 95, 99, 111, 110, 102, 105, 103,
-          ])
-        ),
-      ],
-    });
+    accounts.globalConfig.value = await findGlobalConfigPda({ programAddress });
   }
   if (!accounts.boostVaultAuthority.value) {
-    accounts.boostVaultAuthority.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([98, 111, 111, 115, 116, 95, 118, 97, 117, 108, 116])
+    accounts.boostVaultAuthority.value = await findBoostVaultAuthorityPda(
+      {
+        pool: getAddressFromResolvedInstructionAccount(
+          "pool",
+          accounts.pool.value,
         ),
-        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
-      ],
-    });
+      },
+      { programAddress },
+    );
   }
   if (!accounts.boostVault.value) {
     accounts.boostVault.value = await getProgramDerivedAddress({
       programAddress:
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>,
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
         getAddressEncoder().encode(
-          expectAddress(accounts.boostVaultAuthority.value)
+          getAddressFromResolvedInstructionAccount(
+            "boostVaultAuthority",
+            accounts.boostVaultAuthority.value,
+          ),
         ),
         getAddressEncoder().encode(
-          expectAddress(accounts.quoteTokenProgram.value)
+          getAddressFromResolvedInstructionAccount(
+            "quoteTokenProgram",
+            accounts.quoteTokenProgram.value,
+          ),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.quoteMint.value)),
+        getAddressEncoder().encode(
+          getAddressFromResolvedInstructionAccount(
+            "quoteMint",
+            accounts.quoteMint.value,
+          ),
+        ),
       ],
     });
   }
   if (!accounts.eventAuthority.value) {
-    accounts.eventAuthority.value = await getProgramDerivedAddress({
+    accounts.eventAuthority.value = await findEventAuthorityPda({
       programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([
-            95, 95, 101, 118, 101, 110, 116, 95, 97, 117, 116, 104, 111, 114,
-            105, 116, 121,
-          ])
-        ),
-      ],
     });
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.boostVaultAuthority),
-      getAccountMeta(accounts.boostVault),
-      getAccountMeta(accounts.baseTokenProgram),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("poolBaseTokenAccount", accounts.poolBaseTokenAccount),
+      getAccountMeta("poolQuoteTokenAccount", accounts.poolQuoteTokenAccount),
+      getAccountMeta("boostVaultAuthority", accounts.boostVaultAuthority),
+      getAccountMeta("boostVault", accounts.boostVault),
+      getAccountMeta("baseTokenProgram", accounts.baseTokenProgram),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getBoostBuyAndBurnInstructionDataEncoder().encode(
-      args as BoostBuyAndBurnInstructionDataArgs
+      args as BoostBuyAndBurnInstructionDataArgs,
     ),
     programAddress,
   } as BoostBuyAndBurnInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountAuthority,
-    TAccountGlobalConfig,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountBoostVaultAuthority,
-    TAccountBoostVault,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBoostVaultAuthority,
+      InstructionAccountInputAddress<TAccountBoostVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBoostVault,
+      InstructionAccountInputAddress<TAccountBoostVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
 export type BoostBuyAndBurnInput<
-  TAccountPool extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountGlobalConfig extends string = string,
-  TAccountBaseMint extends string = string,
-  TAccountQuoteMint extends string = string,
-  TAccountPoolBaseTokenAccount extends string = string,
-  TAccountPoolQuoteTokenAccount extends string = string,
-  TAccountBoostVaultAuthority extends string = string,
-  TAccountBoostVault extends string = string,
-  TAccountBaseTokenProgram extends string = string,
-  TAccountQuoteTokenProgram extends string = string,
-  TAccountEventAuthority extends string = string,
-  TAccountProgram extends string = string,
+  TAccountPool extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBoostVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountBoostVault extends InstructionAccountInput = InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  pool: Address<TAccountPool>;
-  authority: TransactionSigner<TAccountAuthority>;
-  globalConfig: Address<TAccountGlobalConfig>;
-  baseMint: Address<TAccountBaseMint>;
-  quoteMint: Address<TAccountQuoteMint>;
-  poolBaseTokenAccount: Address<TAccountPoolBaseTokenAccount>;
-  poolQuoteTokenAccount: Address<TAccountPoolQuoteTokenAccount>;
-  boostVaultAuthority: Address<TAccountBoostVaultAuthority>;
-  boostVault: Address<TAccountBoostVault>;
-  baseTokenProgram: Address<TAccountBaseTokenProgram>;
-  quoteTokenProgram: Address<TAccountQuoteTokenProgram>;
-  eventAuthority: Address<TAccountEventAuthority>;
-  program: Address<TAccountProgram>;
-  quoteAmountIn: BoostBuyAndBurnInstructionDataArgs['quoteAmountIn'];
-  minBaseAmountBurned: BoostBuyAndBurnInstructionDataArgs['minBaseAmountBurned'];
+  pool: TAccountPool;
+  authority: TAccountAuthority;
+  globalConfig: TAccountGlobalConfig;
+  baseMint: TAccountBaseMint;
+  quoteMint: TAccountQuoteMint;
+  poolBaseTokenAccount: TAccountPoolBaseTokenAccount;
+  poolQuoteTokenAccount: TAccountPoolQuoteTokenAccount;
+  boostVaultAuthority: TAccountBoostVaultAuthority;
+  boostVault: TAccountBoostVault;
+  baseTokenProgram: TAccountBaseTokenProgram;
+  quoteTokenProgram: TAccountQuoteTokenProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  quoteAmountIn: BoostBuyAndBurnInstructionDataArgs["quoteAmountIn"];
+  minBaseAmountBurned: BoostBuyAndBurnInstructionDataArgs["minBaseAmountBurned"];
 };
 
 export function getBoostBuyAndBurnInstruction<
-  TAccountPool extends string,
-  TAccountAuthority extends string,
-  TAccountGlobalConfig extends string,
-  TAccountBaseMint extends string,
-  TAccountQuoteMint extends string,
-  TAccountPoolBaseTokenAccount extends string,
-  TAccountPoolQuoteTokenAccount extends string,
-  TAccountBoostVaultAuthority extends string,
-  TAccountBoostVault extends string,
-  TAccountBaseTokenProgram extends string,
-  TAccountQuoteTokenProgram extends string,
-  TAccountEventAuthority extends string,
-  TAccountProgram extends string,
+  TAccountPool extends InstructionAccountInput,
+  TAccountAuthority extends InstructionSignerInput,
+  TAccountGlobalConfig extends InstructionAccountInput,
+  TAccountBaseMint extends InstructionAccountInput,
+  TAccountQuoteMint extends InstructionAccountInput,
+  TAccountPoolBaseTokenAccount extends InstructionAccountInput,
+  TAccountPoolQuoteTokenAccount extends InstructionAccountInput,
+  TAccountBoostVaultAuthority extends InstructionAccountInput,
+  TAccountBoostVault extends InstructionAccountInput,
+  TAccountBaseTokenProgram extends InstructionAccountInput,
+  TAccountQuoteTokenProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof PUMP_AMM_PROGRAM_ADDRESS,
 >(
   input: BoostBuyAndBurnInput<
@@ -434,101 +564,214 @@ export function getBoostBuyAndBurnInstruction<
     TAccountEventAuthority,
     TAccountProgram
   >,
-  config?: { programAddress?: TProgramAddress }
+  config?: { programAddress?: TProgramAddress },
 ): BoostBuyAndBurnInstruction<
   TProgramAddress,
-  TAccountPool,
-  TAccountAuthority,
-  TAccountGlobalConfig,
-  TAccountBaseMint,
-  TAccountQuoteMint,
-  TAccountPoolBaseTokenAccount,
-  TAccountPoolQuoteTokenAccount,
-  TAccountBoostVaultAuthority,
-  TAccountBoostVault,
-  TAccountBaseTokenProgram,
-  TAccountQuoteTokenProgram,
-  TAccountEventAuthority,
-  TAccountProgram
+  ResolvedInstructionAccountMeta<
+    TAccountPool,
+    InstructionAccountInputAddress<TAccountPool>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAuthority,
+    InstructionAccountInputAddress<TAccountAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountGlobalConfig,
+    InstructionAccountInputAddress<TAccountGlobalConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseMint,
+    InstructionAccountInputAddress<TAccountBaseMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteMint,
+    InstructionAccountInputAddress<TAccountQuoteMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolBaseTokenAccount,
+    InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPoolQuoteTokenAccount,
+    InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBoostVaultAuthority,
+    InstructionAccountInputAddress<TAccountBoostVaultAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBoostVault,
+    InstructionAccountInputAddress<TAccountBoostVault>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountBaseTokenProgram,
+    InstructionAccountInputAddress<TAccountBaseTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountQuoteTokenProgram,
+    InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
+  >
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PUMP_AMM_PROGRAM_ADDRESS;
 
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
   // Original accounts.
   const originalAccounts = {
-    pool: { value: input.pool ?? null, isWritable: false },
-    authority: { value: input.authority ?? null, isWritable: true },
-    globalConfig: { value: input.globalConfig ?? null, isWritable: false },
-    baseMint: { value: input.baseMint ?? null, isWritable: true },
-    quoteMint: { value: input.quoteMint ?? null, isWritable: false },
+    pool: { value: input.pool ?? null, isSigner: false, isWritable: false },
+    authority: {
+      value: input.authority ?? null,
+      isSigner: true,
+      isWritable: true,
+    },
+    globalConfig: {
+      value: input.globalConfig ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    baseMint: {
+      value: input.baseMint ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    quoteMint: {
+      value: input.quoteMint ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     poolBaseTokenAccount: {
       value: input.poolBaseTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     poolQuoteTokenAccount: {
       value: input.poolQuoteTokenAccount ?? null,
+      isSigner: false,
       isWritable: true,
     },
     boostVaultAuthority: {
       value: input.boostVaultAuthority ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    boostVault: { value: input.boostVault ?? null, isWritable: true },
+    boostVault: {
+      value: input.boostVault ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     baseTokenProgram: {
       value: input.baseTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
     quoteTokenProgram: {
       value: input.quoteTokenProgram ?? null,
+      isSigner: false,
       isWritable: false,
     },
-    eventAuthority: { value: input.eventAuthority ?? null, isWritable: false },
-    program: { value: input.program ?? null, isWritable: false },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
-    ResolvedAccount
+    ResolvedInstructionAccount
   >;
 
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.globalConfig),
-      getAccountMeta(accounts.baseMint),
-      getAccountMeta(accounts.quoteMint),
-      getAccountMeta(accounts.poolBaseTokenAccount),
-      getAccountMeta(accounts.poolQuoteTokenAccount),
-      getAccountMeta(accounts.boostVaultAuthority),
-      getAccountMeta(accounts.boostVault),
-      getAccountMeta(accounts.baseTokenProgram),
-      getAccountMeta(accounts.quoteTokenProgram),
-      getAccountMeta(accounts.eventAuthority),
-      getAccountMeta(accounts.program),
+      getAccountMeta("pool", accounts.pool),
+      getAccountMeta("authority", accounts.authority),
+      getAccountMeta("globalConfig", accounts.globalConfig),
+      getAccountMeta("baseMint", accounts.baseMint),
+      getAccountMeta("quoteMint", accounts.quoteMint),
+      getAccountMeta("poolBaseTokenAccount", accounts.poolBaseTokenAccount),
+      getAccountMeta("poolQuoteTokenAccount", accounts.poolQuoteTokenAccount),
+      getAccountMeta("boostVaultAuthority", accounts.boostVaultAuthority),
+      getAccountMeta("boostVault", accounts.boostVault),
+      getAccountMeta("baseTokenProgram", accounts.baseTokenProgram),
+      getAccountMeta("quoteTokenProgram", accounts.quoteTokenProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getBoostBuyAndBurnInstructionDataEncoder().encode(
-      args as BoostBuyAndBurnInstructionDataArgs
+      args as BoostBuyAndBurnInstructionDataArgs,
     ),
     programAddress,
   } as BoostBuyAndBurnInstruction<
     TProgramAddress,
-    TAccountPool,
-    TAccountAuthority,
-    TAccountGlobalConfig,
-    TAccountBaseMint,
-    TAccountQuoteMint,
-    TAccountPoolBaseTokenAccount,
-    TAccountPoolQuoteTokenAccount,
-    TAccountBoostVaultAuthority,
-    TAccountBoostVault,
-    TAccountBaseTokenProgram,
-    TAccountQuoteTokenProgram,
-    TAccountEventAuthority,
-    TAccountProgram
+    ResolvedInstructionAccountMeta<
+      TAccountPool,
+      InstructionAccountInputAddress<TAccountPool>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAuthority,
+      InstructionAccountInputAddress<TAccountAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountGlobalConfig,
+      InstructionAccountInputAddress<TAccountGlobalConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseMint,
+      InstructionAccountInputAddress<TAccountBaseMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteMint,
+      InstructionAccountInputAddress<TAccountQuoteMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolBaseTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolBaseTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPoolQuoteTokenAccount,
+      InstructionAccountInputAddress<TAccountPoolQuoteTokenAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBoostVaultAuthority,
+      InstructionAccountInputAddress<TAccountBoostVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBoostVault,
+      InstructionAccountInputAddress<TAccountBoostVault>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountBaseTokenProgram,
+      InstructionAccountInputAddress<TAccountBaseTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountQuoteTokenProgram,
+      InstructionAccountInputAddress<TAccountQuoteTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
   >);
 }
 
@@ -561,11 +804,16 @@ export function parseBoostBuyAndBurnInstruction<
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
-    InstructionWithData<ReadonlyUint8Array>
+    InstructionWithData<ReadonlyUint8Array>,
 ): ParsedBoostBuyAndBurnInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 13) {
-    // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new SolanaError(
+      SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+      {
+        actualAccountMetas: instruction.accounts.length,
+        expectedAccountMetas: 13,
+      },
+    );
   }
   let accountIndex = 0;
   const getNextAccount = () => {

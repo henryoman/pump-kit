@@ -1,6 +1,6 @@
 import { createLaunchLookupTable } from "../launch/lookup_table";
 import type { Address, Instruction, TransactionSigner } from "@solana/kit";
-import { generateKeyPairSigner } from "@solana/signers";
+import { assertMintSigner } from "../clients/create_v2";
 
 import type { RpcClient, RpcSubscriptionsClient } from "../config/connection";
 import { getDefaultCommitment } from "../config/commitment";
@@ -31,7 +31,7 @@ export interface CreateAndBuyOptions {
   feeRecipient?: string;
   bondingCurveCreator?: string;
   mintAuthority?: string;
-  mint?: TransactionSigner;
+  mint: TransactionSigner;
   addressLookupTables?: Record<string, readonly Address[]>;
   priorityFees?: PriorityFeeOptions;
   prependInstructions?: readonly Instruction[];
@@ -71,7 +71,8 @@ export async function createAndBuy(options: CreateAndBuyOptions): Promise<Create
     rpcSubscriptions,
   } = options;
 
-  const mintSigner = providedMint ?? (await generateKeyPairSigner());
+  assertMintSigner(providedMint);
+  const mintSigner = providedMint;
 
   const mintParams: MintWithFirstBuyParams = {
     user: creator,

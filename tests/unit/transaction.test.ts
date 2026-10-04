@@ -10,6 +10,7 @@ import {
   sendAndConfirmTransaction,
   TransactionExecutionError,
   simulateTransaction,
+  buildPriorityFeeInstructions,
 } from "../../src/utils/transaction";
 import type { Commitment } from "@solana/rpc-types";
 
@@ -35,6 +36,16 @@ function createMockRpc() {
 }
 
 describe("transaction utilities", () => {
+  test("rejects invalid priority fees before constructing instructions", () => {
+    for (const computeUnitLimit of [-1, 1.5, NaN, Infinity, 1400001]) {
+      expect(() => buildPriorityFeeInstructions({ computeUnitLimit })).toThrow("computeUnitLimit");
+    }
+    for (const computeUnitPriceMicroLamports of [-1, -1n, NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, 18446744073709551616n, "100"]) {
+      expect(() => buildPriorityFeeInstructions({ computeUnitPriceMicroLamports } as any)).toThrow("computeUnitPriceMicroLamports");
+    }
+    expect(buildPriorityFeeInstructions({ computeUnitLimit: 0, computeUnitPriceMicroLamports: 0n })).toEqual([]);
+    expect(buildPriorityFeeInstructions({ computeUnitLimit: 1400000, computeUnitPriceMicroLamports: 18446744073709551615n })).toHaveLength(2);
+  });
   test("buildTransaction attaches fee payer signer and lifetime", async () => {
     const signer = await generateKeyPairSigner();
     const mockRpc = createMockRpc();

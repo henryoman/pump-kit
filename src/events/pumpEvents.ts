@@ -1,6 +1,6 @@
 import { address } from "@solana/kit";
 import type { Address, Commitment } from "@solana/kit";
-import type { RpcSubscriptions, LogsNotificationsApi } from "@solana/rpc-subscriptions";
+import type { RpcSubscriptions, LogsNotificationsApi } from "@solana/kit";
 
 export type PumpLogsSubscriptions = RpcSubscriptions<LogsNotificationsApi>;
 import { PUMP_PROGRAM_ID } from "../config/addresses";

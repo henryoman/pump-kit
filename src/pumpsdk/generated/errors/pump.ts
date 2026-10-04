@@ -11,8 +11,8 @@ import {
   type Address,
   type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type SolanaError,
-} from '@solana/kit';
-import { PUMP_PROGRAM_ADDRESS } from '../programs';
+} from "@solana/kit";
+import { PUMP_PROGRAM_ADDRESS } from "../programs";
 
 /** NotAuthorized: The given account is not authorized to execute this instruction. */
 export const PUMP_ERROR__NOT_AUTHORIZED = 0x1770; // 6000
@@ -300,7 +300,7 @@ export type PumpError =
   | typeof PUMP_ERROR__WRONG_BUYBACK_FEE_RECIPIENTS_COUNT;
 
 let pumpErrorMessages: Record<PumpError, string> | undefined;
-if (process.env.NODE_ENV !== 'production') {
+if (process.env["NODE_ENV"] !== "production") {
   pumpErrorMessages = {
     [PUMP_ERROR__ACCOUNT_TYPE_NOT_SUPPORTED]: `Account type not supported`,
     [PUMP_ERROR__ALL_BUYBACK_FEE_RECIPIENTS_SHOULD_BE_NON_ZERO]: ``,
@@ -400,11 +400,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export function getPumpErrorMessage(code: PumpError): string {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env["NODE_ENV"] !== "production") {
     return (pumpErrorMessages as Record<PumpError, string>)[code];
   }
 
-  return 'Error message not available in production bundles.';
+  return "Error message not available in production bundles.";
 }
 
 export function isPumpError<TProgramErrorCode extends PumpError>(
@@ -412,13 +412,13 @@ export function isPumpError<TProgramErrorCode extends PumpError>(
   transactionMessage: {
     instructions: Record<number, { programAddress: Address }>;
   },
-  code?: TProgramErrorCode
+  code?: TProgramErrorCode,
 ): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> &
   Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
   return isProgramError<TProgramErrorCode>(
     error,
     transactionMessage,
     PUMP_PROGRAM_ADDRESS,
-    code
+    code,
   );
 }
